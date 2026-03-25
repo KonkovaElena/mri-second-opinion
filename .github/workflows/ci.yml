@@ -1,0 +1,46 @@
+name: ci
+
+on:
+  push:
+    paths:
+      - 'package.json'
+      - 'package-lock.json'
+      - 'tsconfig.json'
+      - '.env.example'
+      - 'src/**'
+      - 'tests/**'
+      - '.github/workflows/ci.yml'
+  pull_request:
+    paths:
+      - 'package.json'
+      - 'package-lock.json'
+      - 'tsconfig.json'
+      - '.env.example'
+      - 'src/**'
+      - 'tests/**'
+      - '.github/workflows/ci.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  install-and-build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Build
+        run: npm run build
+
+      - name: Test
+        run: npm test

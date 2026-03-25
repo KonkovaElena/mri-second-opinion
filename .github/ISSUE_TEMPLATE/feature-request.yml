@@ -1,0 +1,45 @@
+name: Feature request
+description: Propose a scoped improvement that stays within the MRI standalone boundary.
+title: "[Feature]: "
+labels:
+  - enhancement
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Keep requests aligned with the MRI-only scope and the conservative launch posture described in `README.md` and `docs/scope-lock.md`.
+  - type: textarea
+    id: problem
+    attributes:
+      label: Problem to solve
+      description: What concrete workflow or contributor problem needs to be solved?
+    validations:
+      required: true
+  - type: textarea
+    id: proposed-change
+    attributes:
+      label: Proposed change
+      description: Describe the smallest sound change you want.
+    validations:
+      required: true
+  - type: textarea
+    id: boundaries
+    attributes:
+      label: Scope and non-goals
+      description: What should explicitly stay out of scope?
+    validations:
+      required: true
+  - type: textarea
+    id: evidence
+    attributes:
+      label: Supporting evidence or references
+      description: Link docs, prior issues, or external references that justify the request.
+  - type: checkboxes
+    id: confirmations
+    attributes:
+      label: Confirmations
+      options:
+        - label: I checked that this request does not require autonomous diagnosis claims.
+          required: true
+        - label: I checked the current docs to make sure this is not already planned or intentionally excluded.
+          required: true

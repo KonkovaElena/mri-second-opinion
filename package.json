@@ -1,0 +1,38 @@
+{
+  "name": "mri-second-opinion",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Clinician-in-the-loop MRI second-opinion workflow baseline with a standalone TypeScript API and restart-safe local persistence",
+  "license": "MIT",
+  "type": "commonjs",
+  "keywords": [
+    "mri",
+    "medical-imaging",
+    "radiology",
+    "second-opinion",
+    "clinical-review",
+    "typescript",
+    "nodejs",
+    "express",
+    "workflow-orchestration",
+    "research-use-only"
+  ],
+  "engines": {
+    "node": ">=22"
+  },
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "test": "node --import tsx --test tests/**/*.test.ts",
+    "start": "node dist/index.js",
+    "dev": "tsx watch src/index.ts"
+  },
+  "dependencies": {
+    "express": "^4.21.2"
+  },
+  "devDependencies": {
+    "@types/express": "^5.0.1",
+    "@types/node": "^22.13.10",
+    "tsx": "^4.19.3",
+    "typescript": "^5.8.2"
+  }
+}

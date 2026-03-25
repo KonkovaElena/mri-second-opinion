@@ -1,0 +1,133 @@
+name: docs-governance
+
+on:
+  push:
+    paths:
+      - 'README.md'
+      - 'LICENSE'
+      - 'CODE_OF_CONDUCT.md'
+      - 'SUPPORT.md'
+      - 'GOVERNANCE.md'
+      - 'SECURITY.md'
+      - 'CONTRIBUTING.md'
+      - 'docs/**'
+      - '.github/ISSUE_TEMPLATE/**'
+      - '.github/dependabot.yml'
+      - '.github/PULL_REQUEST_TEMPLATE.md'
+      - '.github/workflows/docs-governance.yml'
+  pull_request:
+    paths:
+      - 'README.md'
+      - 'LICENSE'
+      - 'CODE_OF_CONDUCT.md'
+      - 'SUPPORT.md'
+      - 'GOVERNANCE.md'
+      - 'SECURITY.md'
+      - 'CONTRIBUTING.md'
+      - 'docs/**'
+      - '.github/ISSUE_TEMPLATE/**'
+      - '.github/dependabot.yml'
+      - '.github/PULL_REQUEST_TEMPLATE.md'
+      - '.github/workflows/docs-governance.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  verify-doc-surfaces:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Verify required root files
+        run: |
+          test -f README.md
+          test -f LICENSE
+          test -f CODE_OF_CONDUCT.md
+          test -f SUPPORT.md
+          test -f GOVERNANCE.md
+          test -f SECURITY.md
+          test -f CONTRIBUTING.md
+
+      - name: Verify contributor-intake files
+        run: |
+          test -f .github/ISSUE_TEMPLATE/bug-report.yml
+          test -f .github/ISSUE_TEMPLATE/feature-request.yml
+          test -f .github/ISSUE_TEMPLATE/docs-scope.yml
+          test -f .github/ISSUE_TEMPLATE/config.yml
+          test -f .github/PULL_REQUEST_TEMPLATE.md
+          test -f .github/dependabot.yml
+
+      - name: Verify required docs files
+        run: |
+          test -f docs/scope-lock.md
+          test -f docs/status-model.md
+          test -f docs/api-scope.md
+          test -f docs/architecture/overview.md
+          test -f docs/launch-readiness-checklist.md
+          test -f docs/verification/launch-evidence-index.md
+          test -f docs/demo/demo-script.md
+          test -f docs/releases/v1-go-no-go.md
+          test -f docs/releases/github-publication-playbook.md
+          test -f docs/releases/github-go-live-checklist.md
+          test -f docs/releases/github-metadata-copy.md
+          test -f docs/releases/github-settings-worksheet.md
+          test -f docs/releases/github-live-publication-sequence.md
+          test -f docs/releases/first-public-announcement-draft.md
+          test -f docs/releases/github-operator-packet.md
+          test -f docs/demo/social-preview-brief.md
+          test -f docs/verification/hosted-evidence-capture-template.md
+
+      - name: Verify README launch links
+        run: |
+          grep -q 'docs/launch-readiness-checklist.md' README.md
+          grep -q 'docs/verification/launch-evidence-index.md' README.md
+          grep -q 'docs/demo/demo-script.md' README.md
+          grep -q 'docs/releases/v1-go-no-go.md' README.md
+          grep -q 'docs/releases/github-publication-playbook.md' README.md
+          grep -q 'docs/releases/github-go-live-checklist.md' README.md
+          grep -q 'docs/releases/github-metadata-copy.md' README.md
+          grep -q 'docs/releases/github-settings-worksheet.md' README.md
+          grep -q 'docs/releases/github-live-publication-sequence.md' README.md
+          grep -q 'docs/releases/first-public-announcement-draft.md' README.md
+          grep -q 'docs/releases/github-operator-packet.md' README.md
+          grep -q 'docs/demo/social-preview-brief.md' README.md
+          grep -q 'docs/verification/hosted-evidence-capture-template.md' README.md
+          grep -q 'SUPPORT.md' README.md
+          grep -q 'GOVERNANCE.md' README.md
+
+      - name: Verify public safety language
+        run: |
+          grep -q 'clinician-in-the-loop' README.md
+          grep -q 'autonomous diagnostic system' README.md
+          grep -q 'NOT_READY' docs/releases/v1-go-no-go.md
+
+      - name: Reject parent-only evidence references
+        run: |
+          ! grep -R -n 'docs/superpowers/specs/' README.md docs .github || exit 1
+          ! grep -R -n '(parent)' README.md docs .github || exit 1
+
+      - name: Verify markdown links resolve locally
+        run: |
+          python - <<'PY'
+          import pathlib, re, sys
+          root = pathlib.Path('.')
+          files = [root / 'README.md', *root.glob('docs/**/*.md'), *root.glob('.github/**/*.md')]
+          pattern = re.compile(r'\[[^\]]+\]\(([^)]+)\)')
+          missing = []
+          for file in files:
+              text = file.read_text(encoding='utf-8')
+              for target in pattern.findall(text):
+                  if target.startswith(('http://', 'https://', '#', 'mailto:')):
+                      continue
+                  clean = target.split('#', 1)[0].strip()
+                  if not clean:
+                      continue
+                  resolved = (file.parent / clean).resolve()
+                  if not resolved.exists():
+                      missing.append(f'{file}:{target}')
+          if missing:
+              print('\n'.join(missing))
+              sys.exit(1)
+          PY

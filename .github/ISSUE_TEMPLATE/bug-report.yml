@@ -1,0 +1,75 @@
+name: Bug report
+description: Report a reproducible runtime, verification, or documentation defect in MRI Standalone
+title: "[Bug]: "
+labels:
+  - bug
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Use this form for reproducible defects in MRI Standalone.
+
+        Do not report active security vulnerabilities here. Follow `SECURITY.md` instead.
+  - type: textarea
+    id: summary
+    attributes:
+      label: Summary
+      description: What is broken?
+      placeholder: Concise description of the defect.
+    validations:
+      required: true
+  - type: textarea
+    id: reproduction
+    attributes:
+      label: Reproduction steps
+      description: Exact steps, commands, or requests needed to reproduce the issue.
+      placeholder: |
+        1. Run ...
+        2. Call ...
+        3. Observe ...
+    validations:
+      required: true
+  - type: textarea
+    id: expected
+    attributes:
+      label: Expected behavior
+    validations:
+      required: true
+  - type: textarea
+    id: actual
+    attributes:
+      label: Actual behavior
+    validations:
+      required: true
+  - type: dropdown
+    id: surface
+    attributes:
+      label: Affected surface
+      options:
+        - Runtime API
+        - Durable state or persistence
+        - CI or verification
+        - Documentation or release evidence
+        - Contributor workflow
+    validations:
+      required: true
+  - type: textarea
+    id: evidence
+    attributes:
+      label: Evidence
+      description: Paste logs, failing output, screenshots, or route examples without secrets or PHI.
+  - type: input
+    id: environment
+    attributes:
+      label: Environment
+      description: OS, Node version, and any other relevant environment details.
+      placeholder: Windows 11, Node 22.x
+  - type: checkboxes
+    id: safety
+    attributes:
+      label: Safety checks
+      options:
+        - label: I did not include PHI, secrets, or real clinical data.
+          required: true
+        - label: I checked `README.md`, `CONTRIBUTING.md`, and relevant docs before filing.
+          required: true

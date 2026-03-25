@@ -1,0 +1,101 @@
+import {
+  closeSync,
+  existsSync,
+  mkdirSync,
+  openSync,
+  readFileSync,
+  renameSync,
+  unlinkSync,
+  writeFileSync,
+} from "node:fs";
+import { dirname } from "node:path";
+import { randomUUID } from "node:crypto";
+import type { CaseRecord, PersistedCaseSnapshot } from "./cases";
+
+function cloneCase<T>(value: T): T {
+  return JSON.parse(JSON.stringify(value)) as T;
+}
+
+export function loadPersistedCaseSnapshot(snapshotFilePath?: string) {
+  if (!snapshotFilePath || !existsSync(snapshotFilePath)) {
+    return {
+      revision: 0,
+      cases: [] as CaseRecord[],
+    };
+  }
+
+  const raw = readFileSync(snapshotFilePath, "utf8");
+  if (raw.trim().length === 0) {
+    return {
+      revision: 0,
+      cases: [] as CaseRecord[],
+    };
+  }
+
+  const parsed = JSON.parse(raw) as PersistedCaseSnapshot;
+  if (parsed.version !== "0.1.0" || typeof parsed.revision !== "number" || !Array.isArray(parsed.cases)) {
+    throw new Error(`Invalid case snapshot format in ${snapshotFilePath}`);
+  }
+
+  return {
+    revision: parsed.revision,
+    cases: parsed.cases.map((caseRecord) => ({
+      ...caseRecord,
+      lastInferenceFingerprint: caseRecord.lastInferenceFingerprint ?? null,
+    })),
+  };
+}
+
+export function savePersistedCaseSnapshot(
+  snapshotFilePath: string | undefined,
+  currentRevision: number,
+  cases: Iterable<CaseRecord>,
+) {
+  if (!snapshotFilePath) {
+    return currentRevision;
+  }
+
+  const directory = dirname(snapshotFilePath);
+  const lockFile = `${snapshotFilePath}.lock`;
+  let lockHandle: number | null = null;
+
+  mkdirSync(directory, { recursive: true });
+
+  try {
+    lockHandle = openSync(lockFile, "wx");
+  } catch {
+    throw new Error(`Case store is busy for ${snapshotFilePath}`);
+  }
+
+  try {
+    if (existsSync(snapshotFilePath)) {
+      const currentRaw = readFileSync(snapshotFilePath, "utf8");
+      if (currentRaw.trim().length > 0) {
+        const currentSnapshot = JSON.parse(currentRaw) as PersistedCaseSnapshot;
+        if (currentSnapshot.revision !== currentRevision) {
+          throw new Error(`Concurrent case store modification detected for ${snapshotFilePath}`);
+        }
+      } else if (currentRevision !== 0) {
+        throw new Error(`Concurrent case store modification detected for ${snapshotFilePath}`);
+      }
+    } else if (currentRevision !== 0) {
+      throw new Error(`Concurrent case store modification detected for ${snapshotFilePath}`);
+    }
+
+    const snapshot: PersistedCaseSnapshot = {
+      version: "0.1.0",
+      revision: currentRevision + 1,
+      cases: Array.from(cases, (caseRecord) => cloneCase(caseRecord)),
+    };
+    const tmpFile = `${snapshotFilePath}.${process.pid}.${randomUUID()}.tmp`;
+
+    writeFileSync(tmpFile, JSON.stringify(snapshot, null, 2), "utf8");
+    renameSync(tmpFile, snapshotFilePath);
+    return snapshot.revision;
+  } finally {
+    if (lockHandle !== null) {
+      closeSync(lockHandle);
+    }
+    unlinkSync(lockFile);
+  }
+}
