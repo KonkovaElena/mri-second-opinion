@@ -140,8 +140,8 @@ jobs:
 
       - name: Reject parent-only evidence references
         run: |
-          ! grep -R -n 'docs/superpowers/specs/' README.md docs .github || exit 1
-          ! grep -R -n '(parent)' README.md docs .github || exit 1
+          ! grep -R -n --exclude='docs-governance.yml' 'docs/superpowers/specs/' README.md docs .github || exit 1
+          ! grep -R -n --exclude='docs-governance.yml' '(parent)' README.md docs .github || exit 1
 
       - name: Verify markdown links resolve locally
         run: |
