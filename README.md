@@ -54,7 +54,7 @@ The standalone repository still does not provide:
 4. OHIF or other frontend review surfaces
 5. a real Python worker path for QC and MRI processing
 6. demo closure or launch-ready evidence
-7. hosted GitHub Actions success history recorded inside the repository evidence pack
+7. main-branch GitHub-hosted CI build and test evidence recorded inside the repository evidence pack
 
 ## Quick Start
 
@@ -71,11 +71,11 @@ Use this quick start to verify the current baseline only.
 
 It does not prove a launch-ready product, a hosted deployment path, or a full MRI review stack.
 
-The repository includes a standalone `.github/workflows/ci.yml`, but until hosted runs exist and are captured in `docs/verification/launch-evidence-index.md`, CI should be treated as configured rather than evidenced.
+The repository includes standalone `.github/workflows/ci.yml` and `.github/workflows/docs-governance.yml` workflows. Hosted docs-governance evidence now exists, but main-branch CI build and test evidence still needs to be recorded in `docs/verification/launch-evidence-index.md`.
 
 ## Community Health
 
-Public publication is being prepared conservatively.
+Public publication is live and intentionally conservative.
 
 Use these repository-health files when contributing or evaluating readiness:
 

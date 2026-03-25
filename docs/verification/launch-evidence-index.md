@@ -8,9 +8,18 @@ Every claim about launch readiness should link back to one or more artifacts lis
 
 - Current verdict: `NOT_READY`
 - Last reviewed: 2026-03-25
+- Public repository: `https://github.com/KonkovaElena/mri-second-opinion`
 - Auditor handoff: `docs/verification/ai-auditor-handoff-2026-03-25.md`
 - Repository audit: `docs/verification/repository-audit-2026-03-25.md`
 - Hosted evidence scaffold: `docs/verification/hosted-evidence-capture-template.md`
+
+## Hosted Workflow Snapshot
+
+Recorded hosted evidence today:
+
+1. `docs-governance` succeeded on GitHub-hosted runners for commit `1eac899` on 2026-03-25:
+  `https://github.com/KonkovaElena/mri-second-opinion/actions/runs/23555671232`
+2. main-branch `ci` build and test evidence is still pending capture in this index
 
 ## Priority Tracks
 
@@ -58,6 +67,9 @@ Required artifacts:
 Record:
 
 - Status: partial
+- Hosted note:
+  - docs-governance hosted publication check is green on `1eac899`
+  - main-branch `ci` install, build, and test proof is still pending capture
 - Artifact links:
   - `package.json`
   - `package-lock.json`
@@ -149,7 +161,11 @@ Required artifacts:
 
 Record:
 
-- Status: in progress
+- Status: partial
+- Hosted note:
+  - `docs-governance` GitHub-hosted proof: `https://github.com/KonkovaElena/mri-second-opinion/actions/runs/23555671232`
+  - public repository is live with About metadata applied
+  - main-branch `ci` evidence is still missing from this ledger
 - Artifact links:
   - `README.md`
   - `LICENSE`

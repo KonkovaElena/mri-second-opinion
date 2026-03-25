@@ -77,7 +77,7 @@ Primary evidence:
 
 The most defensible stage label today is:
 
-`runtime scaffold with target-operating architecture, pre-MVP`
+`workflow-capable local runtime baseline with target-operating architecture, pre-MVP`
 
 ### Why this stage label fits
 
@@ -85,10 +85,10 @@ Because all of the following are simultaneously true:
 
 1. the subtree has its own `package.json`, `tsconfig.json`, `.env.example`, source files, and GitHub workflow
 2. the TypeScript service builds and starts
-3. only scaffold-grade runtime endpoints are actually implemented in code
-4. the package currently exposes only `build`, `start`, and `dev` scripts and does not expose an automated test entrypoint
-5. the declared public workflow API remains design-level rather than implemented runtime behavior
-6. the architecture and release docs are much more mature than the current code path
+3. a baseline workflow and operations HTTP surface is actually implemented in code
+4. the package exposes `build`, `test`, `start`, and `dev` scripts
+5. the higher readiness surfaces remain open: durable database state, queue execution, frontend closure, worker closure, and demo evidence
+6. the architecture and release docs are still broader than the currently implemented runtime envelope
 
 ## Verified Runtime Facts
 
@@ -109,17 +109,17 @@ Observed facts:
 3. Node engine floor is `>=22`
 4. repository is still marked `private: true`
 5. build command is `tsc -p tsconfig.json`
-6. runtime command is `node dist/index.js`
-7. development command is `tsx watch src/index.ts`
-8. no automated test script is declared in `package.json`
+6. test command is `node --import tsx --test tests/**/*.test.ts`
+7. runtime command is `node dist/index.js`
+8. development command is `tsx watch src/index.ts`
 
 Important nuance:
 
-No `tests/` directory is currently present in the subtree and no test runner entrypoint is declared in the package manifest.
+The subtree includes a `tests/` directory and an automated test entrypoint, which materially strengthens the local runtime baseline compared with a pure scaffold.
 
-That is a material maturity signal and should not be inferred away by the strength of the surrounding documentation pack.
+It does not, by itself, prove higher readiness or GitHub-hosted main-branch CI evidence.
 
-### 2. Implemented HTTP surface is scaffold-only
+### 2. Implemented HTTP surface is workflow-baseline, not product-complete
 
 Evidence:
 
@@ -132,12 +132,23 @@ Implemented endpoints visible in code:
 2. `GET /healthz`
 3. `GET /readyz`
 4. `GET /metrics`
+5. `POST /api/cases`
+6. `GET /api/cases`
+7. `GET /api/cases/:caseId`
+8. `POST /api/cases/:caseId/review`
+9. `POST /api/cases/:caseId/finalize`
+10. `GET /api/cases/:caseId/report`
+11. `GET /api/operations/summary`
+12. `POST /api/delivery/:caseId/retry`
+13. `POST /api/internal/ingest`
+14. `POST /api/internal/inference-callback`
+15. `POST /api/internal/delivery-callback`
 
 Important nuance:
 
-The root endpoint explicitly says the service is a scaffold and that workflow routes are not implemented yet.
+The root endpoint still identifies the service as a `wave1-api` baseline.
 
-That is a strong honesty signal.
+That is a strong honesty signal, but it no longer means that workflow routes are absent.
 
 ### 3. Standalone CI workflow exists
 
@@ -153,7 +164,7 @@ Observed facts:
 
 Important nuance:
 
-The repository docs say CI presence exists, but recorded passing GitHub-hosted evidence is not yet preserved as an artifact in the docs pack.
+The repository now has recorded passing GitHub-hosted `docs-governance` evidence, but main-branch `ci` build and test evidence is still not preserved as an artifact in the docs pack.
 
 ## Design-Declared But Not Runtime-Implemented Yet
 

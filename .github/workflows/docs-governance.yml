@@ -1,6 +1,7 @@
 name: docs-governance
 
 on:
+  workflow_dispatch:
   push:
     paths:
       - 'package.json'

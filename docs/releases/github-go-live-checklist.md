@@ -30,23 +30,28 @@ Use it in two passes:
 
 ## Phase 2. First push to GitHub
 
-- [ ] create or publish the standalone repository
-- [ ] enable GitHub Actions
-- [ ] verify Issues are enabled
+- [x] create or publish the standalone repository
+- [x] enable GitHub Actions
+- [x] verify Issues are enabled
 - [ ] confirm issue-form chooser shows bug, feature, and docs or scope templates
 - [ ] confirm Security tab or private reporting route is configured as documented
 - [ ] upload social preview asset
-- [ ] set About description
+- [x] set About description
 - [ ] set repository topics
 - [ ] leave homepage blank unless a real public URL exists
 
 ## Phase 3. Hosted evidence capture
 
 - [ ] `ci.yml` passes on GitHub-hosted runners
-- [ ] `docs-governance.yml` passes on GitHub-hosted runners
-- [ ] hosted workflow URLs or screenshots are recorded in `docs/verification/launch-evidence-index.md`
-- [ ] public-repository-hygiene review is updated with hosted proof
-- [ ] launch evidence and README remain mutually consistent after push
+- [x] `docs-governance.yml` passes on GitHub-hosted runners
+- [x] hosted workflow URLs or screenshots are recorded in `docs/verification/launch-evidence-index.md`
+- [x] public-repository-hygiene review is updated with hosted proof
+- [x] launch evidence and README remain mutually consistent after push
+
+Current hosted proof recorded:
+
+1. `docs-governance` success on `1eac899`: `https://github.com/KonkovaElena/mri-second-opinion/actions/runs/23555671232`
+2. main-branch `ci` build and test evidence still pending
 
 ## Phase 4. Publication safety review
 
