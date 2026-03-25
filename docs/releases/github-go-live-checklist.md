@@ -33,12 +33,12 @@ Use it in two passes:
 - [x] create or publish the standalone repository
 - [x] enable GitHub Actions
 - [x] verify Issues are enabled
-- [ ] confirm issue-form chooser shows bug, feature, and docs or scope templates
-- [ ] confirm Security tab or private reporting route is configured as documented
-- [ ] upload social preview asset
+- [x] confirm issue-form chooser shows bug, feature, and docs or scope templates (3 YAML templates + `config.yml` with `blank_issues_enabled: false`)
+- [-] confirm Security tab or private reporting route is configured as documented (SECURITY.md exists; GitHub private reporting requires manual activation in Settings > Security)
+- [-] upload social preview asset (requires manual upload via GitHub UI; see `docs/demo/social-preview-brief.md`)
 - [x] set About description
-- [ ] set repository topics
-- [ ] leave homepage blank unless a real public URL exists
+- [-] set repository topics (requires GitHub UI; recommended set in `docs/releases/github-metadata-copy.md`)
+- [x] leave homepage blank unless a real public URL exists (confirmed blank via API)
 
 ## Phase 3. Hosted evidence capture
 
@@ -56,18 +56,18 @@ Current hosted proof recorded:
 
 ## Phase 4. Publication safety review
 
-- [ ] no GitHub About text implies production readiness
-- [ ] no topic suggests unimplemented worker, frontend, or deployment completeness
-- [ ] no screenshot or social-preview asset looks like a fake shipping UI
-- [ ] no public doc uses autonomous-diagnosis language
-- [ ] no public issue template invites PHI or real clinical uploads
+- [x] no GitHub About text implies production readiness (description: "Clinician-in-the-loop MRI second-opinion workflow baseline")
+- [x] no topic suggests unimplemented worker, frontend, or deployment completeness (topics currently empty; recommended list in metadata-copy.md is scope-safe)
+- [x] no screenshot or social-preview asset looks like a fake shipping UI (none uploaded)
+- [x] no public doc uses autonomous-diagnosis language (verified in documentation-honesty-review)
+- [x] no public issue template invites PHI or real clinical uploads (templates scoped to bug, feature, docs)
 
 ## Phase 5. Immediate post-publication triage
 
-- [ ] first external issue is triaged through the intended templates
-- [ ] docs or scope drift reports are handled using the docs-scope path
-- [ ] security reporting instructions are still correct in the live repository
-- [ ] branch protection and required checks are added only after workflows are stable
+- [-] first external issue is triaged through the intended templates (no external issues yet; 5 open items are Dependabot PRs)
+- [-] docs or scope drift reports are handled using the docs-scope path (no drift reports yet)
+- [x] security reporting instructions are still correct in the live repository (SECURITY.md references GitHub Private Vulnerability Reporting + fallback email)
+- [-] branch protection and required checks are added only after workflows are stable (workflows are stable; requires manual GitHub Settings > Branches action)
 
 ## Completion rule
 

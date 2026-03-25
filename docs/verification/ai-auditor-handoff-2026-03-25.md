@@ -1,7 +1,7 @@
 ---
 title: "MRI Standalone Auditor Handoff"
 status: "active"
-version: "1.0.0"
+version: "1.1.0"
 last_updated: "2026-03-25"
 tags: [mri, audit, verification, handoff, github, mvp]
 ---
@@ -34,16 +34,16 @@ It distinguishes:
 
 As of 2026-03-25, it is best classified as:
 
-1. a runtime-capable scaffold
+1. a local-runtime-capable workflow baseline (15 routes, 20 tests, file-based persistence)
 2. a documentation-rich target architecture package
 3. a pre-MVP repository
-4. not yet a workflow-complete product
+4. not yet a production-infrastructure-backed product
 
 The current repository-level verdict remains:
 
 `NOT_READY`
 
-That verdict is correct and should be challenged only if the auditor finds evidence that workflow closure, durable state, frontend closure, demo closure, and CI-backed public publication proof are materially further along than the current docs claim.
+That verdict is correct and should be challenged only if the auditor finds evidence that production infrastructure closure (database, queue, worker), frontend closure, and demo closure are materially further along than the current docs claim.
 
 ## Project Identity
 
@@ -77,7 +77,7 @@ Primary evidence:
 
 The most defensible stage label today is:
 
-`workflow-capable local runtime baseline with target-operating architecture, pre-MVP`
+`workflow-implemented local runtime baseline with target-operating architecture, pre-MVP`
 
 ### Why this stage label fits
 
@@ -85,10 +85,11 @@ Because all of the following are simultaneously true:
 
 1. the subtree has its own `package.json`, `tsconfig.json`, `.env.example`, source files, and GitHub workflow
 2. the TypeScript service builds and starts
-3. a baseline workflow and operations HTTP surface is actually implemented in code
+3. all 15 workflow and operations HTTP routes are implemented in code and tested
 4. the package exposes `build`, `test`, `start`, and `dev` scripts
-5. the higher readiness surfaces remain open: durable database state, queue execution, frontend closure, worker closure, and demo evidence
-6. the architecture and release docs are still broader than the currently implemented runtime envelope
+5. file-based snapshot persistence survives service restart
+6. the higher readiness surfaces remain open: PostgreSQL-backed state, Redis queue execution, real inference worker, frontend closure, and demo evidence
+7. the architecture and release docs are still broader than the currently implemented runtime envelope
 
 ## Verified Runtime Facts
 
@@ -169,17 +170,19 @@ The repository now has recorded passing GitHub-hosted evidence for both workflow
 - `ci` green on `177094a`: `https://github.com/KonkovaElena/mri-second-opinion/actions/runs/23556374310`
 - `docs-governance` green on `177094a`: `https://github.com/KonkovaElena/mri-second-opinion/actions/runs/23556374341`
 
-## Design-Declared But Not Runtime-Implemented Yet
+## Design-Declared Surfaces: Local Runtime vs Production Infrastructure
 
-The following surfaces are real design assets, but they should not be mistaken for completed product behavior.
+The following surfaces have design documentation that goes beyond the current runtime implementation. Items 1 and 2 are now partially implemented at the local level; item 3 remains target architecture only.
 
-### 1. Public workflow API
+### 1. Public workflow API — local runtime vs production infrastructure
 
 Evidence:
 
 1. `docs/api-scope.md`
+2. `src/app.ts` (15 routes implemented)
+3. `tests/workflow-api.test.ts` (14 tests covering the full lifecycle)
 
-Declared wave-1 endpoints include:
+Declared wave-1 endpoints:
 
 1. `POST /api/cases`
 2. `GET /api/cases`
@@ -192,20 +195,23 @@ Declared wave-1 endpoints include:
 9. `POST /api/internal/ingest`
 10. `POST /api/internal/inference-callback`
 
-Current code evidence does not show these routes implemented in `src/app.ts`.
+All of these routes are now implemented in `src/app.ts` and exercised by `tests/workflow-api.test.ts`.
+
+They operate against an in-memory case service (`MemoryCaseService`) with optional file-based snapshot persistence. Inference and delivery callbacks are handled via internal HTTP endpoints rather than a real Python worker or queue.
 
 Auditor conclusion:
 
-This API surface is currently target-state documentation, not verified runtime closure.
+The API surface is runtime-implemented at the local level. The remaining gap is between this local-runtime implementation and a production-grade stack backed by PostgreSQL, Redis queues, and a real inference worker.
 
-The present mismatch is not a partially closed workflow surface. It is a design-to-runtime gap: the documented case and review API exists in docs, while the runtime currently exposes only scaffold endpoints.
-
-### 2. Durable workflow lifecycle
+### 2. Durable workflow lifecycle — file-based vs database-backed
 
 Evidence:
 
 1. `docs/status-model.md`
 2. `docs/launch-readiness-checklist.md`
+3. `src/case-storage.ts` (file-based snapshot persistence)
+4. `tests/workflow-api.test.ts` ("case records survive app restart" test at line 226)
+5. `tests/memory-case-service.test.ts` (6 tests including stale-writer rejection and restart survival)
 
 Declared state vocabulary includes:
 
@@ -219,11 +225,11 @@ Declared state vocabulary includes:
 8. `DELIVERED`
 9. `DELIVERY_FAILED`
 
-Current runtime code does not yet expose persistence or state-transition handlers for this lifecycle.
+The state vocabulary is used in runtime code. State transitions are enforced by `MemoryCaseService`. File-based snapshot persistence is implemented and tested: cases survive service restart when a snapshot file is configured.
 
 Auditor conclusion:
 
-The state model is a canonical design contract, not yet demonstrated as runtime truth.
+The state model is demonstrated as local-runtime truth with file-based persistence. The gap is between file-based snapshots and PostgreSQL-backed durable state with queue-driven execution.
 
 ### 3. Seven-node deployment baseline
 
@@ -324,14 +330,18 @@ The strongest accurate status is:
 
 The following evidence remains missing or only partial:
 
-1. real `POST /api/cases` and related workflow endpoints
-2. durable persistence across restart
-3. queue-backed workflow execution truth
-4. operations summary path
-5. review and finalize loop
-6. report preview path
-7. screenshot-backed UI closure
-8. truthful end-to-end demo transcript
+1. queue-backed workflow execution (Redis/real worker)
+2. database-backed persistence (PostgreSQL instead of file snapshots)
+3. screenshot-backed UI closure
+4. truthful end-to-end demo transcript
+
+The following items are now implemented at the local-runtime level:
+
+1. `POST /api/cases` and all 14 other workflow endpoints (in-memory + file snapshot)
+2. durable persistence across restart (file-based snapshot, tested)
+3. operations summary path (`GET /api/operations/summary`)
+4. review and finalize loop (`POST .../review`, `POST .../finalize`)
+5. report preview path (`GET .../report`)
 
 Primary evidence:
 
@@ -342,12 +352,12 @@ Primary evidence:
 
 The launch evidence ledger is explicit here:
 
-1. API workflow verification is still `missing`
-2. durable state verification is still `missing`
+1. API workflow verification is `partial` (routes and tests exist; production infrastructure not yet wired)
+2. durable state verification is `partial` (file-based snapshot tested; database migration not yet run)
 3. frontend verification is still `missing`
 4. demo verification is still `missing`
 
-Those missing states are the clearest operational reason the MVP cannot yet be treated as closed.
+Those partial and missing states are the clearest operational reason the MVP cannot yet be treated as closed.
 
 ## Publication Readiness Assessment
 
@@ -356,16 +366,16 @@ Those missing states are the clearest operational reason the MVP cannot yet be t
 1. root governance files exist
 2. standalone package metadata exists
 3. standalone build path exists
-4. CI workflow exists
-5. README is bounded and not promotional
-6. public docs say the runtime is still a scaffold
+4. CI workflow exists with hosted green evidence on main branch
+5. automated tests exist and run under CI
+6. README is bounded and not promotional
+7. public docs correctly distinguish local runtime from production readiness
 
 ### What still needs auditor attention
 
-1. whether `private: true` should remain until the publication step
-2. whether the CI workflow has current green external run evidence
-3. whether any public docs still imply broader readiness than the runtime provides
-4. whether any parent-repo assumptions remain embedded in subtree documentation or workflow references
+1. whether `private: true` should remain (it prevents accidental npm publish but the repo is already public on GitHub)
+2. whether any public docs still imply broader readiness than the local runtime provides
+3. whether any parent-repo assumptions remain embedded in subtree documentation or workflow references
 
 ## Claim Classification Matrix
 
@@ -375,9 +385,9 @@ Those missing states are the clearest operational reason the MVP cannot yet be t
 | Standalone service starts | verified | `runtime-baseline-verification.md`, `src/index.ts` |
 | `/`, `/healthz`, `/readyz` are implemented | verified | `src/app.ts` |
 | `/metrics` exists as scaffold placeholder | verified | `src/app.ts` |
-| automated test entrypoint exists in subtree package | refuted | `package.json` exposes only build, start, and dev scripts |
-| full cases workflow API exists | not verified | design doc only in `api-scope.md` |
-| durable workflow state exists | not verified | checklist and state model indicate target, not proof |
+| automated test entrypoint exists in subtree package | verified | `package.json` exposes `test` script: `node --import tsx --test tests/**/*.test.ts` |
+| full cases workflow API exists | verified as local runtime | all 15 routes implemented in `src/app.ts`, exercised by `tests/workflow-api.test.ts` |
+| durable workflow state exists | verified as file-based | `MemoryCaseService` + `case-storage.ts` with file snapshot persistence tested in `workflow-api.test.ts` |
 | seven-node product runtime exists | not verified | architecture target only |
 | orchestrator contract set is well-defined | verified as documentation | contract docs exist, runtime implementation not proven |
 | neuro-first MVP path is defined | verified as documentation | MVP docs exist |
@@ -468,24 +478,24 @@ Questions:
 
 The most important failure modes to catch are:
 
-1. treating design-complete docs as product-complete implementation
-2. missing contradictions between `api-scope.md` and current runtime code
-3. assuming the existence of persistence, queue, review, or frontend closure because the docs describe them well
-4. upgrading the verdict based on CI presence alone without workflow closure evidence
+1. treating design-complete docs as production-complete implementation
+2. mistaking local in-memory runtime for production-infrastructure readiness
+3. assuming PostgreSQL, Redis queue, real inference worker, or frontend exist because the docs describe them well
+4. upgrading the verdict based on CI presence alone without production infrastructure evidence
 5. inferring clinical readiness from MRI ecosystem sophistication or architecture maturity
 
 ## Recommended Auditor Conclusion Template
 
 If the auditor agrees with the current evidence, the shortest defensible conclusion is:
 
-"This is a standalone MRI second-opinion repository with a verified Node/TypeScript runtime scaffold, strong target-state documentation, and a credible MVP execution map, but it is still pre-MVP and correctly classified as `NOT_READY`. The main implementation gap is not architectural thinking but workflow closure: cases API, durable state, queue-backed execution, review/finalize flow, frontend closure, and demo evidence."
+"This is a standalone MRI second-opinion repository with a verified Node/TypeScript local runtime, strong target-state documentation, and a credible MVP execution map. It is still pre-MVP and correctly classified as `NOT_READY`. The workflow API surface and file-based persistence are implemented and tested at the local level. The main implementation gap is the transition from local runtime to production infrastructure: PostgreSQL-backed persistence, Redis queue execution, real inference worker, frontend closure, and demo evidence."
 
 ## Change Rule
 
 Update this handoff when any of the following happen:
 
 1. verdict changes
-2. cases workflow API becomes real
-3. persistence and queue evidence become real
-4. demo closure becomes real
+2. production infrastructure replaces local runtime (PostgreSQL, Redis, real worker)
+3. demo closure becomes real
+4. frontend closure becomes real
 5. public GitHub publication proof becomes materially stronger

@@ -46,9 +46,12 @@ Those claims are still kept below MVP or launch-ready language.
 
 ## 5. Remaining honesty gap
 
-The docs package is coherent, but hosted evidence still lags local verification, and the target architecture docs remain intentionally ahead of the current single-process implementation.
+The docs package is coherent. Hosted CI evidence now exists on the main branch:
 
-This is currently mitigated by:
+1. `ci` green on `177094a`: https://github.com/KonkovaElena/mri-second-opinion/actions/runs/23556374310
+2. `docs-governance` green on `177094a`: https://github.com/KonkovaElena/mri-second-opinion/actions/runs/23556374341
+
+The target architecture docs remain intentionally ahead of the current single-process implementation. This is mitigated by:
 
 1. `docs/releases/v1-go-no-go.md`
 2. `docs/verification/launch-evidence-index.md`
@@ -57,6 +60,15 @@ This is currently mitigated by:
 
 ## Verdict
 
-Documentation honesty is in acceptable shape for a conservative pre-publication wave1 baseline.
+Documentation honesty is in acceptable shape for a publicly hosted pre-MVP repository.
 
-It is not yet sufficient to justify `INTERNAL_DEMO_READY` or `PUBLIC_GITHUB_READY`.
+The repository has been successfully published on GitHub with:
+
+1. hosted CI evidence (both `ci` and `docs-governance` workflows green)
+2. conservative `NOT_READY` product verdict maintained
+3. clear separation between local-runtime capability and target architecture
+4. complete governance file set (LICENSE, CODE_OF_CONDUCT, SECURITY, CONTRIBUTING, SUPPORT, GOVERNANCE)
+
+The docs are sufficient to justify `PUBLIC_GITHUB_READY` from an honesty perspective.
+
+They are not yet sufficient to justify `INTERNAL_DEMO_READY` or `MVP_READY` — those verdicts require production infrastructure closure (database, queue, worker) and end-to-end demo evidence.
