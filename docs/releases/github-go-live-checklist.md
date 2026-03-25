@@ -37,7 +37,7 @@ Use it in two passes:
 - [-] confirm Security tab or private reporting route is configured as documented (SECURITY.md exists; GitHub private reporting requires manual activation in Settings > Security)
 - [-] upload social preview asset (requires manual upload via GitHub UI; see `docs/demo/social-preview-brief.md`)
 - [x] set About description
-- [-] set repository topics (requires GitHub UI; recommended set in `docs/releases/github-metadata-copy.md`)
+- [-] set repository topics (requires GitHub UI; recommended set in `docs/releases/github-metadata-copy.md` and mirrored in `docs/releases/pending-manual-github-actions.md`)
 - [x] leave homepage blank unless a real public URL exists (confirmed blank via API)
 
 ## Phase 3. Hosted evidence capture
@@ -53,6 +53,8 @@ Current hosted proof recorded:
 1. `docs-governance` success on `1eac899`: `https://github.com/KonkovaElena/mri-second-opinion/actions/runs/23555671232`
 2. `ci` success on `177094a`: `https://github.com/KonkovaElena/mri-second-opinion/actions/runs/23556374310`
 3. `docs-governance` success on `177094a`: `https://github.com/KonkovaElena/mri-second-opinion/actions/runs/23556374341`
+4. `docs-governance` success on `8f851b3`: `https://github.com/KonkovaElena/mri-second-opinion/actions/runs/23557754782`
+5. `docs-governance` success on `49b794c`: `https://github.com/KonkovaElena/mri-second-opinion/actions/runs/23557837645`
 
 ## Phase 4. Publication safety review
 
@@ -68,6 +70,8 @@ Current hosted proof recorded:
 - [-] docs or scope drift reports are handled using the docs-scope path (no drift reports yet)
 - [x] security reporting instructions are still correct in the live repository (SECURITY.md references GitHub Private Vulnerability Reporting + fallback email)
 - [-] branch protection and required checks are added only after workflows are stable (workflows are stable; requires manual GitHub Settings > Branches action)
+
+Manual-only follow-up is consolidated in `docs/releases/pending-manual-github-actions.md`.
 
 ## Completion rule
 

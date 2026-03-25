@@ -88,6 +88,7 @@ Leave blank until a real public URL exists.
 2. apply the topic set above
 3. upload the social preview asset described in `../demo/social-preview-brief.md`
 4. confirm the Security policy page matches `SECURITY.md`
+5. if any of items 2-4 remain blocked by GitHub UI access, track them in `pending-manual-github-actions.md`
 
 ## 5. Hosted verification
 
@@ -125,9 +126,10 @@ Stop and correct before any announcement if:
 
 1. `github-publication-playbook.md`
 2. `github-go-live-checklist.md`
-3. `github-settings-worksheet.md`
-4. `github-live-publication-sequence.md`
-5. `github-metadata-copy.md`
-6. `first-public-announcement-draft.md`
-7. `../verification/hosted-evidence-capture-template.md`
-8. `../demo/social-preview-brief.md`
+3. `pending-manual-github-actions.md`
+4. `github-settings-worksheet.md`
+5. `github-live-publication-sequence.md`
+6. `github-metadata-copy.md`
+7. `first-public-announcement-draft.md`
+8. `../verification/hosted-evidence-capture-template.md`
+9. `../demo/social-preview-brief.md`

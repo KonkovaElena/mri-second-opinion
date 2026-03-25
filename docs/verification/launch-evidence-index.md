@@ -23,6 +23,10 @@ Recorded hosted evidence today:
   `https://github.com/KonkovaElena/mri-second-opinion/actions/runs/23556374310`
 3. `docs-governance` also succeeded on `177094a`:
   `https://github.com/KonkovaElena/mri-second-opinion/actions/runs/23556374341`
+4. `docs-governance` succeeded on `8f851b3` after the auditor-handoff corrections:
+  `https://github.com/KonkovaElena/mri-second-opinion/actions/runs/23557754782`
+5. `docs-governance` succeeded on `49b794c` after adding the pending manual GitHub actions runbook:
+  `https://github.com/KonkovaElena/mri-second-opinion/actions/runs/23557837645`
 
 ## Priority Tracks
 
@@ -73,6 +77,8 @@ Record:
 - Hosted note:
   - `ci` green on `177094a`: `https://github.com/KonkovaElena/mri-second-opinion/actions/runs/23556374310`
   - `docs-governance` green on `177094a`: `https://github.com/KonkovaElena/mri-second-opinion/actions/runs/23556374341`
+  - `docs-governance` green on `8f851b3`: `https://github.com/KonkovaElena/mri-second-opinion/actions/runs/23557754782`
+  - `docs-governance` green on `49b794c`: `https://github.com/KonkovaElena/mri-second-opinion/actions/runs/23557837645`
 - Artifact links:
   - `package.json`
   - `package-lock.json`
@@ -169,6 +175,8 @@ Record:
   - `docs-governance` green on `1eac899`: `https://github.com/KonkovaElena/mri-second-opinion/actions/runs/23555671232`
   - `ci` green on `177094a`: `https://github.com/KonkovaElena/mri-second-opinion/actions/runs/23556374310`
   - `docs-governance` green on `177094a`: `https://github.com/KonkovaElena/mri-second-opinion/actions/runs/23556374341`
+  - `docs-governance` green on `8f851b3`: `https://github.com/KonkovaElena/mri-second-opinion/actions/runs/23557754782`
+  - `docs-governance` green on `49b794c`: `https://github.com/KonkovaElena/mri-second-opinion/actions/runs/23557837645`
   - public repository is live with About metadata applied
 - Artifact links:
   - `README.md`
@@ -190,6 +198,7 @@ Record:
   - `docs/releases/github-publication-playbook.md`
   - `docs/releases/github-go-live-checklist.md`
   - `docs/releases/github-metadata-copy.md`
+  - `docs/releases/pending-manual-github-actions.md`
   - `docs/releases/github-settings-worksheet.md`
   - `docs/releases/github-live-publication-sequence.md`
   - `docs/releases/first-public-announcement-draft.md`
