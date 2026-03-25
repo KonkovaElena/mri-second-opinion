@@ -104,7 +104,7 @@ The codebase does not currently need repair for failing build or failing tests.
 
 The remaining work is mostly closure work rather than bug repair:
 
-1. main-branch hosted CI build and test evidence
+1. ~~main-branch hosted CI build and test evidence~~ (recorded: `ci` green on `177094a`)
 2. queue and database runtime closure
 3. frontend review closure
 4. demo reproducibility

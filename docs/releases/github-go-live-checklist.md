@@ -42,7 +42,7 @@ Use it in two passes:
 
 ## Phase 3. Hosted evidence capture
 
-- [ ] `ci.yml` passes on GitHub-hosted runners
+- [x] `ci.yml` passes on GitHub-hosted runners
 - [x] `docs-governance.yml` passes on GitHub-hosted runners
 - [x] hosted workflow URLs or screenshots are recorded in `docs/verification/launch-evidence-index.md`
 - [x] public-repository-hygiene review is updated with hosted proof
@@ -51,7 +51,8 @@ Use it in two passes:
 Current hosted proof recorded:
 
 1. `docs-governance` success on `1eac899`: `https://github.com/KonkovaElena/mri-second-opinion/actions/runs/23555671232`
-2. main-branch `ci` build and test evidence still pending
+2. `ci` success on `177094a`: `https://github.com/KonkovaElena/mri-second-opinion/actions/runs/23556374310`
+3. `docs-governance` success on `177094a`: `https://github.com/KonkovaElena/mri-second-opinion/actions/runs/23556374341`
 
 ## Phase 4. Publication safety review
 

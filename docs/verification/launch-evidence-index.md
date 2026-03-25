@@ -19,7 +19,10 @@ Recorded hosted evidence today:
 
 1. `docs-governance` succeeded on GitHub-hosted runners for commit `1eac899` on 2026-03-25:
   `https://github.com/KonkovaElena/mri-second-opinion/actions/runs/23555671232`
-2. main-branch `ci` build and test evidence is still pending capture in this index
+2. `ci` succeeded on GitHub-hosted runners for commit `177094a` on 2026-03-25:
+  `https://github.com/KonkovaElena/mri-second-opinion/actions/runs/23556374310`
+3. `docs-governance` also succeeded on `177094a`:
+  `https://github.com/KonkovaElena/mri-second-opinion/actions/runs/23556374341`
 
 ## Priority Tracks
 
@@ -66,10 +69,10 @@ Required artifacts:
 
 Record:
 
-- Status: partial
+- Status: complete
 - Hosted note:
-  - docs-governance hosted publication check is green on `1eac899`
-  - main-branch `ci` install, build, and test proof is still pending capture
+  - `ci` green on `177094a`: `https://github.com/KonkovaElena/mri-second-opinion/actions/runs/23556374310`
+  - `docs-governance` green on `177094a`: `https://github.com/KonkovaElena/mri-second-opinion/actions/runs/23556374341`
 - Artifact links:
   - `package.json`
   - `package-lock.json`
@@ -161,11 +164,12 @@ Required artifacts:
 
 Record:
 
-- Status: partial
+- Status: complete
 - Hosted note:
-  - `docs-governance` GitHub-hosted proof: `https://github.com/KonkovaElena/mri-second-opinion/actions/runs/23555671232`
+  - `docs-governance` green on `1eac899`: `https://github.com/KonkovaElena/mri-second-opinion/actions/runs/23555671232`
+  - `ci` green on `177094a`: `https://github.com/KonkovaElena/mri-second-opinion/actions/runs/23556374310`
+  - `docs-governance` green on `177094a`: `https://github.com/KonkovaElena/mri-second-opinion/actions/runs/23556374341`
   - public repository is live with About metadata applied
-  - main-branch `ci` evidence is still missing from this ledger
 - Artifact links:
   - `README.md`
   - `LICENSE`

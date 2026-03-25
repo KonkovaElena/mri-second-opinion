@@ -164,7 +164,10 @@ Observed facts:
 
 Important nuance:
 
-The repository now has recorded passing GitHub-hosted `docs-governance` evidence, but main-branch `ci` build and test evidence is still not preserved as an artifact in the docs pack.
+The repository now has recorded passing GitHub-hosted evidence for both workflows:
+
+- `ci` green on `177094a`: `https://github.com/KonkovaElena/mri-second-opinion/actions/runs/23556374310`
+- `docs-governance` green on `177094a`: `https://github.com/KonkovaElena/mri-second-opinion/actions/runs/23556374341`
 
 ## Design-Declared But Not Runtime-Implemented Yet
 

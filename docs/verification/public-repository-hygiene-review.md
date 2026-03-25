@@ -67,15 +67,19 @@ Confirmed today:
 3. `docs-governance` passed on GitHub-hosted runners for commit `1eac899`:
 	`https://github.com/KonkovaElena/mri-second-opinion/actions/runs/23555671232`
 
+4. `ci` passed on GitHub-hosted runners for commit `177094a`:
+	`https://github.com/KonkovaElena/mri-second-opinion/actions/runs/23556374310`
+5. `docs-governance` also passed on `177094a`:
+	`https://github.com/KonkovaElena/mri-second-opinion/actions/runs/23556374341`
+
 ## 4. Remaining gaps
 
-The repository is materially closer to safe publication, but two items still remain:
+One item remains:
 
-1. main-branch CI build and test evidence is not yet recorded in this repository state
-2. security reporting still depends on a shared umbrella contact or repository settings rather than a repo-specific maintainer channel
+1. security reporting still depends on a shared umbrella contact or repository settings rather than a repo-specific maintainer channel
 
 ## Verdict
 
-Public repository hygiene is partially established and now includes hosted publication proof.
+Public repository hygiene is established with hosted CI and docs-governance proof.
 
-The repository is in a credible public state with community-health basics present, publication-card guidance documented, contributor intake clarified, and a hosted `docs-governance` pass recorded, but it is not yet in a fully evidence-backed public release state because main-branch CI proof is still missing from the evidence pack.
+The repository is in a credible public state with community-health basics present, publication-card guidance documented, contributor intake clarified, and both `ci` and `docs-governance` hosted passes recorded. The remaining open item is security reporting channel configuration.
