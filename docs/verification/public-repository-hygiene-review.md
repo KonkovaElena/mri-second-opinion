@@ -58,13 +58,28 @@ The repository now includes:
 
 ## 3. Remaining gaps
 
-The repository is materially closer to safe publication, but two blockers remain:
+Hosted publication proof is now partially present.
 
-1. GitHub-hosted CI success evidence is not yet recorded in this repository state
-2. security reporting still depends on a shared umbrella contact or repository settings rather than a repo-specific maintainer channel
+Confirmed today:
+
+1. the public GitHub repository is live
+2. the About description is applied on the live repository page
+3. `docs-governance` passed on GitHub-hosted runners for commit `1eac899`:
+	`https://github.com/KonkovaElena/mri-second-opinion/actions/runs/23555671232`
+
+4. `ci` passed on GitHub-hosted runners for commit `177094a`:
+	`https://github.com/KonkovaElena/mri-second-opinion/actions/runs/23556374310`
+5. `docs-governance` also passed on `177094a`:
+	`https://github.com/KonkovaElena/mri-second-opinion/actions/runs/23556374341`
+
+## 4. Remaining gaps
+
+One item remains:
+
+1. security reporting still depends on a shared umbrella contact or repository settings rather than a repo-specific maintainer channel
 
 ## Verdict
 
-Public repository hygiene is partially established.
+Public repository hygiene is established with hosted CI and docs-governance proof.
 
-The repository is in a credible public-preparation state with community-health basics present, publication-card guidance documented, and contributor intake clarified, but not yet in a hosted-evidence-backed public release state.
+The repository is in a credible public state with community-health basics present, publication-card guidance documented, contributor intake clarified, and both `ci` and `docs-governance` hosted passes recorded. The remaining open item is security reporting channel configuration.

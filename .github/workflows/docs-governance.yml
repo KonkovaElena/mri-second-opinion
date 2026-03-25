@@ -1,8 +1,10 @@
 name: docs-governance
 
 on:
+  workflow_dispatch:
   push:
     paths:
+      - 'package.json'
       - 'README.md'
       - 'LICENSE'
       - 'CODE_OF_CONDUCT.md'
@@ -17,6 +19,7 @@ on:
       - '.github/workflows/docs-governance.yml'
   pull_request:
     paths:
+      - 'package.json'
       - 'README.md'
       - 'LICENSE'
       - 'CODE_OF_CONDUCT.md'
@@ -42,6 +45,7 @@ jobs:
 
       - name: Verify required root files
         run: |
+          test -f package.json
           test -f README.md
           test -f LICENSE
           test -f CODE_OF_CONDUCT.md
@@ -103,10 +107,42 @@ jobs:
           grep -q 'autonomous diagnostic system' README.md
           grep -q 'NOT_READY' docs/releases/v1-go-no-go.md
 
+      - name: Verify package metadata matches publication posture
+        run: |
+          python - <<'PY'
+          import json
+          from pathlib import Path
+
+          package = json.loads(Path('package.json').read_text(encoding='utf-8'))
+
+          expected_description = 'Clinician-in-the-loop MRI second-opinion workflow baseline with a standalone TypeScript API and restart-safe local persistence'
+          expected_keywords = {
+              'mri',
+              'medical-imaging',
+              'radiology',
+              'second-opinion',
+              'clinical-review',
+              'typescript',
+              'nodejs',
+              'express',
+              'workflow-orchestration',
+              'research-use-only',
+          }
+
+          actual_description = package.get('description')
+          if actual_description != expected_description:
+              raise SystemExit(f'package.json description drift: {actual_description!r}')
+
+          keywords = set(package.get('keywords', []))
+          missing = sorted(expected_keywords - keywords)
+          if missing:
+              raise SystemExit(f'package.json missing publication keywords: {missing}')
+          PY
+
       - name: Reject parent-only evidence references
         run: |
-          ! grep -R -n 'docs/superpowers/specs/' README.md docs .github || exit 1
-          ! grep -R -n '(parent)' README.md docs .github || exit 1
+          ! grep -R -n --exclude='docs-governance.yml' 'docs/superpowers/specs/' README.md docs .github || exit 1
+          ! grep -R -n --exclude='docs-governance.yml' '(parent)' README.md docs .github || exit 1
 
       - name: Verify markdown links resolve locally
         run: |

@@ -46,7 +46,7 @@ The repository still does not prove:
 2. Redis-backed queue execution
 3. worker-process inference
 4. frontend review closure
-5. hosted GitHub Actions success history
+5. main-branch GitHub-hosted CI build and test success history recorded in the evidence pack
 
 ## 3. Documentation honesty
 
@@ -104,7 +104,7 @@ The codebase does not currently need repair for failing build or failing tests.
 
 The remaining work is mostly closure work rather than bug repair:
 
-1. hosted CI evidence
+1. ~~main-branch hosted CI build and test evidence~~ (recorded: `ci` green on `177094a`)
 2. queue and database runtime closure
 3. frontend review closure
 4. demo reproducibility
