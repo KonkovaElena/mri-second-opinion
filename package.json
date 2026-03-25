@@ -22,12 +22,15 @@
   },
   "scripts": {
     "build": "tsc -p tsconfig.json",
+    "db:migrate": "tsx scripts/db-migrate.ts",
+    "db:migrate:smoke": "tsx scripts/db-migrate-smoke.ts",
     "test": "node --import tsx --test tests/**/*.test.ts",
     "start": "node dist/index.js",
     "dev": "tsx watch src/index.ts"
   },
   "dependencies": {
-    "express": "^4.21.2"
+    "express": "^4.21.2",
+    "pg": "^8.20.0"
   },
   "devDependencies": {
     "@types/express": "^5.0.1",

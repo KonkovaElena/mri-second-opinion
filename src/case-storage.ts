@@ -42,6 +42,13 @@ export function loadPersistedCaseSnapshot(snapshotFilePath?: string) {
     cases: parsed.cases.map((caseRecord) => ({
       ...caseRecord,
       lastInferenceFingerprint: caseRecord.lastInferenceFingerprint ?? null,
+      workflowQueue: Array.isArray(caseRecord.workflowQueue)
+        ? caseRecord.workflowQueue.map((entry) => ({
+            ...entry,
+            resolvedAt: entry.resolvedAt ?? null,
+          }))
+        : [],
+      workerArtifacts: caseRecord.workerArtifacts ?? undefined,
     })),
   };
 }

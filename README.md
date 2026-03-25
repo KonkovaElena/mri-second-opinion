@@ -5,8 +5,8 @@ Open-source, clinician-in-the-loop MRI second-opinion workflow.
 ## Repository Snapshot
 
 1. scope: MRI-only workflow baseline
-2. verified today: standalone TypeScript API plus restart-safe local persistence
-3. not present yet: database durability, queueing, worker execution, frontend review workspace, and demo closure
+2. verified today: standalone TypeScript API plus snapshot-backed restart safety, a durable local queue/read-model layer for inference and delivery, first-class persisted study-context/QC/findings artifacts, a bounded structural run surface with typed derived artifacts, a minimal equivalent operator surface for queue/review/report work, an optional PostgreSQL persistence mode, local clean-database migration smoke on PostgreSQL, Postgres restart-survival integration tests, and a CI postgres-smoke job
+3. not present yet: release-grade durable-state evidence beyond local smoke, Redis-backed queueing, background worker execution, frontend review workspace, and demo closure
 4. current repository verdict: `NOT_READY`
 
 ## Scope
@@ -41,20 +41,24 @@ Currently verified baseline:
 3. baseline service startup
 4. public workflow routes for case create, list, detail, review, finalize, report retrieval, delivery retry, and operations summary
 5. internal ingest, inference callback, and delivery callback endpoints
-6. restart-safe local snapshot persistence for case state, delivery state, retry history, and operation transcript
-7. structured API error envelopes for invalid transport input
-8. `GET /`, `GET /healthz`, `GET /readyz`, and `GET /metrics`
-9. internal workflow logic is now split across orchestration, planning, and snapshot-repository seams without changing the HTTP contract
+6. restart-safe local snapshot persistence for case state, queue state, delivery state, retry history, and operation transcript
+7. first-class persisted study-context, QC summary, findings payload, and bounded structural run surfaces on case detail reads
+8. structured API error envelopes for invalid transport input
+9. `GET /`, `GET /healthz`, `GET /readyz`, and `GET /metrics`
+10. internal workflow logic is now split across orchestration, planning, and snapshot-repository seams without changing the HTTP contract
+11. `GET /operator` serves a minimal equivalent operator surface for queue, case detail, review, finalize, report preview, and delivery retry
 
 The standalone repository still does not provide:
 
-1. PostgreSQL durable state or migrations
-2. Redis-backed queue dispatch
+1. release-grade PostgreSQL durability evidence beyond the local integration tests and CI-configured migration verification
+2. Redis-backed queue infrastructure or background-worker dispatch
 3. object-store-backed artifact durability
 4. OHIF or other frontend review surfaces
-5. a real Python worker path for QC and MRI processing
+5. a real Python or external worker path for QC and MRI processing beyond the current bounded local structural run contract
 6. demo closure or launch-ready evidence
 7. ~~main-branch GitHub-hosted CI build and test evidence~~ (now recorded — see `docs/verification/launch-evidence-index.md`)
+
+The runtime can now select snapshot mode or PostgreSQL-backed persistence via `DATABASE_URL`. `npm run db:migrate` prepares the current schema, and `npm run db:migrate:smoke` now proves the migration path against a clean local PostgreSQL container. That is useful local evidence, but it still does not by itself establish launch-ready durable-state closure.
 
 ## Quick Start
 
@@ -66,6 +70,15 @@ npm run build
 npm test
 npm start
 ```
+
+Optional database setup rail for the future durable-state path:
+
+```bash
+DATABASE_URL=postgresql://... npm run db:migrate
+npm run db:migrate:smoke
+```
+
+When `DATABASE_URL` is present, the API now advertises `persistenceMode: "postgres"` from `GET /` and `GET /readyz` and routes case storage through the PostgreSQL repository.
 
 Use this quick start to verify the current baseline only.
 

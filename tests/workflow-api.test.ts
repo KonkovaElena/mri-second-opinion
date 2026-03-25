@@ -21,6 +21,8 @@ async function startServer(caseStoreFile: string) {
       nodeEnv: "test",
       port: 0,
       caseStoreFile,
+      databaseUrl: undefined,
+      persistenceMode: "snapshot",
     }),
   );
 
@@ -51,6 +53,7 @@ async function withServer<T>(
   caseStoreFile: string,
   run: (helpers: {
     jsonRequest: (path: string, init?: RequestInit) => Promise<{ response: Response; body: any }>;
+    textRequest: (path: string, init?: RequestInit) => Promise<{ response: Response; body: string }>;
   }) => Promise<T>,
 ) {
   const { server, baseUrl } = await startServer(caseStoreFile);
@@ -69,11 +72,63 @@ async function withServer<T>(
         const body = bodyText.length > 0 ? JSON.parse(bodyText) : null;
         return { response, body };
       },
+      textRequest: async (path: string, init?: RequestInit) => {
+        const response = await fetch(`${baseUrl}${path}`, init);
+        return { response, body: await response.text() };
+      },
     });
   } finally {
     await stopServer(server);
   }
 }
+
+test("operator surface exposes queue, case detail, review, and report preview bindings", async () => {
+  const { tempDir, caseStoreFile } = createTestStoreFile();
+
+  try {
+    await withServer(caseStoreFile, async ({ jsonRequest, textRequest }) => {
+      const created = await jsonRequest("/api/cases", {
+        method: "POST",
+        body: JSON.stringify({
+          patientAlias: "operator-patient-001",
+          studyUid: "1.2.840.operator.1",
+          sequenceInventory: ["T1w", "FLAIR"],
+        }),
+      });
+      const caseId = created.body.case.caseId as string;
+
+      await jsonRequest("/api/internal/inference-callback", {
+        method: "POST",
+        body: JSON.stringify({
+          caseId,
+          qcDisposition: "pass",
+          findings: ["No acute intracranial abnormality."],
+          measurements: [{ label: "brain_volume_ml", value: 1112 }],
+          artifacts: ["artifact://overlay-preview", "artifact://report"],
+          generatedSummary: "Operator preview draft.",
+        }),
+      });
+
+      const page = await textRequest(`/operator?caseId=${encodeURIComponent(caseId)}`);
+
+      assert.equal(page.response.status, 200);
+      assert.equal(page.response.headers.get("content-type")?.includes("text/html"), true);
+      assert.equal(page.body.includes("Queue Dashboard"), true);
+      assert.equal(page.body.includes("Case Detail"), true);
+      assert.equal(page.body.includes("Review Workspace"), true);
+      assert.equal(page.body.includes("Report Preview"), true);
+      assert.equal(page.body.includes("Retry Delivery"), true);
+      assert.equal(page.body.includes("/api/operations/summary"), true);
+      assert.equal(page.body.includes(`/api/cases/${caseId}`), true);
+      assert.equal(page.body.includes(`/api/cases/${caseId}/review`), true);
+      assert.equal(page.body.includes(`/api/cases/${caseId}/finalize`), true);
+      assert.equal(page.body.includes(`/api/cases/${caseId}/report`), true);
+      assert.equal(page.body.includes(`/api/delivery/${caseId}/retry`), true);
+    });
+  } finally {
+    rmSync(tempDir, { recursive: true, force: true });
+  }
+});
 
 test("public case lifecycle reaches delivery failure and retry path", async () => {
   const { tempDir, caseStoreFile } = createTestStoreFile();
@@ -155,6 +210,13 @@ test("public case lifecycle reaches delivery failure and retry path", async () =
       assert.equal(summary.body.reviewRequiredCount, 0);
       assert.equal(Array.isArray(summary.body.retryHistory), true);
       assert.equal(summary.body.retryHistory.length, 1);
+      assert.equal(summary.body.queue.totalActive, 1);
+      assert.equal(summary.body.queue.byStage.inference, 0);
+      assert.equal(summary.body.queue.byStage.delivery, 1);
+      assert.equal(Array.isArray(summary.body.queue.active), true);
+      assert.equal(summary.body.queue.active[0].caseId, caseId);
+      assert.equal(summary.body.queue.active[0].stage, "delivery");
+      assert.equal(summary.body.queue.active[0].status, "queued");
       assert.equal(summary.body.retryHistory[0].caseId, caseId);
       assert.equal(summary.body.retryHistory[0].operationType, "delivery-retry-requested");
 
@@ -163,6 +225,23 @@ test("public case lifecycle reaches delivery failure and retry path", async () =
       assert.equal(Array.isArray(detail.body.case.operationLog), true);
       assert.equal(detail.body.case.operationLog.some((entry: { operationType: string }) => entry.operationType === "case-created"), true);
       assert.equal(detail.body.case.operationLog.some((entry: { operationType: string }) => entry.operationType === "delivery-retry-requested"), true);
+      assert.equal(detail.body.case.workerArtifacts.studyContext.studyUid, "1.2.840.0.1");
+      assert.equal(detail.body.case.workerArtifacts.studyContext.workflowFamily, "brain-structural");
+      assert.equal(detail.body.case.workerArtifacts.qcSummary.disposition, "warn");
+      assert.equal(detail.body.case.workerArtifacts.qcSummary.issues[0], "Motion artifact warning.");
+      assert.equal(detail.body.case.workerArtifacts.findingsPayload.summary, "Structural draft generated with mild volume-loss finding.");
+      assert.equal(detail.body.case.workerArtifacts.findingsPayload.findings[0], "Mild generalized cortical volume loss.");
+      assert.equal(detail.body.case.workerArtifacts.structuralRun.packageId, "brain-structural-fastsurfer");
+      assert.equal(detail.body.case.workerArtifacts.structuralRun.packageVersion, "0.1.0");
+      assert.equal(detail.body.case.workerArtifacts.structuralRun.status, "succeeded");
+      assert.equal(
+        detail.body.case.workerArtifacts.structuralRun.artifacts.some((artifact: { artifactType: string }) => artifact.artifactType === "overlay-preview"),
+        true,
+      );
+      assert.equal(
+        detail.body.case.evidenceCards.some((card: { cardType: string }) => card.cardType === "branch-execution"),
+        true,
+      );
     });
   } finally {
     rmSync(tempDir, { recursive: true, force: true });
@@ -616,6 +695,7 @@ test("observability endpoints expose the expected runtime baseline", async () =>
       const root = await jsonRequest("/");
       assert.equal(root.response.status, 200);
       assert.equal(root.body.status, "wave1-api");
+      assert.equal(root.body.persistenceMode, "snapshot");
       assert.equal(root.body.api.internal.includes("POST /api/internal/delivery-callback"), true);
 
       const health = await jsonRequest("/healthz");
@@ -625,6 +705,7 @@ test("observability endpoints expose the expected runtime baseline", async () =>
       const ready = await jsonRequest("/readyz");
       assert.equal(ready.response.status, 200);
       assert.equal(ready.body.mode, "wave1-api");
+      assert.equal(ready.body.persistenceMode, "snapshot");
 
       const metrics = await fetch(`${new URL(root.response.url).origin}/metrics`);
       const metricsBody = await metrics.text();
@@ -632,6 +713,42 @@ test("observability endpoints expose the expected runtime baseline", async () =>
       assert.equal(metricsBody.includes("mri_standalone_api_info"), true);
     });
   } finally {
+    rmSync(tempDir, { recursive: true, force: true });
+  }
+});
+
+test("observability endpoints can advertise postgres mode without touching workflow routes", async () => {
+  const { tempDir, caseStoreFile } = createTestStoreFile();
+
+  const server = createServer(
+    createApp({
+      nodeEnv: "test",
+      port: 0,
+      caseStoreFile,
+      databaseUrl: "postgresql://demo:demo@127.0.0.1:5432/mri_second_opinion",
+      persistenceMode: "postgres",
+    }),
+  );
+
+  try {
+    await new Promise<void>((resolve) => {
+      server.listen(0, resolve);
+    });
+
+    const address = server.address() as AddressInfo;
+    const baseUrl = `http://127.0.0.1:${address.port}`;
+
+    const root = await fetch(`${baseUrl}/`);
+    const rootBody = JSON.parse(await root.text());
+    assert.equal(root.status, 200);
+    assert.equal(rootBody.persistenceMode, "postgres");
+
+    const ready = await fetch(`${baseUrl}/readyz`);
+    const readyBody = JSON.parse(await ready.text());
+    assert.equal(ready.status, 200);
+    assert.equal(readyBody.persistenceMode, "postgres");
+  } finally {
+    await stopServer(server);
     rmSync(tempDir, { recursive: true, force: true });
   }
 });

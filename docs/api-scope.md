@@ -27,4 +27,4 @@
 3. public API is workflow-oriented, not PACS-oriented
 4. draft content is exposed through `GET /api/cases/:caseId` after internal ingest and inference complete; wave 1 does not expose a separate public draft-generation endpoint
 5. delivery state is exposed through case detail and operations summary; wave 1 does not expose a separate public delivery-detail endpoint
-6. current durability proof is limited to restart-safe local snapshot storage; PostgreSQL and queue-backed truth remain future work
+6. current durability proof covers restart-safe local snapshot storage, a local durable queue/read-model layer, and an optional PostgreSQL-backed persistence path with local integration proof; Redis-backed queue infrastructure and a real external worker path remain future work

@@ -188,6 +188,20 @@ export function createEvidenceCards(caseRecord: CaseRecord): EvidenceCard[] {
     });
   }
 
+  if (caseRecord.workerArtifacts.structuralRun) {
+    cards.push({
+      cardType: "branch-execution",
+      cardVersion: "0.1.0",
+      caseId: caseRecord.caseId,
+      headline: `Structural branch ${caseRecord.workerArtifacts.structuralRun.status}`,
+      severity: "info",
+      status: "good",
+      summary: `${caseRecord.workerArtifacts.structuralRun.packageId}@${caseRecord.workerArtifacts.structuralRun.packageVersion} produced ${caseRecord.workerArtifacts.structuralRun.artifacts.length} artifact(s).`,
+      supportingRefs: caseRecord.workerArtifacts.structuralRun.artifacts.map((artifact) => artifact.storageRef),
+      recommendedAction: null,
+    });
+  }
+
   return cards;
 }
 

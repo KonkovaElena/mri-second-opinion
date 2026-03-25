@@ -8,6 +8,8 @@ const server = createServer(app);
 
 server.listen(config.port, () => {
   process.stdout.write(
-    `[mri-second-opinion] listening on http://localhost:${config.port} using case store ${config.caseStoreFile}\n`,
+    config.persistenceMode === "postgres"
+      ? `[mri-second-opinion] listening on http://localhost:${config.port} using postgres persistence\n`
+      : `[mri-second-opinion] listening on http://localhost:${config.port} using case store ${config.caseStoreFile}\n`,
   );
 });

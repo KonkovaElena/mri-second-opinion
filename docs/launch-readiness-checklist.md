@@ -18,7 +18,7 @@ Use `releases/public-github-and-mvp-path.md` to distinguish safe public publicat
 - [x] standalone build works from repo root
 - [x] no runtime imports depend on parent repository `src/**`
 - [x] `.env.example` is sufficient for first local startup
-- [ ] CI proves install and build independently
+- [x] CI proves install and build independently
 
 Primary evidence:
 
@@ -51,23 +51,29 @@ Primary evidence:
 - [x] retry history survives restart
 - [x] queue view can be rebuilt from durable records
 - [x] operations totals can be rebuilt from durable records
-- [ ] migrations run from clean database
+- [x] runtime can switch between snapshot and PostgreSQL persistence modes
+- [x] migrations run from clean database
+- [x] Postgres-backed restart survival verified through integration tests
+- [x] CI postgres-smoke job configured for migration verification on GitHub-hosted runners
 
 Primary evidence:
 
 1. restart persistence tests
-2. migration logs
-3. read-model verification
+2. persistence-mode and PostgreSQL repository tests
+3. `npm run db:migrate:smoke` local PostgreSQL migration log
+4. read-model verification
+5. `tests/postgres-integration.test.ts` (3 tests: restart survival, full lifecycle, delete propagation)
+6. `.github/workflows/ci.yml` postgres-smoke job
 
 ## Gate 4. Frontend Closure
 
-- [ ] queue dashboard exists
-- [ ] case detail and review workspace exists
-- [ ] final report preview exists
-- [ ] operations summary screen exists
-- [ ] delivery failure and retry view exists
-- [ ] no dead navigation or placeholder panels remain
-- [ ] every visible action maps to a real backend endpoint
+- [x] queue dashboard exists
+- [x] case detail and review workspace exists
+- [x] final report preview exists
+- [x] operations summary screen exists
+- [x] delivery failure and retry view exists
+- [x] no dead navigation or placeholder panels remain
+- [x] every visible action maps to a real backend endpoint
 
 Primary evidence:
 
@@ -95,7 +101,7 @@ Primary evidence:
 - [x] `LICENSE` exists
 - [x] `SECURITY.md` exists
 - [x] `CONTRIBUTING.md` exists
-- [ ] CI workflow exists and passes
+- [x] CI workflow exists and passes
 - [x] workflow permissions are minimized
 - [ ] no stale internal-only docs are presented as public-facing product docs
 

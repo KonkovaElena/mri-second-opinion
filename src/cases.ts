@@ -6,7 +6,7 @@ import {
   createPlanEnvelope,
 } from "./case-planning";
 import { missingRequiredSequences, nowIso } from "./case-common";
-import { SnapshotCaseRepository } from "./case-repository";
+import { type CaseRepository, SnapshotCaseRepository } from "./case-repository";
 
 export const CASE_STATUSES = [
   "INGESTING",
@@ -35,6 +35,8 @@ export type BranchStatus =
   | "failed"
   | "omitted";
 export type DeliveryOutcome = "pending" | "failed" | "delivered";
+export type WorkflowQueueStage = "inference" | "delivery";
+export type WorkflowQueueStatus = "queued" | "completed" | "failed";
 
 export class WorkflowError extends Error {
   constructor(
@@ -102,6 +104,75 @@ export interface OperationLogEntry {
   outcome: "accepted" | "completed" | "blocked" | "replayed" | "failed";
   detail: string;
   at: string;
+}
+
+export interface WorkflowQueueEntry {
+  queueEntryId: string;
+  caseId: string;
+  stage: WorkflowQueueStage;
+  status: WorkflowQueueStatus;
+  attempt: number;
+  enqueuedAt: string;
+  updatedAt: string;
+  resolvedAt: string | null;
+  detail: string;
+  sourceOperation: string;
+}
+
+export interface StudyContextArtifact {
+  studyUid: string;
+  workflowFamily: WorkflowFamily;
+  sequenceInventory: string[];
+  indication: string | null;
+  selectedPackage: string | null;
+  requiredArtifacts: string[];
+  createdAt: string;
+  source: "public-api" | "internal-ingest";
+}
+
+export interface QcSummaryArtifact {
+  disposition: QcDisposition;
+  summary: string;
+  issues: string[];
+  artifactRefs: string[];
+  generatedAt: string;
+}
+
+export interface FindingsPayloadArtifact {
+  summary: string;
+  findings: string[];
+  measurements: Array<{ label: string; value: number; unit?: string }>;
+  generatedAt: string;
+  workflowVersion: string;
+}
+
+export type StructuralArtifactType =
+  | "qc-summary"
+  | "overlay-preview"
+  | "metrics-json"
+  | "report-preview"
+  | "derived-artifact";
+
+export interface StructuralDerivedArtifact {
+  artifactType: StructuralArtifactType;
+  storageRef: string;
+  generatedAt: string;
+  workflowVersion: string;
+}
+
+export interface StructuralRunArtifact {
+  packageId: string;
+  packageVersion: string;
+  status: "succeeded" | "blocked";
+  artifacts: StructuralDerivedArtifact[];
+  completedAt: string;
+}
+
+export interface WorkerArtifacts {
+  studyContext: StudyContextArtifact;
+  qcSummary: QcSummaryArtifact | null;
+  findingsPayload: FindingsPayloadArtifact | null;
+  structuralRun: StructuralRunArtifact | null;
 }
 
 export interface EvidenceCard {
@@ -217,6 +288,8 @@ export interface CaseRecord {
   sequenceInventory: string[];
   history: CaseHistoryEntry[];
   operationLog: OperationLogEntry[];
+  workflowQueue: WorkflowQueueEntry[];
+  workerArtifacts: WorkerArtifacts;
   planEnvelope: PlanEnvelope;
   evidenceCards: EvidenceCard[];
   report: ReportPayload | null;
@@ -231,6 +304,7 @@ export interface CaseRecord {
 
 export interface MemoryCaseServiceOptions {
   snapshotFilePath?: string;
+  repository?: CaseRepository;
 }
 
 export interface PersistedCaseSnapshot {
@@ -284,6 +358,147 @@ function createOperationLogEntry(input: Omit<OperationLogEntry, "operationId" | 
   };
 }
 
+function normalizeWorkflowQueueEntry(entry: WorkflowQueueEntry): WorkflowQueueEntry {
+  return {
+    ...entry,
+    resolvedAt: entry.resolvedAt ?? null,
+  };
+}
+
+function buildStudyContextArtifact(caseRecord: Pick<
+  CaseRecord,
+  "studyUid" | "workflowFamily" | "sequenceInventory" | "indication" | "planEnvelope"
+>): StudyContextArtifact {
+  return {
+    studyUid: caseRecord.studyUid,
+    workflowFamily: caseRecord.workflowFamily,
+    sequenceInventory: [...caseRecord.sequenceInventory],
+    indication: caseRecord.indication,
+    selectedPackage: caseRecord.planEnvelope.packageResolution.selectedPackage,
+    requiredArtifacts: [...caseRecord.planEnvelope.requiredArtifacts],
+    createdAt: caseRecord.planEnvelope.provenance.createdAt,
+    source: caseRecord.planEnvelope.provenance.source,
+  };
+}
+
+function buildQcSummaryFromReport(report: ReportPayload | null): QcSummaryArtifact | null {
+  if (!report || report.qcDisposition === "pending") {
+    return null;
+  }
+
+  return {
+    disposition: report.qcDisposition,
+    summary: report.processingSummary,
+    issues: [...report.issues],
+    artifactRefs: [...report.artifacts],
+    generatedAt: report.provenance.generatedAt,
+  };
+}
+
+function buildFindingsPayloadFromReport(report: ReportPayload | null): FindingsPayloadArtifact | null {
+  if (!report) {
+    return null;
+  }
+
+  return {
+    summary: report.processingSummary,
+    findings: [...report.findings],
+    measurements: report.measurements.map((measurement) => ({ ...measurement })),
+    generatedAt: report.provenance.generatedAt,
+    workflowVersion: report.provenance.workflowVersion,
+  };
+}
+
+function inferStructuralArtifactType(storageRef: string): StructuralArtifactType {
+  const normalized = storageRef.toLowerCase();
+
+  if (normalized.includes("overlay")) {
+    return "overlay-preview";
+  }
+  if (normalized.includes("qc-summary") || normalized.endsWith("://qc") || normalized.includes("/qc")) {
+    return "qc-summary";
+  }
+  if (normalized.includes("metrics")) {
+    return "metrics-json";
+  }
+  if (normalized.includes("report")) {
+    return "report-preview";
+  }
+
+  return "derived-artifact";
+}
+
+function buildStructuralRunFromReport(caseRecord: CaseRecord): StructuralRunArtifact | null {
+  if (!caseRecord.report) {
+    return null;
+  }
+
+  const workflowVersion = caseRecord.report.provenance.workflowVersion;
+  const [packageId, packageVersion = "0.1.0"] = workflowVersion.split("@");
+  const storageRefs = Array.from(new Set(caseRecord.report.artifacts));
+
+  return {
+    packageId: packageId || caseRecord.planEnvelope.packageResolution.selectedPackage || "brain-structural-fastsurfer",
+    packageVersion,
+    status: "succeeded",
+    artifacts: storageRefs.map((storageRef) => ({
+      artifactType: inferStructuralArtifactType(storageRef),
+      storageRef,
+      generatedAt: caseRecord.report!.provenance.generatedAt,
+      workflowVersion,
+    })),
+    completedAt: caseRecord.report.provenance.generatedAt,
+  };
+}
+
+function normalizeWorkerArtifacts(caseRecord: CaseRecord): WorkerArtifacts {
+  const persisted = caseRecord.workerArtifacts;
+  return {
+    studyContext: persisted?.studyContext
+      ? {
+          ...buildStudyContextArtifact(caseRecord),
+          ...persisted.studyContext,
+          sequenceInventory: Array.isArray(persisted.studyContext.sequenceInventory)
+            ? [...persisted.studyContext.sequenceInventory]
+            : [...caseRecord.sequenceInventory],
+          requiredArtifacts: Array.isArray(persisted.studyContext.requiredArtifacts)
+            ? [...persisted.studyContext.requiredArtifacts]
+            : [...caseRecord.planEnvelope.requiredArtifacts],
+        }
+      : buildStudyContextArtifact(caseRecord),
+    qcSummary: persisted?.qcSummary
+      ? {
+          ...persisted.qcSummary,
+          issues: [...persisted.qcSummary.issues],
+          artifactRefs: [...persisted.qcSummary.artifactRefs],
+        }
+      : buildQcSummaryFromReport(caseRecord.report),
+    findingsPayload: persisted?.findingsPayload
+      ? {
+          ...persisted.findingsPayload,
+          findings: [...persisted.findingsPayload.findings],
+          measurements: persisted.findingsPayload.measurements.map((measurement) => ({ ...measurement })),
+        }
+      : buildFindingsPayloadFromReport(caseRecord.report),
+    structuralRun: persisted?.structuralRun
+      ? {
+          ...persisted.structuralRun,
+          artifacts: persisted.structuralRun.artifacts.map((artifact) => ({ ...artifact })),
+        }
+      : buildStructuralRunFromReport(caseRecord),
+  };
+}
+
+function normalizeCaseRecordShape(caseRecord: CaseRecord): CaseRecord {
+  return {
+    ...caseRecord,
+    workflowQueue: Array.isArray(caseRecord.workflowQueue)
+      ? caseRecord.workflowQueue.map(normalizeWorkflowQueueEntry)
+      : [],
+    workerArtifacts: normalizeWorkerArtifacts(caseRecord),
+  };
+}
+
 function normalizeMeasurementSet(
   measurements: Array<{ label: string; value: number; unit?: string }>,
 ) {
@@ -306,23 +521,24 @@ function createInferenceFingerprint(input: InferenceCallbackInput) {
 }
 
 export class MemoryCaseService {
-  private readonly repository: SnapshotCaseRepository;
+  private readonly repository: CaseRepository;
 
   constructor(private readonly options: MemoryCaseServiceOptions = {}) {
-    this.repository = new SnapshotCaseRepository(options);
+    this.repository = options.repository ?? new SnapshotCaseRepository(options);
   }
 
-  listCases() {
-    return this.repository.list();
+  async listCases() {
+    const cases = await this.repository.list();
+    return cases.map(normalizeCaseRecordShape);
   }
 
-  getCase(caseId: string) {
-    return cloneCase(this.requireCase(caseId));
+  async getCase(caseId: string) {
+    return cloneCase(await this.requireCase(caseId));
   }
 
-  createCase(input: CreateCaseInput) {
+  async createCase(input: CreateCaseInput) {
     const normalized = this.normalizeCreateInput(input);
-    const existing = this.findMatchingExistingCase(normalized);
+    const existing = await this.findMatchingExistingCase(normalized);
 
     if (existing) {
       return cloneCase(existing);
@@ -337,13 +553,13 @@ export class MemoryCaseService {
     }
 
     const record = this.buildCaseRecord(normalized, "public-api", "SUBMITTED", "Public case created");
-    this.persistNewCase(record);
+    await this.persistNewCase(record);
     return cloneCase(record);
   }
 
-  ingestCase(input: CreateCaseInput) {
+  async ingestCase(input: CreateCaseInput) {
     const normalized = this.normalizeCreateInput(input);
-    const existing = this.findMatchingExistingCase(normalized);
+    const existing = await this.findMatchingExistingCase(normalized);
 
     if (existing) {
       return cloneCase(existing);
@@ -368,18 +584,21 @@ export class MemoryCaseService {
       outcome: nextStatus === "SUBMITTED" ? "accepted" : "blocked",
       detail: nextReason,
     });
+    if (nextStatus === "SUBMITTED") {
+      this.enqueueQueueEntry(initial, "inference", "ingest-accepted", "Case queued for inference.");
+    }
     initial.evidenceCards = createEvidenceCards(initial);
-    this.persistNewCase(initial);
+    await this.persistNewCase(initial);
 
     return cloneCase(initial);
   }
 
-  completeInference(caseId: string, input: InferenceCallbackInput) {
-    const record = this.requireCase(caseId);
+  async completeInference(caseId: string, input: InferenceCallbackInput) {
+    const record = await this.requireCase(caseId);
     const normalizedInput = this.normalizeInferenceInput(input);
     const fingerprint = createInferenceFingerprint(normalizedInput);
 
-    return this.persistExistingCase(record, () => {
+    return this.persistExistingCase(record, async (record) => {
       if (record.status !== "SUBMITTED") {
         if (record.lastInferenceFingerprint === fingerprint) {
           this.appendOperation(record, {
@@ -406,6 +625,16 @@ export class MemoryCaseService {
 
       if (normalizedInput.qcDisposition === "reject") {
         record.lastInferenceFingerprint = fingerprint;
+        record.workerArtifacts.qcSummary = {
+          disposition: normalizedInput.qcDisposition,
+          summary: normalizedInput.generatedSummary ?? "QC gate rejected the study.",
+          issues: [...(normalizedInput.issues ?? [])],
+          artifactRefs: [...normalizedInput.artifacts],
+          generatedAt: nowIso(),
+        };
+        record.workerArtifacts.findingsPayload = null;
+        record.workerArtifacts.structuralRun = null;
+        this.resolveLatestQueueEntry(record, "inference", "completed", "Inference completed with QC rejection.");
         this.transition(record, "QC_REJECTED", "QC gate rejected the study");
         this.appendOperation(record, {
           caseId: record.caseId,
@@ -421,6 +650,10 @@ export class MemoryCaseService {
 
       record.lastInferenceFingerprint = fingerprint;
       record.report = createDraftReport(record, normalizedInput);
+      record.workerArtifacts.qcSummary = buildQcSummaryFromReport(record.report);
+      record.workerArtifacts.findingsPayload = buildFindingsPayloadFromReport(record.report);
+      record.workerArtifacts.structuralRun = buildStructuralRunFromReport(record);
+      this.resolveLatestQueueEntry(record, "inference", "completed", "Inference completed and draft prepared.");
       record.planEnvelope.branches = record.planEnvelope.branches.map((branch) => ({
         ...branch,
         status: branch.status === "blocked" ? branch.status : "succeeded",
@@ -440,9 +673,9 @@ export class MemoryCaseService {
     });
   }
 
-  reviewCase(caseId: string, input: ReviewCaseInput) {
-    const record = this.requireCase(caseId);
-    return this.persistExistingCase(record, () => {
+  async reviewCase(caseId: string, input: ReviewCaseInput) {
+    const record = await this.requireCase(caseId);
+    return this.persistExistingCase(record, async (record) => {
       this.assertStatus(record, ["AWAITING_REVIEW"]);
 
       const normalized = {
@@ -494,9 +727,9 @@ export class MemoryCaseService {
     });
   }
 
-  finalizeCase(caseId: string, input: FinalizeCaseInput = {}) {
-    const record = this.requireCase(caseId);
-    return this.persistExistingCase(record, () => {
+  async finalizeCase(caseId: string, input: FinalizeCaseInput = {}) {
+    const record = await this.requireCase(caseId);
+    return this.persistExistingCase(record, async (record) => {
       this.assertStatus(record, ["REVIEWED"]);
 
       if (!record.report) {
@@ -528,9 +761,11 @@ export class MemoryCaseService {
         outcome: "accepted",
         detail: "Report queued for outbound delivery.",
       });
+      this.enqueueQueueEntry(record, "delivery", "delivery-queued", "Report queued for outbound delivery.");
 
       if (deliveryOutcome === "failed") {
         this.transition(record, "DELIVERY_FAILED", "Outbound delivery failed");
+        this.resolveLatestQueueEntry(record, "delivery", "failed", "Simulated outbound delivery failure recorded at finalize time.");
         this.appendOperation(record, {
           caseId: record.caseId,
           operationType: "delivery-failed",
@@ -541,6 +776,7 @@ export class MemoryCaseService {
         });
       } else if (deliveryOutcome === "delivered") {
         this.transition(record, "DELIVERED", "Outbound delivery succeeded");
+        this.resolveLatestQueueEntry(record, "delivery", "completed", "Simulated outbound delivery success recorded at finalize time.");
         this.appendOperation(record, {
           caseId: record.caseId,
           operationType: "delivery-succeeded",
@@ -557,9 +793,9 @@ export class MemoryCaseService {
     });
   }
 
-  retryDelivery(caseId: string) {
-    const record = this.requireCase(caseId);
-    return this.persistExistingCase(record, () => {
+  async retryDelivery(caseId: string) {
+    const record = await this.requireCase(caseId);
+    return this.persistExistingCase(record, async (record) => {
       this.assertStatus(record, ["DELIVERY_FAILED"]);
       this.transition(record, "DELIVERY_PENDING", "Delivery retry requested");
       this.appendOperation(record, {
@@ -570,14 +806,15 @@ export class MemoryCaseService {
         outcome: "accepted",
         detail: "Delivery retry requested from public API.",
       });
+      this.enqueueQueueEntry(record, "delivery", "delivery-retry-requested", "Delivery retry requested from public API.");
       record.evidenceCards = createEvidenceCards(record);
       return cloneCase(record);
     });
   }
 
-  completeDelivery(caseId: string, input: DeliveryCallbackInput) {
-    const record = this.requireCase(caseId);
-    return this.persistExistingCase(record, () => {
+  async completeDelivery(caseId: string, input: DeliveryCallbackInput) {
+    const record = await this.requireCase(caseId);
+    return this.persistExistingCase(record, async (record) => {
       if (record.status === "DELIVERED" && input.deliveryStatus === "delivered") {
         this.appendOperation(record, {
           caseId: record.caseId,
@@ -616,6 +853,12 @@ export class MemoryCaseService {
             ? `Outbound delivery succeeded: ${input.detail.trim()}`
             : "Outbound delivery succeeded",
         );
+        this.resolveLatestQueueEntry(
+          record,
+          "delivery",
+          "completed",
+          input.detail?.trim().length ? input.detail.trim() : "Delivery callback confirmed success.",
+        );
         this.appendOperation(record, {
           caseId: record.caseId,
           operationType: "delivery-succeeded",
@@ -634,6 +877,12 @@ export class MemoryCaseService {
             ? `Outbound delivery failed: ${input.detail.trim()}`
             : "Outbound delivery failed",
         );
+        this.resolveLatestQueueEntry(
+          record,
+          "delivery",
+          "failed",
+          input.detail?.trim().length ? input.detail.trim() : "Delivery callback reported failure.",
+        );
         this.appendOperation(record, {
           caseId: record.caseId,
           operationType: "delivery-failed",
@@ -651,8 +900,8 @@ export class MemoryCaseService {
     });
   }
 
-  getReport(caseId: string) {
-    const record = this.requireCase(caseId);
+  async getReport(caseId: string) {
+    const record = await this.requireCase(caseId);
 
     if (!record.report) {
       throw new WorkflowError(404, "Report is not available for this case", "REPORT_NOT_READY");
@@ -661,23 +910,37 @@ export class MemoryCaseService {
     return JSON.parse(JSON.stringify(record.report)) as ReportPayload;
   }
 
-  getOperationsSummary() {
+  async getOperationsSummary() {
     const byStatus = Object.fromEntries(CASE_STATUSES.map((status) => [status, 0])) as Record<CaseStatus, number>;
-    const operations = Array.from(this.repository.values())
+    const cases = await this.repository.list();
+    const operations = cases
       .flatMap((caseRecord) => caseRecord.operationLog.map((entry) => cloneCase(entry)))
       .sort((left, right) => right.at.localeCompare(left.at));
+    const queueEntries = cases
+      .flatMap((caseRecord) => normalizeCaseRecordShape(caseRecord).workflowQueue.map((entry) => cloneCase(entry)))
+      .sort((left, right) => right.updatedAt.localeCompare(left.updatedAt));
+    const activeQueue = queueEntries.filter((entry) => entry.status === "queued");
 
-    for (const caseRecord of this.repository.values()) {
+    for (const caseRecord of cases) {
       byStatus[caseRecord.status] += 1;
     }
 
     return {
-      totalCases: this.repository.size(),
+      totalCases: cases.length,
       byStatus,
       reviewRequiredCount: byStatus.AWAITING_REVIEW,
       deliveryFailures: byStatus.DELIVERY_FAILED,
       recentOperations: operations.slice(0, 20),
       retryHistory: operations.filter((entry) => entry.operationType === "delivery-retry-requested"),
+      queue: {
+        totalActive: activeQueue.length,
+        byStage: {
+          inference: activeQueue.filter((entry) => entry.stage === "inference").length,
+          delivery: activeQueue.filter((entry) => entry.stage === "delivery").length,
+        },
+        active: activeQueue,
+        recent: queueEntries.slice(0, 20),
+      },
     };
   }
 
@@ -749,6 +1012,22 @@ export class MemoryCaseService {
         },
       ],
       operationLog: [],
+      workflowQueue: [],
+      workerArtifacts: {
+        studyContext: {
+          studyUid: input.studyUid,
+          workflowFamily: "brain-structural",
+          sequenceInventory: [...input.sequenceInventory],
+          indication: input.indication,
+          selectedPackage: null,
+          requiredArtifacts: [],
+          createdAt,
+          source,
+        },
+        qcSummary: null,
+        findingsPayload: null,
+        structuralRun: null,
+      },
       planEnvelope: createPlanEnvelope({
         caseId,
         studyUid: input.studyUid,
@@ -767,6 +1046,7 @@ export class MemoryCaseService {
         reviewedAt: null,
       },
     };
+    record.workerArtifacts.studyContext = buildStudyContextArtifact(record);
     this.appendOperation(record, {
       caseId,
       operationType: source === "public-api" ? "case-created" : "ingest-received",
@@ -775,20 +1055,28 @@ export class MemoryCaseService {
       outcome: "accepted",
       detail: reason,
     });
+    if (initialStatus === "SUBMITTED") {
+      this.enqueueQueueEntry(
+        record,
+        "inference",
+        source === "public-api" ? "case-created" : "ingest-accepted",
+        "Case queued for inference.",
+      );
+    }
     record.evidenceCards = createEvidenceCards(record);
     return record;
   }
 
-  private requireCase(caseId: string) {
-    const caseRecord = this.repository.get(caseId);
+  private async requireCase(caseId: string) {
+    const caseRecord = await this.repository.get(caseId);
     if (!caseRecord) {
       throw new WorkflowError(404, `Case ${caseId} not found`, "CASE_NOT_FOUND");
     }
-    return caseRecord;
+    return normalizeCaseRecordShape(caseRecord);
   }
 
-  private findMatchingExistingCase(input: ReturnType<MemoryCaseService["normalizeCreateInput"]>) {
-    const existing = this.repository.findByStudyUid(input.studyUid);
+  private async findMatchingExistingCase(input: ReturnType<MemoryCaseService["normalizeCreateInput"]>) {
+    const existing = await this.repository.findByStudyUid(input.studyUid);
 
     if (!existing) {
       return null;
@@ -807,7 +1095,7 @@ export class MemoryCaseService {
       );
     }
 
-    return existing;
+    return normalizeCaseRecordShape(existing);
   }
 
   private assertStatus(caseRecord: CaseRecord, expected: readonly CaseStatus[]) {
@@ -845,31 +1133,58 @@ export class MemoryCaseService {
     caseRecord.operationLog.push(createOperationLogEntry(entry));
   }
 
-  private persistNewCase(caseRecord: CaseRecord) {
-    this.repository.set(caseRecord);
+  private enqueueQueueEntry(
+    caseRecord: CaseRecord,
+    stage: WorkflowQueueStage,
+    sourceOperation: string,
+    detail: string,
+  ) {
+    const timestamp = nowIso();
+    const attempt = caseRecord.workflowQueue.filter((entry) => entry.stage === stage).length + 1;
+    caseRecord.workflowQueue.push({
+      queueEntryId: randomUUID(),
+      caseId: caseRecord.caseId,
+      stage,
+      status: "queued",
+      attempt,
+      enqueuedAt: timestamp,
+      updatedAt: timestamp,
+      resolvedAt: null,
+      detail,
+      sourceOperation,
+    });
+  }
 
-    try {
-      this.saveSnapshot();
-    } catch (error) {
-      this.repository.delete(caseRecord.caseId);
-      throw error;
+  private resolveLatestQueueEntry(
+    caseRecord: CaseRecord,
+    stage: WorkflowQueueStage,
+    status: Exclude<WorkflowQueueStatus, "queued">,
+    detail: string,
+  ) {
+    for (let index = caseRecord.workflowQueue.length - 1; index >= 0; index -= 1) {
+      const entry = caseRecord.workflowQueue[index];
+      if (entry.stage !== stage || entry.status !== "queued") {
+        continue;
+      }
+
+      const timestamp = nowIso();
+      entry.status = status;
+      entry.updatedAt = timestamp;
+      entry.resolvedAt = timestamp;
+      entry.detail = detail;
+      return;
     }
   }
 
-  private persistExistingCase<T>(caseRecord: CaseRecord, mutate: () => T) {
-    const previous = cloneCase(caseRecord);
-
-    try {
-      const result = mutate();
-      this.saveSnapshot();
-      return result;
-    } catch (error) {
-      this.repository.set(previous);
-      throw error;
-    }
+  private async persistNewCase(caseRecord: CaseRecord) {
+    await this.repository.upsert(caseRecord);
   }
 
-  private saveSnapshot() {
-    this.repository.save();
+  private async persistExistingCase<T>(caseRecord: CaseRecord, mutate: (workingCopy: CaseRecord) => Promise<T>) {
+    const workingCopy = cloneCase(caseRecord);
+
+    const result = await mutate(workingCopy);
+    await this.repository.upsert(workingCopy);
+    return result;
   }
 }

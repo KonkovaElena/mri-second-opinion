@@ -107,6 +107,10 @@ Record:
 - Status: partial
 - Artifact links:
   - `tests/workflow-api.test.ts`
+  - `tests/memory-case-service.test.ts`
+  - `tests/postgres-integration.test.ts`
+  - `src/cases.ts`
+  - `docs/verification/worker-artifact-contract-samples.md`
   - `docs/verification/runtime-baseline-verification.md`
   - `docs/verification/repository-audit-2026-03-25.md`
   - `docs/verification/architecture-and-publication-audit-2026-03-25.md`
@@ -122,11 +126,29 @@ Required artifacts:
 
 Record:
 
-- Status: partial
+- Status: complete for the current local baseline
 - Artifact links:
   - `tests/memory-case-service.test.ts`
+  - `tests/postgres-case-repository.test.ts`
+  - `tests/postgres-integration.test.ts`
+  - `tests/db-migrations.test.ts`
+  - `src/db-migrations.ts`
+  - `scripts/db-migrate.ts`
+  - `scripts/db-migrate-smoke.ts`
+  - `.github/workflows/ci.yml` (postgres-smoke job)
   - `docs/verification/runtime-baseline-verification.md`
   - `docs/verification/architecture-and-publication-audit-2026-03-25.md`
+
+Recorded local evidence on 2026-03-25:
+
+1. `npm test` passed with `35/35` tests in the standalone subtree after the durable queue-model and worker-artifact tests were added
+2. `npm run db:migrate:smoke` succeeded against a clean local `postgres:17-alpine` container
+3. the smoke confirmed `schema_migrations` contains `001_create_case_records`
+4. the smoke confirmed the `case_records` table exists after migration
+5. `tests/memory-case-service.test.ts` verifies that the workflow queue and operations read model rebuild correctly from durable records across restart
+6. `tests/postgres-integration.test.ts` verifies restart survival, full lifecycle persistence, and delete propagation through the Postgres repository layer, including persisted workflow-queue state
+7. CI `postgres-smoke` job added to `.github/workflows/ci.yml` — runs migration against a `postgres:17-alpine` service container and verifies schema on GitHub-hosted runners
+8. `tests/memory-case-service.test.ts`, `tests/workflow-api.test.ts`, and `tests/postgres-integration.test.ts` verify durable study-context, QC artifact, and findings-payload surfaces across snapshot restart, API detail reads, and PostgreSQL restart
 
 ## 4. Frontend Verification
 
@@ -138,8 +160,11 @@ Required artifacts:
 
 Record:
 
-- Status: missing
+- Status: partial
 - Artifact links:
+  - `tests/workflow-api.test.ts`
+  - `src/app.ts`
+  - `docs/verification/operator-surface-verification.md`
   - `docs/architecture/mvp-work-package-map.md`
 
 ## 5. Demo Verification

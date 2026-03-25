@@ -10,6 +10,8 @@ on:
       - '.env.example'
       - 'src/**'
       - 'tests/**'
+      - 'sql/**'
+      - 'scripts/**'
       - '.github/workflows/ci.yml'
   pull_request:
     paths:
@@ -19,6 +21,8 @@ on:
       - '.env.example'
       - 'src/**'
       - 'tests/**'
+      - 'sql/**'
+      - 'scripts/**'
       - '.github/workflows/ci.yml'
 
 permissions:
@@ -45,3 +49,55 @@ jobs:
 
       - name: Test
         run: npm test
+
+  postgres-smoke:
+    runs-on: ubuntu-latest
+    needs: install-and-build
+    services:
+      postgres:
+        image: postgres:17-alpine
+        env:
+          POSTGRES_DB: mri_smoke
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Run migrations against clean database
+        env:
+          DATABASE_URL: postgresql://postgres:postgres@localhost:5432/mri_smoke
+        run: npm run db:migrate
+
+      - name: Verify migration state
+        env:
+          DATABASE_URL: postgresql://postgres:postgres@localhost:5432/mri_smoke
+        run: |
+          node -e "
+            const pg = require('pg');
+            const pool = new pg.Pool({ connectionString: process.env.DATABASE_URL });
+            (async () => {
+              const t = await pool.query(\"SELECT EXISTS (SELECT 1 FROM information_schema.tables WHERE table_name = 'case_records') AS ok\");
+              const m = await pool.query('SELECT id FROM schema_migrations ORDER BY id');
+              console.log('case_records exists:', t.rows[0].ok);
+              console.log('migrations:', m.rows.map(r => r.id).join(', '));
+              if (!t.rows[0].ok) { process.exitCode = 1; console.error('FAIL: case_records not found'); }
+              await pool.end();
+            })();
+          "

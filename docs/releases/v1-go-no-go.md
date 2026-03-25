@@ -16,7 +16,7 @@ Only these verdicts are allowed:
 
 ## Why
 
-The standalone repository now has a verified wave1 workflow API baseline and local restart-safe file-backed durability, but evidence for hosted CI success history, queue-backed execution, database-backed durability, frontend completeness, and demo reproducibility is still incomplete.
+The standalone repository now has a verified wave1 workflow API baseline, local restart-safe file-backed durability, a durable local queue/read-model layer for inference and delivery stages, first-class persisted study-context/QC/findings artifact surfaces, a bounded structural run surface with typed derived artifacts and branch-execution visibility, an optional PostgreSQL-backed repository path, local clean-database PostgreSQL migration proof, Postgres restart-survival integration tests (3 tests covering restart, full lifecycle, and delete), a CI postgres-smoke job, and hosted CI proof for the standalone subtree, but a real worker execution path, frontend completeness, demo reproducibility, and broader release-grade operational evidence are still incomplete.
 
 ## Evidence Basis
 
@@ -35,12 +35,13 @@ Supporting artifacts that exist now:
 
 Missing evidence required for a higher verdict:
 
-1. CI success evidence proving standalone install and build in GitHub Actions
-2. hosted API contract verification for the declared workflow surface
-3. hosted or release-linked restart-persistence verification
-4. screenshot-backed frontend closure proof
-5. reproducible synthetic demo transcript
-6. workflow-level evidence beyond the current local wave1 baseline
+1. hosted API contract verification for the declared workflow surface
+2. release-linked restart-persistence verification against the intended durable-state path
+3. broader PostgreSQL operational evidence beyond the current local integration tests and CI-configured migration verification
+4. a real worker execution proof beyond the current persisted local artifact contract
+5. screenshot-backed frontend closure proof
+6. reproducible synthetic demo transcript
+7. workflow-level evidence beyond the current local wave1 baseline
 
 ## Upgrade Rules
 
