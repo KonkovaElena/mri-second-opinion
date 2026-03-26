@@ -1,6 +1,6 @@
 # GitHub Go-Live Checklist
 
-Date: 2026-03-25
+Date: 2026-03-27
 
 ## Purpose
 
@@ -35,7 +35,7 @@ Use it in two passes:
 - [x] verify Issues are enabled
 - [x] confirm issue-form chooser shows bug, feature, and docs or scope templates (3 YAML templates + `config.yml` with `blank_issues_enabled: false`)
 - [-] confirm Security tab or private reporting route is configured as documented (SECURITY.md exists; GitHub private reporting requires manual activation in Settings > Security)
-- [-] upload social preview asset (requires manual upload via GitHub UI; see `docs/demo/social-preview-brief.md`)
+- [-] upload prepared social preview asset via GitHub UI (`docs/demo/social-preview.png`; brief in `docs/demo/social-preview-brief.md`)
 - [x] set About description
 - [-] set repository topics (requires GitHub UI; recommended set in `docs/releases/github-metadata-copy.md` and mirrored in `docs/releases/pending-manual-github-actions.md`)
 - [x] leave homepage blank unless a real public URL exists (confirmed blank via API)

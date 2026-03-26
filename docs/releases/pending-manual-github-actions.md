@@ -1,6 +1,6 @@
 # Pending Manual GitHub Actions
 
-Date: 2026-03-25
+Date: 2026-03-27
 Status: **open** — these items require GitHub UI access and cannot be automated via git push
 
 ## 1. Set Repository Topics
@@ -33,7 +33,11 @@ Requirements (from `docs/demo/social-preview-brief.md`):
 - 1280×640, under 1 MB
 - No fake dashboard, no diagnostic wording, no patient imagery
 
-**Note**: The image asset must be created first. No asset exists in the repo yet.
+Prepared asset in the repository:
+
+- `docs/demo/social-preview.png`
+
+**Manual action still required**: upload that file through the GitHub UI.
 
 ## 4. Add Branch Protection Rules
 

@@ -1,6 +1,6 @@
 # Social Preview Brief
 
-Date: 2026-03-25
+Date: 2026-03-27
 
 ## Purpose
 
@@ -37,6 +37,12 @@ MRI-only | TypeScript API | Not launch-ready
 4. use one calm MRI-inspired motif or abstract scan geometry
 5. keep text readable on solid backgrounds
 6. prefer a 1280x640 export under 1 MB
+
+## Prepared asset
+
+The current repository now includes a ready-to-upload asset at `docs/demo/social-preview.png`.
+
+Use that file for the initial GitHub social preview unless a later replacement still follows this brief.
 
 ## Rejection rules
 

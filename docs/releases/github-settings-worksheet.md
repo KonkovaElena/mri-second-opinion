@@ -1,6 +1,6 @@
 # GitHub Settings Worksheet
 
-Date: 2026-03-25
+Date: 2026-03-27
 
 ## Purpose
 
@@ -96,6 +96,10 @@ Recommended protected-branch checks once live:
 ## Social preview
 
 Use the asset described in `../demo/social-preview-brief.md`.
+
+Prepared file in the repository:
+
+1. `docs/demo/social-preview.png`
 
 Preferred text embedded in the image:
 
