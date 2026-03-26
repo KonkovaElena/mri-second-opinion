@@ -5,8 +5,8 @@ Open-source, clinician-in-the-loop MRI second-opinion workflow.
 ## Repository Snapshot
 
 1. scope: MRI-only workflow baseline
-2. verified today: standalone TypeScript API plus snapshot-backed restart safety, a durable local queue/read-model layer for inference and delivery, first-class persisted study-context/QC/findings artifacts, a bounded structural run surface with typed derived artifacts, a minimal equivalent operator surface for queue/review/report work, an optional PostgreSQL persistence mode, local clean-database migration smoke on PostgreSQL, Postgres restart-survival integration tests, and a CI postgres-smoke job
-3. not present yet: release-grade durable-state evidence beyond local smoke, Redis-backed queueing, background worker execution, frontend review workspace, and demo closure
+2. verified today: standalone TypeScript API plus snapshot-backed restart safety, a durable local queue/read-model layer for inference and delivery, a bounded internal dispatch-claim seam for worker handoff, an optional Redis-backed dispatch substrate for `inference` and `delivery` claims, first-class persisted study-context/QC/findings artifacts, a persisted workflow-package manifest plus structural execution envelope and typed artifact manifest, typed artifact references with a local-file or s3-compatible object-store seam, a bounded structural run surface with typed derived artifacts, a minimal equivalent operator surface for queue/review/report work, an optional PostgreSQL persistence mode with stale-writer rejection on whole-record updates, optional bearer-token protection for internal mutation routes, local clean-database migration smoke on PostgreSQL, Postgres restart-survival integration tests, and a CI postgres-smoke job
+3. not present yet: release-grade durable-state evidence beyond local smoke, production worker execution, frontend review workspace, and demo closure
 4. current repository verdict: `NOT_READY`
 
 ## Scope
@@ -40,21 +40,26 @@ Currently verified baseline:
 2. standalone TypeScript build
 3. baseline service startup
 4. public workflow routes for case create, list, detail, review, finalize, report retrieval, delivery retry, and operations summary
-5. internal ingest, inference callback, and delivery callback endpoints
-6. restart-safe local snapshot persistence for case state, queue state, delivery state, retry history, and operation transcript
-7. first-class persisted study-context, QC summary, findings payload, and bounded structural run surfaces on case detail reads
-8. structured API error envelopes for invalid transport input
-9. `GET /`, `GET /healthz`, `GET /readyz`, and `GET /metrics`
-10. internal workflow logic is now split across orchestration, planning, and snapshot-repository seams without changing the HTTP contract
-11. `GET /operator` serves a minimal equivalent operator surface for queue, case detail, review, finalize, report preview, and delivery retry
+5. internal ingest, dispatch heartbeat, inference callback, and delivery callback endpoints
+6. optional bearer-token protection for internal ingest, dispatch claim, inference callback, and delivery callback endpoints via `MRI_INTERNAL_API_TOKEN`; HMAC-SHA256 signed-request authentication available via `MRI_INTERNAL_HMAC_SECRET` (preferred for production)
+7. clinician-action review and finalize routes require explicit human identity from the request body and reject internal machine credentials on those public routes
+8. restart-safe local snapshot persistence for case state, queue state, delivery state, retry history, and operation transcript
+9. first-class persisted study-context, workflow-package manifest, structural execution envelope, typed artifact manifest, QC summary, findings payload, and bounded structural run surfaces on case detail reads
+10. typed artifact references with URI, checksum, media type, producer, attempt identity, and a local-file or s3-compatible storage seam
+10. structured API error envelopes for invalid transport input
+11. `GET /`, `GET /healthz`, `GET /readyz`, and `GET /metrics`
+12. internal workflow logic is now split across orchestration, planning, and snapshot-repository seams without changing the HTTP contract
+13. `POST /api/internal/dispatch/claim` exposes a bounded internal worker-handoff seam for queued `inference` and `delivery` work with durable lease metadata and expiry-based requeue
+14. PostgreSQL-backed whole-record updates now reject stale writers instead of blindly overwriting a newer durable case revision
+15. `GET /operator` serves a minimal equivalent operator surface for queue, case detail, review, finalize, report preview, and delivery retry
 
 The standalone repository still does not provide:
 
 1. release-grade PostgreSQL durability evidence beyond the local integration tests and CI-configured migration verification
-2. Redis-backed queue infrastructure or background-worker dispatch
-3. object-store-backed artifact durability
+2. background-worker execution, multi-worker lease coordination, or dead-letter governance beyond the current bounded internal dispatch-claim seam and optional Redis queue substrate
+3. release-grade object-store-backed artifact durability beyond the current typed artifact-reference seam
 4. OHIF or other frontend review surfaces
-5. a real Python or external worker path for QC and MRI processing beyond the current bounded local structural run contract
+5. a production-grade Python or external worker runtime beyond the current bounded signed worker scaffold and local structural run contract
 6. demo closure or launch-ready evidence
 7. ~~main-branch GitHub-hosted CI build and test evidence~~ (now recorded — see `docs/verification/launch-evidence-index.md`)
 
@@ -78,7 +83,60 @@ DATABASE_URL=postgresql://... npm run db:migrate
 npm run db:migrate:smoke
 ```
 
+Optional local infrastructure bring-up for the current Postgres and Redis seams:
+
+```bash
+docker compose up -d postgres redis
+```
+
 When `DATABASE_URL` is present, the API now advertises `persistenceMode: "postgres"` from `GET /` and `GET /readyz` and routes case storage through the PostgreSQL repository.
+
+When `MRI_INTERNAL_API_TOKEN` is present, internal mutation routes require `Authorization: Bearer <token>`.
+
+When `MRI_INTERNAL_HMAC_SECRET` is present (≥ 32 bytes), internal mutation routes require HMAC-SHA256 signed requests instead of Bearer tokens. Each request must include three headers:
+
+| Header | Content |
+|--------|---------|
+| `X-MRI-Timestamp` | ISO 8601 UTC timestamp at send time |
+| `X-MRI-Nonce` | Unique random value per request |
+| `X-MRI-Signature` | `HMAC-SHA256(secret, METHOD + "\n" + PATH + "\n" + Timestamp + "\n" + Nonce + "\n" + SHA256(body))` as hex |
+
+Requests outside the clock-skew window (default ±60 s, configurable via `MRI_CLOCK_SKEW_TOLERANCE_MS`) are rejected.
+
+**Replay protection:** When HMAC signing is active, the server tracks consumed nonces in memory. A repeated nonce within the TTL window (default 120 s, configurable via `MRI_REPLAY_STORE_TTL_MS`) returns `409 REPLAY_DETECTED`. The in-memory store holds up to `MRI_REPLAY_STORE_MAX_ENTRIES` entries (default 10 000) before evicting the oldest. A PostgreSQL-backed replay store is available via migration `002-replay-nonces.sql` (not yet wired — memory mode covers the current baseline).
+
+When both `MRI_INTERNAL_HMAC_SECRET` and `MRI_INTERNAL_API_TOKEN` are set, HMAC takes precedence and Bearer is ignored.
+
+Derived artifacts now flow through a typed reference contract instead of staying only as opaque inline blobs. Configure that seam with:
+
+| Variable | Purpose |
+|--------|---------|
+| `MRI_ARTIFACT_STORE_PROVIDER` | `local-file` or `s3-compatible` |
+| `MRI_ARTIFACT_STORE_BASE_PATH` | local artifact root or object-key base path |
+| `MRI_ARTIFACT_STORE_ENDPOINT` | optional explicit endpoint for s3-compatible deployments |
+| `MRI_ARTIFACT_STORE_BUCKET` | optional bucket name for s3-compatible deployments |
+
+The current implementation still defaults to a local-file artifact root under `.mri-data/artifacts`, but the persisted reference model is now object-store ready without another case-state rewrite.
+
+Dispatch claims can also move from the default local queue substrate to Redis-backed transport:
+
+| Variable | Purpose |
+|--------|---------|
+| `MRI_QUEUE_PROVIDER` | `local` or `redis` |
+| `MRI_REDIS_URL` | Redis connection string used when the provider is `redis` |
+| `MRI_QUEUE_KEY_PREFIX` | stage-specific queue key prefix |
+
+The Redis path now covers queue transport for `POST /api/internal/dispatch/claim`, but the durable source of truth for attempts, lease metadata, and operator-visible queue state remains the persisted case record.
+
+That boundary currently covers `POST /api/internal/ingest`, `POST /api/internal/dispatch/claim`, `POST /api/internal/dispatch/heartbeat`, `POST /api/internal/inference-callback`, and `POST /api/internal/delivery-callback`.
+
+One minimal external worker loop now exists under `worker/`.
+
+It signs claim, heartbeat, and callback requests against the current HMAC contract so the repository no longer depends only on local callback simulation to prove worker-loop closure.
+
+It is a bounded scaffold, not a production inference runtime.
+
+Public clinician-action routes stay separate from that machine boundary. `POST /api/cases/:caseId/review` requires `reviewerId` in the request body, `POST /api/cases/:caseId/finalize` requires `clinicianId`, and both routes reject internal bearer or HMAC credentials with `403 MACHINE_CREDENTIAL_REJECTED`.
 
 Use this quick start to verify the current baseline only.
 
@@ -118,13 +176,14 @@ Core standalone documents:
 8. `docs/architecture/reasoning-agent-safety-and-validation.md`
 9. `docs/architecture/mvp-work-package-map.md`
 10. `docs/architecture/reference-workflow-routing.md`
-11. `docs/architecture/reporting-and-export-contract.md`
-12. `docs/open-source-target-architecture.md`
-13. `docs/academic/evidence-and-claims-policy.md`
-14. `docs/academic/open-source-rationale.md`
-15. `docs/academic/ecosystem-landscape-march-2026.md`
-16. `docs/academic/external-evidence-register-march-2026.md`
-17. `docs/academic/model-licensing-and-deployment-gates.md`
+9. `docs/architecture/reporting-and-export-contract.md`
+10. `docs/architecture/queue-substrate-adr.md`
+11. `docs/open-source-target-architecture.md`
+12. `docs/academic/ecosystem-landscape-march-2026.md`
+13. `docs/academic/external-evidence-register-march-2026.md`
+14. `docs/academic/model-licensing-and-deployment-gates.md`
+15. `docs/academic/regulatory-positioning.md`
+16. `docs/roadmap-and-validation.md`
 18. `docs/academic/regulatory-positioning.md`
 19. `docs/roadmap-and-validation.md`
 
@@ -137,21 +196,23 @@ Use these documents as the current release gate:
 1. `docs/launch-readiness-checklist.md`
 2. `docs/verification/launch-evidence-index.md`
 3. `docs/demo/demo-script.md`
-4. `docs/releases/v1-go-no-go.md`
-5. `docs/verification/documentation-honesty-review.md`
-6. `docs/verification/runtime-baseline-verification.md`
-7. `docs/releases/public-github-and-mvp-path.md`
-8. `docs/releases/github-publication-playbook.md`
-9. `docs/releases/github-go-live-checklist.md`
-10. `docs/releases/github-metadata-copy.md`
-11. `docs/releases/github-settings-worksheet.md`
-12. `docs/releases/github-live-publication-sequence.md`
-13. `docs/releases/first-public-announcement-draft.md`
-14. `docs/releases/github-operator-packet.md`
-15. `docs/demo/social-preview-brief.md`
-16. `docs/verification/hosted-evidence-capture-template.md`
-17. `docs/verification/ai-auditor-handoff-2026-03-25.md`
-18. `docs/verification/repository-audit-2026-03-25.md`
+4. `docs/demo/synthetic-demo-input-provenance.md`
+5. `docs/demo/demo-transcript.md`
+6. `docs/releases/v1-go-no-go.md`
+7. `docs/verification/documentation-honesty-review.md`
+8. `docs/verification/runtime-baseline-verification.md`
+9. `docs/releases/public-github-and-mvp-path.md`
+10. `docs/releases/github-publication-playbook.md`
+11. `docs/releases/github-go-live-checklist.md`
+12. `docs/releases/github-metadata-copy.md`
+13. `docs/releases/github-settings-worksheet.md`
+14. `docs/releases/github-live-publication-sequence.md`
+15. `docs/releases/first-public-announcement-draft.md`
+16. `docs/releases/github-operator-packet.md`
+17. `docs/demo/social-preview-brief.md`
+18. `docs/verification/hosted-evidence-capture-template.md`
+19. `docs/verification/ai-auditor-handoff-2026-03-25.md`
+20. `docs/verification/repository-audit-2026-03-25.md`
 
 ## Academic Position
 

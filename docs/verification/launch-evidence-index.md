@@ -7,7 +7,7 @@ Every claim about launch readiness should link back to one or more artifacts lis
 ## Repository Status
 
 - Current verdict: `NOT_READY`
-- Last reviewed: 2026-03-25
+- Last reviewed: 2026-03-26
 - Public repository: `https://github.com/KonkovaElena/mri-second-opinion`
 - Auditor handoff: `docs/verification/ai-auditor-handoff-2026-03-25.md`
 - Repository audit: `docs/verification/repository-audit-2026-03-25.md`
@@ -61,6 +61,20 @@ Primary planning references:
 1. `../architecture/mvp-work-package-map.md`
 2. `../architecture/neuro-first-mvp-slice.md`
 
+## PR-17 Claim-To-Evidence Ledger
+
+| Claim | Status | Concrete artifacts | Boundary |
+|---|---|---|---|
+| Signed internal mutation routes require HMAC-authenticated requests | complete for the current local baseline | `src/app.ts`, `tests/workflow-api.test.ts`, `docs/verification/runtime-baseline-verification.md` | one shared-secret trust boundary only; not hosted multi-service identity proof |
+| Replay and idempotency closure reject duplicate signed nonces and keep duplicate intake safe | partial | `tests/workflow-api.test.ts`, `README.md`, `tests/memory-case-service.test.ts` | nonce replay protection is still in-memory in the current runtime; the PostgreSQL replay store is not yet wired |
+| Queue substrate and worker transcript prove claim, heartbeat, callback, and degraded-worker visibility | partial | `tests/fixtures/worker-inference-transcript.json`, `tests/workflow-api.test.ts`, `worker/main.py`, `docs/verification/runtime-baseline-verification.md` | bounded local scaffold only; not evidence of a production worker fleet |
+| Artifact indirection and version pinning preserve typed artifact references and stable finalized releases | partial | `sql/migrations/004_projection_split.sql`, `tests/memory-case-service.test.ts`, `tests/postgres-integration.test.ts`, `docs/architecture/reporting-and-export-contract.md` | object-store-backed artifacts and export-grade release evidence remain incomplete |
+
+Verdict discipline:
+
+1. any `partial` row above keeps the repository verdict at `NOT_READY`
+2. `docs/releases/v1-go-no-go.md` remains the authority for verdict wording
+
 ## Evidence Categories
 
 ## 1. Clean Checkout And Build
@@ -106,9 +120,12 @@ Record:
 
 - Status: partial
 - Artifact links:
+  - `README.md`
   - `tests/workflow-api.test.ts`
   - `tests/memory-case-service.test.ts`
   - `tests/postgres-integration.test.ts`
+  - `tests/fixtures/worker-inference-transcript.json`
+  - `worker/main.py`
   - `src/cases.ts`
   - `docs/verification/worker-artifact-contract-samples.md`
   - `docs/verification/runtime-baseline-verification.md`
@@ -128,6 +145,7 @@ Record:
 
 - Status: complete for the current local baseline
 - Artifact links:
+  - `sql/migrations/004_projection_split.sql`
   - `tests/memory-case-service.test.ts`
   - `tests/postgres-case-repository.test.ts`
   - `tests/postgres-integration.test.ts`
@@ -141,7 +159,7 @@ Record:
 
 Recorded local evidence on 2026-03-25:
 
-1. `npm test` passed with `35/35` tests in the standalone subtree after the durable queue-model and worker-artifact tests were added
+1. `npm test` passed with `91/91` tests in the standalone subtree on 2026-03-26 after queue diagnostics and correlation persistence updates
 2. `npm run db:migrate:smoke` succeeded against a clean local `postgres:17-alpine` container
 3. the smoke confirmed `schema_migrations` contains `001_create_case_records`
 4. the smoke confirmed the `case_records` table exists after migration
@@ -178,10 +196,18 @@ Required artifacts:
 
 Record:
 
-- Status: missing
+- Status: partial
 - Artifact links:
   - `docs/demo/demo-script.md`
+  - `docs/demo/synthetic-demo-input-provenance.md`
+  - `docs/demo/demo-transcript.md`
+  - `docs/releases/v1-go-no-go.md`
   - `docs/architecture/mvp-work-package-map.md`
+
+Current boundary:
+
+1. the synthetic-safe input packet and bounded transcript now exist
+2. the screenshot bundle is still missing, so the verdict remains `NOT_READY`
 
 ## 6. Public Repository Hygiene
 
@@ -247,7 +273,7 @@ Required artifacts:
 
 Record:
 
-- Status: partial
+- Status: complete
 - Artifact links:
   - `docs/verification/documentation-honesty-review.md`
   - `docs/verification/repository-audit-2026-03-25.md`
@@ -258,6 +284,12 @@ Record:
   - `docs/academic/evidence-and-claims-policy.md`
   - `docs/verification/runtime-baseline-verification.md`
   - `docs/verification/architecture-and-publication-audit-2026-03-25.md`
+
+Recorded closure note on 2026-03-26:
+
+1. public-facing release and product docs keep the repository verdict at `NOT_READY`
+2. public-facing wording no longer depends on parent-platform framing to explain the current standalone state
+3. remaining launch blockers are demo evidence and broader runtime proof, not public-doc honesty drift
 
 ## 8. Academic Rationale Layer
 

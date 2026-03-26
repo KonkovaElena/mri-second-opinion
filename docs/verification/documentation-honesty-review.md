@@ -57,6 +57,7 @@ The target architecture docs remain intentionally ahead of the current single-pr
 2. `docs/verification/launch-evidence-index.md`
 3. explicit `NOT_READY` posture in release docs
 4. conservative distinction between local wave1 baseline and target stack in `README.md`
+5. public-facing wording now avoids parent-platform framing in product and release surfaces
 
 ## Verdict
 

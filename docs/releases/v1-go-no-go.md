@@ -1,6 +1,6 @@
 # MRI Standalone v1 Go/No-Go
 
-Date: 2026-03-25
+Date: 2026-03-26
 
 ## Allowed Verdicts
 
@@ -16,7 +16,7 @@ Only these verdicts are allowed:
 
 ## Why
 
-The standalone repository now has a verified wave1 workflow API baseline, local restart-safe file-backed durability, a durable local queue/read-model layer for inference and delivery stages, first-class persisted study-context/QC/findings artifact surfaces, a bounded structural run surface with typed derived artifacts and branch-execution visibility, an optional PostgreSQL-backed repository path, local clean-database PostgreSQL migration proof, Postgres restart-survival integration tests (3 tests covering restart, full lifecycle, and delete), a CI postgres-smoke job, and hosted CI proof for the standalone subtree, but a real worker execution path, frontend completeness, demo reproducibility, and broader release-grade operational evidence are still incomplete.
+The standalone repository now has a verified wave1 workflow API baseline, HMAC-signed internal mutation routes, replay rejection for signed nonces, local restart-safe file-backed durability, a durable local queue/read-model layer for inference and delivery stages, explicit queue and worker diagnostics on the operations summary, first-class persisted study-context/QC/findings artifact surfaces, typed artifact-reference projections, pinned reviewed and finalized release versions, a bounded signed worker transcript path, an optional PostgreSQL-backed repository path, local clean-database PostgreSQL migration proof, Postgres restart-survival integration tests, a CI postgres-smoke job, and hosted CI proof for the standalone subtree, but a reproducible synthetic demo packet, screenshot-backed UI closure, hosted or operator-run demo evidence, and broader release-grade operational proof are still incomplete.
 
 ## Evidence Basis
 
@@ -32,16 +32,14 @@ Supporting artifacts that exist now:
 8. `../verification/runtime-baseline-verification.md`
 9. `public-github-and-mvp-path.md`
 10. `../architecture/mvp-work-package-map.md`
+11. `../architecture/reporting-and-export-contract.md`
 
 Missing evidence required for a higher verdict:
 
-1. hosted API contract verification for the declared workflow surface
-2. release-linked restart-persistence verification against the intended durable-state path
-3. broader PostgreSQL operational evidence beyond the current local integration tests and CI-configured migration verification
-4. a real worker execution proof beyond the current persisted local artifact contract
-5. screenshot-backed frontend closure proof
-6. reproducible synthetic demo transcript
-7. workflow-level evidence beyond the current local wave1 baseline
+1. screenshot bundle for queue, case detail, evidence, review, report, and delivery surfaces
+2. operator runbook proof that the bounded demo can be executed repeatably in the intended local setup and timed under ten minutes
+3. broader worker and operational evidence beyond the current bounded local scaffold
+4. hosted or externally repeatable workflow evidence beyond the current local wave1 baseline
 
 ## Upgrade Rules
 
@@ -64,3 +62,7 @@ That publication path may justify making the repository public earlier, but it d
 ## Change Discipline
 
 This file must be updated only when the verdict changes or when new evidence materially changes the justification for the current verdict.
+
+PR-17 updates may expand the evidence basis and tighten the `NOT_READY` justification, but they must not imply a verdict upgrade without the PR-18 demo packet.
+
+The current PR-18 packet adds a synthetic-input provenance note and a bounded end-to-end transcript, but it still does not close the screenshot-backed demo gate.

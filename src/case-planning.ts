@@ -1,4 +1,5 @@
 import type {
+  ArtifactReference,
   CaseRecord,
   CaseStatus,
   EvidenceCard,
@@ -7,7 +8,7 @@ import type {
   PolicyGateRecord,
   ReportPayload,
 } from "./cases";
-import { missingRequiredSequences, nowIso } from "./case-common";
+import { missingRequiredSequences, nowIso, type ReportVersionPins } from "./case-common";
 
 export const ALLOWED_TRANSITIONS: Readonly<Record<CaseStatus, readonly CaseStatus[]>> = {
   INGESTING: ["SUBMITTED", "QC_REJECTED"],
@@ -111,6 +112,8 @@ export function createEvidenceCards(caseRecord: CaseRecord): EvidenceCard[] {
   const cards: EvidenceCard[] = [];
   const missingRequired = missingRequiredSequences(caseRecord.sequenceInventory);
   const selectedPackage = caseRecord.planEnvelope.packageResolution.selectedPackage;
+  const structuralExecution = caseRecord.workerArtifacts.structuralExecution;
+  const artifactManifest = caseRecord.workerArtifacts.artifactManifest;
 
   cards.push({
     cardType: "routing",
@@ -180,7 +183,7 @@ export function createEvidenceCards(caseRecord: CaseRecord): EvidenceCard[] {
       severity: caseRecord.report.qcDisposition === "warn" ? "warn" : "info",
       status: caseRecord.report.qcDisposition === "warn" ? "warn" : "good",
       summary: caseRecord.report.processingSummary,
-      supportingRefs: caseRecord.report.artifacts,
+      supportingRefs: caseRecord.report.artifacts.map((artifact) => artifact.uri),
       recommendedAction:
         caseRecord.report.qcDisposition === "warn"
           ? "Review QC warnings before release."
@@ -188,16 +191,16 @@ export function createEvidenceCards(caseRecord: CaseRecord): EvidenceCard[] {
     });
   }
 
-  if (caseRecord.workerArtifacts.structuralRun) {
+  if (structuralExecution) {
     cards.push({
       cardType: "branch-execution",
       cardVersion: "0.1.0",
       caseId: caseRecord.caseId,
-      headline: `Structural branch ${caseRecord.workerArtifacts.structuralRun.status}`,
+      headline: `Structural branch ${structuralExecution.status}`,
       severity: "info",
       status: "good",
-      summary: `${caseRecord.workerArtifacts.structuralRun.packageId}@${caseRecord.workerArtifacts.structuralRun.packageVersion} produced ${caseRecord.workerArtifacts.structuralRun.artifacts.length} artifact(s).`,
-      supportingRefs: caseRecord.workerArtifacts.structuralRun.artifacts.map((artifact) => artifact.storageRef),
+      summary: `${structuralExecution.packageId}@${structuralExecution.packageVersion} produced ${artifactManifest.length} artifact(s).`,
+      supportingRefs: artifactManifest.map((artifact) => artifact.artifact.uri),
       recommendedAction: null,
     });
   }
@@ -205,9 +208,14 @@ export function createEvidenceCards(caseRecord: CaseRecord): EvidenceCard[] {
   return cards;
 }
 
-export function createDraftReport(caseRecord: CaseRecord, input: InferenceCallbackInput): ReportPayload {
-  const generatedAt = nowIso();
-
+export function createDraftReport(
+  caseRecord: CaseRecord,
+  input: InferenceCallbackInput,
+  artifacts: ArtifactReference[],
+  workflowVersion: string,
+  versionPins: ReportVersionPins,
+  generatedAt: string = nowIso(),
+): ReportPayload {
   return {
     reportSchemaVersion: "0.1.0",
     caseId: caseRecord.caseId,
@@ -225,12 +233,13 @@ export function createDraftReport(caseRecord: CaseRecord, input: InferenceCallba
     measurements: input.measurements,
     uncertaintySummary: "Human review remains mandatory for all machine findings.",
     issues: input.issues ?? [],
-    artifacts: input.artifacts,
+    artifacts: artifacts.map((artifact) => ({ ...artifact })),
     provenance: {
-      workflowVersion: "brain-structural-fastsurfer@0.1.0",
+      workflowVersion,
       plannerVersion: caseRecord.planEnvelope.provenance.plannerVersion,
       generatedAt,
     },
+    versionPins,
     reviewStatus: "draft",
     disclaimerProfile: "RUO_CLINICIAN_REVIEW_REQUIRED",
   };

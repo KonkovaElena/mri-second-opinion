@@ -26,7 +26,7 @@ Discussion and collaboration should stay respectful, evidence-based, and useful 
 
 For behavior that affects contributor safety or repository trust, contact the maintainers through the repository's documented security or maintainer path before escalating publicly.
 
-For active safety or abuse concerns in this repository, use `security@microphoenix.io` with the subject prefix `[mri-second-opinion][conduct]` until a repo-specific contact is published.
+For active safety or abuse concerns in this repository, use the shared repository inbox `security@microphoenix.io` with the subject prefix `[mri-second-opinion][conduct]` until a repo-specific conduct contact is published.
 
 ## Enforcement
 

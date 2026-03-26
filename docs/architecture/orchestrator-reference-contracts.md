@@ -32,6 +32,49 @@ The key rule is simple: narrative text may explain the system, but structured co
 4. evidence cards summarize structured state; they do not invent findings outside it
 5. report and export layers must consume these contracts rather than bypass them
 
+## Queue-State Invariant Sheet (PR-06)
+
+Read surfaces and durable state must preserve a closed pairing between workflow status, report review status, and active queue stage.
+
+| Case status | Required report state | Required active queue |
+|---|---|---|
+| `SUBMITTED` | no report | `inference` only |
+| `AWAITING_REVIEW` | `draft` | none |
+| `REVIEWED` | `reviewed` | none |
+| `DELIVERY_PENDING` | `finalized` | `delivery` only |
+| `DELIVERED` | `finalized` | none |
+| `DELIVERY_FAILED` | `finalized` | none |
+
+Any other pairing is a state-integrity violation rather than a tolerated partial condition.
+
+## Delivery Retry Taxonomy (PR-12)
+
+The current bounded runtime applies explicit retry and dead-letter semantics to delivery dispatch attempts.
+
+The queue contract now distinguishes:
+
+1. `transient` failures that can schedule another attempt under the active retry tier
+2. `terminal` failures that must stop retries and dead-letter the case immediately
+
+The current `standard` retry tier uses:
+
+1. maximum 3 delivery attempts
+2. backoff schedule of 30 seconds after attempt 1 and 120 seconds after attempt 2
+3. dead-letter transition on a transient failure at the max-attempt ceiling or on any terminal failure
+
+Each queue attempt must carry:
+
+1. `attempt`
+2. `attemptId`
+3. `retryTier`
+4. `maxAttempts`
+5. `retryEligibleAt`
+6. `failureClass`
+7. `failureCode`
+8. `deadLetteredAt`
+
+This slice is intentionally bounded to delivery dispatch because that is the only worker-failure path the current standalone runtime models truthfully before the real external worker loop lands.
+
 ## 1. Workflow-Package Manifest
 
 The workflow-package manifest is the unit of orchestration registration.

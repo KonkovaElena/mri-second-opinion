@@ -41,6 +41,20 @@ They do define the safest long-term contract boundaries.
 4. exports must distinguish machine findings, human review state, and final released content
 5. report schemas must be versioned explicitly
 
+## Version Pin Contract (PR-07)
+
+Machine draft generation and clinician release must remain semantically distinct.
+
+The internal report payload now carries three version pins:
+
+1. `machineDraftVersion`: increments when a new machine draft is accepted
+2. `reviewedReleaseVersion`: pinned to the accepted machine draft at clinician review time
+3. `finalizedReleaseVersion`: pinned from the reviewed release at finalization and treated as the delivery-safe release version
+
+Delivery and retry paths must operate against `finalizedReleaseVersion`, not against any hypothetical later draft.
+
+If a later machine rerun attempts to replace a finalized release, the workflow must reject it rather than silently mutate delivered semantics.
+
 ## Result Envelope Layers
 
 The reporting contract should be modeled in four layers.
@@ -116,6 +130,30 @@ Each artifact should preserve:
 4. generation timestamp
 5. storage URI or object-store reference
 
+## Artifact Reference Contract
+
+The implementation seam should treat every durable derived artifact as a typed reference object.
+
+The current minimum reference shape is:
+
+1. `artifactId`
+2. `uri`
+3. `checksum`
+4. `mediaType`
+5. `sizeBytes`
+6. `producer`
+7. `attemptId`
+
+This contract is already sufficient for:
+
+1. local-file URIs during the current baseline
+2. MinIO-compatible or other s3-compatible object-store URIs later
+3. stable audit linkage between structural runs, report payloads, and typed artifact manifests
+
+The important rule is that large derived outputs should travel through this reference contract rather than living only as opaque inline blobs inside case state.
+
+Small summary-safe values may still remain inline when they are required for operator or review surfaces.
+
 ## Export Ladder
 
 The product should ship exports in a staged order rather than promise all formats at once.
@@ -125,6 +163,8 @@ The product should ship exports in a staged order rather than promise all format
 The first mandatory export is the machine-readable JSON report contract.
 
 It is the canonical bridge between compute, review UI, and auditability.
+
+Within that contract, `artifacts[]` should carry typed artifact references rather than format-specific inline blobs.
 
 ### Stage B: Presented Report
 
@@ -185,8 +225,9 @@ The stable internal report payload should eventually carry, at minimum:
 11. `issues[]`
 12. `artifacts[]`
 13. `provenance`
-14. `reviewStatus`
-15. `disclaimerProfile`
+15. `versionPins`
+16. `reviewStatus`
+17. `disclaimerProfile`
 
 The exact field names may evolve, but these semantic groups should not disappear.
 
@@ -212,6 +253,8 @@ The intended operating pattern is:
 2. derived masks or overlays become review-linked artifacts, ideally in standards-oriented forms that can later map cleanly to SEG or SR exports
 3. the workflow core owns the report envelope and review state
 4. outward exports are generated from the stable report contract rather than from ad hoc viewer state
+
+Today that seam is represented by typed references whose URIs can be local-file backed or s3-compatible, while release-grade object-store durability remains a later closure step.
 
 This keeps review tooling and audit-grade reporting aligned without turning the viewer into the system of record.
 

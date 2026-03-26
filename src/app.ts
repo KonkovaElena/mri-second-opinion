@@ -1,5 +1,10 @@
 import express from "express";
+import { randomUUID, timingSafeEqual } from "node:crypto";
 import type { AppConfig } from "./config";
+import { createDefaultArtifactStoreConfig } from "./artifact-store";
+import { createDefaultDispatchQueueConfig, createDispatchQueueFromConfig } from "./dispatch-queue";
+import { verifySignedRequest, HMAC_HEADER_NONCE, HMAC_HEADER_SIGNATURE } from "./hmac-auth";
+import { MemoryReplayStore, type ReplayStore } from "./replay-store";
 import {
   MemoryCaseService,
   WorkflowError,
@@ -10,6 +15,83 @@ import {
 } from "./cases";
 import { SnapshotCaseRepository } from "./case-repository";
 import { PostgresCaseRepository } from "./postgres-case-repository";
+
+const CORRELATION_HEADER = "x-correlation-id";
+
+function requireInternalAuthorization(req: express.Request, config: AppConfig) {
+  // HMAC path: if secret is configured, HMAC is mandatory
+  if (config.hmacSecret) {
+    const rawBody: Buffer = (req as any).rawBody ?? Buffer.alloc(0);
+    const result = verifySignedRequest({
+      method: req.method,
+      path: req.path,
+      headers: req.headers as Record<string, string | undefined>,
+      rawBody,
+      hmacSecret: config.hmacSecret,
+      clockSkewToleranceMs: config.clockSkewToleranceMs,
+    });
+    if (!result.ok) {
+      throw new WorkflowError(401, result.message ?? "HMAC verification failed", "UNAUTHORIZED_INTERNAL_ROUTE");
+    }
+    return;
+  }
+
+  // Bearer fallback: dev/test convenience when HMAC is not configured
+  if (config.internalApiToken) {
+    const header = req.header("authorization") ?? "";
+    const expected = `Bearer ${config.internalApiToken}`;
+    const headerBuf = Buffer.from(header);
+    const expectedBuf = Buffer.from(expected);
+    if (headerBuf.length !== expectedBuf.length || !timingSafeEqual(headerBuf, expectedBuf)) {
+      throw new WorkflowError(401, "Internal route authorization failed", "UNAUTHORIZED_INTERNAL_ROUTE");
+    }
+    return;
+  }
+
+  // Neither configured — open mode (dev/test only; production warns at startup)
+}
+
+function requireNonceNotReplayed(req: express.Request, replayStore: ReplayStore | null) {
+  if (!replayStore) return; // replay check only applies when HMAC is active
+  const nonce = req.headers[HMAC_HEADER_NONCE];
+  if (typeof nonce !== "string" || nonce.length === 0) return; // no nonce = no replay check
+  // checkAndRecord is sync-fast for MemoryReplayStore; await at call site
+  return replayStore.checkAndRecord(nonce, Date.now()).then((isReplay) => {
+    if (isReplay) {
+      throw new WorkflowError(409, "Nonce already consumed — possible replay", "REPLAY_DETECTED");
+    }
+  });
+}
+
+/**
+ * Reject machine-to-machine credentials on clinician-action routes.
+ * Prevents service accounts from impersonating human actors on review/finalize.
+ */
+function rejectMachineCredentials(req: express.Request, config: AppConfig) {
+  // HMAC signature header present → machine credential
+  if (req.headers[HMAC_HEADER_SIGNATURE]) {
+    throw new WorkflowError(
+      403,
+      "Machine credentials not accepted on clinician-action routes",
+      "MACHINE_CREDENTIAL_REJECTED",
+    );
+  }
+
+  // Internal bearer token match → machine credential
+  if (config.internalApiToken) {
+    const header = req.header("authorization") ?? "";
+    const expected = `Bearer ${config.internalApiToken}`;
+    const headerBuf = Buffer.from(header);
+    const expectedBuf = Buffer.from(expected);
+    if (headerBuf.length === expectedBuf.length && timingSafeEqual(headerBuf, expectedBuf)) {
+      throw new WorkflowError(
+        403,
+        "Machine credentials not accepted on clinician-action routes",
+        "MACHINE_CREDENTIAL_REJECTED",
+      );
+    }
+  }
+}
 
 function requireRecord(body: unknown) {
   if (!body || typeof body !== "object" || Array.isArray(body)) {
@@ -26,6 +108,18 @@ function requireStringField(body: Record<string, unknown>, fieldName: string) {
   }
 
   return value;
+}
+
+function requireClinicianActionIdentity(
+  body: Record<string, unknown>,
+  config: AppConfig,
+  fieldName: "reviewerId" | "clinicianId",
+) {
+  if (config.reviewerIdentitySource === "request-body") {
+    return requireStringField(body, fieldName);
+  }
+
+  throw new WorkflowError(500, "Unsupported reviewer identity source", "INTERNAL_ERROR");
 }
 
 function requireStringArrayField(body: Record<string, unknown>, fieldName: string) {
@@ -52,6 +146,18 @@ function optionalDeliveryOutcome(body: Record<string, unknown>) {
   }
 
   throw new WorkflowError(400, "deliveryOutcome must be pending, failed, or delivered", "INVALID_INPUT");
+}
+
+function requireCaseReadView(value: unknown) {
+  if (typeof value === "undefined") {
+    return "detail" as const;
+  }
+
+  if (value === "detail" || value === "summary") {
+    return value;
+  }
+
+  throw new WorkflowError(400, "view must be detail or summary", "INVALID_INPUT");
 }
 
 function requireMeasurements(body: Record<string, unknown>) {
@@ -85,6 +191,67 @@ function requireDeliveryStatus(body: Record<string, unknown>) {
   }
 
   throw new WorkflowError(400, "deliveryStatus must be delivered or failed", "INVALID_INPUT");
+}
+
+function requireQueueStage(body: Record<string, unknown>) {
+  const value = body.stage;
+  if (value === "inference" || value === "delivery") {
+    return value;
+  }
+
+  throw new WorkflowError(400, "stage must be inference or delivery", "INVALID_INPUT");
+}
+
+function requireOptionalLeaseContext(body: Record<string, unknown>) {
+  const hasLeaseId = Object.prototype.hasOwnProperty.call(body, "leaseId");
+  const hasWorkerId = Object.prototype.hasOwnProperty.call(body, "workerId");
+
+  if (!hasLeaseId && !hasWorkerId) {
+    return {};
+  }
+
+  return {
+    leaseId: requireStringField(body, "leaseId"),
+    workerId: requireStringField(body, "workerId"),
+  };
+}
+
+function resolveCorrelationId(req: express.Request) {
+  const header = req.header(CORRELATION_HEADER);
+  return typeof header === "string" && header.trim().length > 0 ? header.trim() : randomUUID();
+}
+
+function getCorrelationId(res: express.Response) {
+  return typeof res.locals.correlationId === "string" ? res.locals.correlationId : randomUUID();
+}
+
+function writeStructuredLog(entry: Record<string, unknown>) {
+  process.stdout.write(`${JSON.stringify({ service: "mri-second-opinion", ...entry })}\n`);
+}
+
+function logMutation(
+  req: express.Request,
+  res: express.Response,
+  input: {
+    event: string;
+    outcome: "completed" | "failed";
+    statusCode: number;
+    caseId?: string | null;
+    errorCode?: string | null;
+  },
+) {
+  writeStructuredLog({
+    ts: new Date().toISOString(),
+    type: "workflow-mutation",
+    event: input.event,
+    correlationId: getCorrelationId(res),
+    method: req.method,
+    path: req.path,
+    caseId: input.caseId ?? null,
+    outcome: input.outcome,
+    statusCode: input.statusCode,
+    errorCode: input.errorCode ?? null,
+  });
 }
 
 function renderOperatorSurface(caseId: string | undefined) {
@@ -250,7 +417,7 @@ function renderOperatorSurface(caseId: string | undefined) {
         <h2>Review Workspace</h2>
         <div class="meta">Bound endpoints: ${reviewPath} and ${finalizePath}</div>
         <div class="meta">Retry endpoint: ${retryPath}</div>
-        <input id="reviewer-id" value="clinician-demo" placeholder="reviewerId" />
+        <input id="reviewer-id" value="clinician-demo" placeholder="clinician identity" />
         <textarea id="review-comments" placeholder="Review comments">Reviewed through operator surface.</textarea>
         <div class="actions">
           <button id="send-review">POST Review</button>
@@ -313,7 +480,10 @@ function renderOperatorSurface(caseId: string | undefined) {
         const response = await fetch(finalizePath(), {
           method: "POST",
           headers: { "content-type": "application/json" },
-          body: JSON.stringify({ finalSummary: "Finalized through operator surface." }),
+          body: JSON.stringify({
+            clinicianId: document.getElementById("reviewer-id").value,
+            finalSummary: "Finalized through operator surface.",
+          }),
         });
         document.getElementById("review-output").textContent = await response.text();
       });
@@ -339,15 +509,39 @@ function renderOperatorSurface(caseId: string | undefined) {
 
 export function createApp(config: AppConfig) {
   const app = express();
+  const artifactStore = config.artifactStore ?? createDefaultArtifactStoreConfig();
   const repository = config.persistenceMode === "postgres"
     ? new PostgresCaseRepository(config.databaseUrl as string)
     : new SnapshotCaseRepository({
         snapshotFilePath: config.caseStoreFile,
       });
-  const caseService = new MemoryCaseService({ repository, snapshotFilePath: config.caseStoreFile });
+  const dispatchQueue = createDispatchQueueFromConfig(
+    config.dispatchQueue ?? createDefaultDispatchQueueConfig(),
+    repository,
+  );
+  const caseService = new MemoryCaseService({
+    repository,
+    snapshotFilePath: config.caseStoreFile,
+    artifactStore,
+    dispatchQueue,
+  });
+
+  // Replay store: active only when HMAC is configured (nonces exist only in signed requests)
+  const replayStore: ReplayStore | null = config.hmacSecret
+    ? new MemoryReplayStore({ ttlMs: config.replayStoreTtlMs, maxEntries: config.replayStoreMaxEntries })
+    : null;
 
   app.disable("x-powered-by");
-  app.use(express.json());
+  app.use(express.json({
+    limit: "1mb",
+    verify: (_req, _res, buf) => { (_req as any).rawBody = buf; },
+  }));
+  app.use((req, res, next) => {
+    const correlationId = resolveCorrelationId(req);
+    res.locals.correlationId = correlationId;
+    res.setHeader(CORRELATION_HEADER, correlationId);
+    next();
+  });
 
   function handleError(res: express.Response, error: unknown) {
     if (error instanceof WorkflowError) {
@@ -364,6 +558,34 @@ export function createApp(config: AppConfig) {
     });
   }
 
+  async function executeMutation(
+    req: express.Request,
+    res: express.Response,
+    event: string,
+    handler: () => Promise<{ statusCode?: number; body: unknown; caseId?: string | null }>,
+  ) {
+    try {
+      const result = await handler();
+      const statusCode = result.statusCode ?? 200;
+      logMutation(req, res, {
+        event,
+        outcome: "completed",
+        statusCode,
+        caseId: result.caseId ?? null,
+      });
+      res.status(statusCode).json(result.body);
+    } catch (error) {
+      logMutation(req, res, {
+        event,
+        outcome: "failed",
+        statusCode: error instanceof WorkflowError ? error.statusCode : 500,
+        caseId: typeof req.params.caseId === "string" ? req.params.caseId : null,
+        errorCode: error instanceof WorkflowError ? error.code : "INTERNAL_ERROR",
+      });
+      handleError(res, error);
+    }
+  }
+
   app.get("/", (_req, res) => {
     res.json({
       name: "mri-second-opinion",
@@ -371,6 +593,22 @@ export function createApp(config: AppConfig) {
       nodeEnv: config.nodeEnv,
       persistenceMode: config.persistenceMode,
       message: "MRI workflow API baseline is available with durable local state.",
+      internalRouteAuth: {
+        enabled: Boolean(config.hmacSecret || config.internalApiToken),
+        scheme: config.hmacSecret ? "hmac-sha256" : config.internalApiToken ? "bearer" : "none",
+      },
+      clinicianReviewPolicy: {
+        reviewerIdentitySource: config.reviewerIdentitySource,
+        machineCredentialsRejected: true,
+      },
+      artifactStore: {
+        provider: artifactStore.provider,
+        endpoint: artifactStore.endpoint,
+        bucket: artifactStore.bucket,
+      },
+      queue: {
+        provider: (config.dispatchQueue ?? createDefaultDispatchQueueConfig()).provider,
+      },
       api: {
         public: [
           "POST /api/cases",
@@ -383,6 +621,8 @@ export function createApp(config: AppConfig) {
           "POST /api/delivery/:caseId/retry",
         ],
         internal: [
+          "POST /api/internal/dispatch/claim",
+          "POST /api/internal/dispatch/heartbeat",
           "POST /api/internal/ingest",
           "POST /api/internal/inference-callback",
           "POST /api/internal/delivery-callback",
@@ -425,19 +665,18 @@ export function createApp(config: AppConfig) {
   });
 
   app.post("/api/cases", async (req, res) => {
-    try {
+    await executeMutation(req, res, "case-created", async () => {
       const input = requireRecord(req.body);
       const created = await caseService.createCase({
         patientAlias: requireStringField(input, "patientAlias"),
         studyUid: requireStringField(input, "studyUid"),
         sequenceInventory: requireStringArrayField(input, "sequenceInventory"),
         indication: optionalStringField(input, "indication"),
+        correlationId: getCorrelationId(res),
       });
 
-      res.status(201).json({ case: created });
-    } catch (error) {
-      handleError(res, error);
-    }
+      return { statusCode: 201, body: { case: created }, caseId: created.caseId };
+    });
   });
 
   app.get("/api/cases", async (_req, res) => {
@@ -446,40 +685,46 @@ export function createApp(config: AppConfig) {
 
   app.get("/api/cases/:caseId", async (req, res) => {
     try {
-      res.json({ case: await caseService.getCase(req.params.caseId) });
+      const view = requireCaseReadView(req.query.view);
+      const caseRecord =
+        view === "summary"
+          ? await caseService.getCaseSummary(req.params.caseId)
+          : await caseService.getCase(req.params.caseId);
+      res.json({ case: caseRecord });
     } catch (error) {
       handleError(res, error);
     }
   });
 
   app.post("/api/cases/:caseId/review", async (req, res) => {
-    try {
+    await executeMutation(req, res, "clinician-reviewed", async () => {
+      rejectMachineCredentials(req, config);
       const input = requireRecord(req.body);
       const updated = await caseService.reviewCase(req.params.caseId, {
-        reviewerId: requireStringField(input, "reviewerId"),
+        reviewerId: requireClinicianActionIdentity(input, config, "reviewerId"),
         reviewerRole: optionalStringField(input, "reviewerRole"),
         comments: optionalStringField(input, "comments"),
         finalImpression: optionalStringField(input, "finalImpression"),
+        correlationId: getCorrelationId(res),
       });
 
-      res.json({ case: updated });
-    } catch (error) {
-      handleError(res, error);
-    }
+      return { body: { case: updated }, caseId: updated.caseId };
+    });
   });
 
   app.post("/api/cases/:caseId/finalize", async (req, res) => {
-    try {
+    await executeMutation(req, res, "case-finalized", async () => {
+      rejectMachineCredentials(req, config);
       const input = requireRecord(req.body);
       const updated = await caseService.finalizeCase(req.params.caseId, {
+        clinicianId: requireClinicianActionIdentity(input, config, "clinicianId"),
         finalSummary: optionalStringField(input, "finalSummary"),
         deliveryOutcome: optionalDeliveryOutcome(input),
+        correlationId: getCorrelationId(res),
       });
 
-      res.json({ case: updated });
-    } catch (error) {
-      handleError(res, error);
-    }
+      return { body: { case: updated }, caseId: updated.caseId };
+    });
   });
 
   app.get("/api/cases/:caseId/report", async (req, res) => {
@@ -495,61 +740,98 @@ export function createApp(config: AppConfig) {
   });
 
   app.post("/api/delivery/:caseId/retry", async (req, res) => {
-    try {
-      res.json({ case: await caseService.retryDelivery(req.params.caseId) });
-    } catch (error) {
-      handleError(res, error);
-    }
+    await executeMutation(req, res, "delivery-retry-requested", async () => {
+      const updated = await caseService.retryDelivery(req.params.caseId, getCorrelationId(res));
+      return { body: { case: updated }, caseId: updated.caseId };
+    });
   });
 
   app.post("/api/internal/ingest", async (req, res) => {
-    try {
+    await executeMutation(req, res, "ingest-request", async () => {
+      requireInternalAuthorization(req, config);
+      await requireNonceNotReplayed(req, replayStore);
       const input = requireRecord(req.body);
       const created = await caseService.ingestCase({
         patientAlias: requireStringField(input, "patientAlias"),
         studyUid: requireStringField(input, "studyUid"),
         sequenceInventory: requireStringArrayField(input, "sequenceInventory"),
         indication: optionalStringField(input, "indication"),
+        correlationId: getCorrelationId(res),
       });
 
-      res.status(201).json({ case: created });
-    } catch (error) {
-      handleError(res, error);
-    }
+      return { statusCode: 201, body: { case: created }, caseId: created.caseId };
+    });
+  });
+
+  app.post("/api/internal/dispatch/claim", async (req, res) => {
+    await executeMutation(req, res, "dispatch-claimed", async () => {
+      requireInternalAuthorization(req, config);
+      await requireNonceNotReplayed(req, replayStore);
+      const input = requireRecord(req.body);
+      const dispatch = await caseService.claimNextDispatch({
+        workerId: requireStringField(input, "workerId"),
+        stage: requireQueueStage(input),
+        leaseSeconds: typeof input.leaseSeconds === "number" ? input.leaseSeconds : undefined,
+        correlationId: getCorrelationId(res),
+      });
+
+      return { body: { dispatch }, caseId: dispatch?.caseId ?? null };
+    });
+  });
+
+  app.post("/api/internal/dispatch/heartbeat", async (req, res) => {
+    await executeMutation(req, res, "dispatch-heartbeat", async () => {
+      requireInternalAuthorization(req, config);
+      await requireNonceNotReplayed(req, replayStore);
+      const input = requireRecord(req.body);
+      const dispatch = await caseService.renewDispatchLease(requireStringField(input, "caseId"), {
+        leaseId: requireStringField(input, "leaseId"),
+        workerId: requireStringField(input, "workerId"),
+        stage: requireQueueStage(input),
+        leaseSeconds: typeof input.leaseSeconds === "number" ? input.leaseSeconds : undefined,
+        correlationId: getCorrelationId(res),
+      });
+
+      return { body: { dispatch }, caseId: dispatch.caseId };
+    });
   });
 
   app.post("/api/internal/inference-callback", async (req, res) => {
-    try {
+    await executeMutation(req, res, "inference-callback", async () => {
+      requireInternalAuthorization(req, config);
+      await requireNonceNotReplayed(req, replayStore);
       const input = requireRecord(req.body);
-
-      res.json({
-        case: await caseService.completeInference(requireStringField(input, "caseId"), {
-          qcDisposition: requireStringField(input, "qcDisposition") as InferenceCallbackInput["qcDisposition"],
-          findings: requireStringArrayField(input, "findings"),
-          measurements: requireMeasurements(input),
-          artifacts: requireStringArrayField(input, "artifacts"),
-          issues: Array.isArray(input.issues) ? input.issues.map((entry) => String(entry)) : undefined,
-          generatedSummary: optionalStringField(input, "generatedSummary"),
-        }),
+      const leaseContext = requireOptionalLeaseContext(input);
+      const updated = await caseService.completeInference(requireStringField(input, "caseId"), {
+        qcDisposition: requireStringField(input, "qcDisposition") as InferenceCallbackInput["qcDisposition"],
+        findings: requireStringArrayField(input, "findings"),
+        measurements: requireMeasurements(input),
+        artifacts: requireStringArrayField(input, "artifacts"),
+        issues: Array.isArray(input.issues) ? input.issues.map((entry) => String(entry)) : undefined,
+        generatedSummary: optionalStringField(input, "generatedSummary"),
+        correlationId: getCorrelationId(res),
+        ...leaseContext,
       });
-    } catch (error) {
-      handleError(res, error);
-    }
+
+      return { body: { case: updated }, caseId: updated.caseId };
+    });
   });
 
   app.post("/api/internal/delivery-callback", async (req, res) => {
-    try {
+    await executeMutation(req, res, "delivery-callback", async () => {
+      requireInternalAuthorization(req, config);
+      await requireNonceNotReplayed(req, replayStore);
       const input = requireRecord(req.body);
-
-      res.json({
-        case: await caseService.completeDelivery(requireStringField(input, "caseId"), {
-          deliveryStatus: requireDeliveryStatus(input),
-          detail: optionalStringField(input, "detail"),
-        }),
+      const leaseContext = requireOptionalLeaseContext(input);
+      const updated = await caseService.completeDelivery(requireStringField(input, "caseId"), {
+        deliveryStatus: requireDeliveryStatus(input),
+        detail: optionalStringField(input, "detail"),
+        correlationId: getCorrelationId(res),
+        ...leaseContext,
       });
-    } catch (error) {
-      handleError(res, error);
-    }
+
+      return { body: { case: updated }, caseId: updated.caseId };
+    });
   });
 
   app.use((error: unknown, _req: express.Request, res: express.Response, _next: express.NextFunction) => {

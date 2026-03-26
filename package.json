@@ -5,6 +5,13 @@
   "description": "Clinician-in-the-loop MRI second-opinion workflow baseline with a standalone TypeScript API and restart-safe local persistence",
   "license": "MIT",
   "type": "commonjs",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/KonkovaElena/mri-second-opinion.git"
+  },
+  "bugs": {
+    "url": "https://github.com/KonkovaElena/mri-second-opinion/issues"
+  },
   "keywords": [
     "mri",
     "medical-imaging",
@@ -30,7 +37,8 @@
   },
   "dependencies": {
     "express": "^4.21.2",
-    "pg": "^8.20.0"
+    "pg": "^8.20.0",
+    "redis": "^5.11.0"
   },
   "devDependencies": {
     "@types/express": "^5.0.1",

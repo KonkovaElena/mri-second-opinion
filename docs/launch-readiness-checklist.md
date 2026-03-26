@@ -35,7 +35,10 @@ Primary evidence:
 - [x] `POST /api/cases/:caseId/finalize` exists and finalizes reviewed case
 - [x] `GET /api/cases/:caseId/report` exists and retrieves rendered report output
 - [x] `POST /api/delivery/:caseId/retry` exists and retries delivery without mutating clinical approval state
-- [x] `GET /api/operations/summary` exists and supports operations view
+- [x] `GET /api/operations/summary` exists and supports operations view with queue and worker diagnostics
+- [x] signed internal mutation routes reject unsigned or malformed HMAC requests
+- [x] replayed nonces are rejected on signed internal ingest and dispatch-claim routes
+- [x] the bounded worker transcript proves claim -> heartbeat -> callback flow against real routes
 - [x] runtime payloads use the locked status vocabulary from `docs/status-model.md`
 
 Primary evidence:
@@ -43,6 +46,7 @@ Primary evidence:
 1. route map
 2. API contract tests
 3. end-to-end API transcript
+4. signed worker transcript fixture and HMAC route tests
 
 ## Gate 3. Durable Workflow Truth
 
@@ -55,6 +59,8 @@ Primary evidence:
 - [x] migrations run from clean database
 - [x] Postgres-backed restart survival verified through integration tests
 - [x] CI postgres-smoke job configured for migration verification on GitHub-hosted runners
+- [x] finalized release version remains pinned across later machine reruns
+- [x] typed artifact-reference projections survive restart and light-read paths
 
 Primary evidence:
 
@@ -64,13 +70,15 @@ Primary evidence:
 4. read-model verification
 5. `tests/postgres-integration.test.ts` (3 tests: restart survival, full lifecycle, delete propagation)
 6. `.github/workflows/ci.yml` postgres-smoke job
+7. `sql/migrations/004_projection_split.sql`
+8. `docs/architecture/reporting-and-export-contract.md`
 
 ## Gate 4. Frontend Closure
 
 - [x] queue dashboard exists
 - [x] case detail and review workspace exists
 - [x] final report preview exists
-- [x] operations summary screen exists
+- [x] operations summary screen exists with explicit queue and worker health semantics
 - [x] delivery failure and retry view exists
 - [x] no dead navigation or placeholder panels remain
 - [x] every visible action maps to a real backend endpoint
@@ -83,11 +91,11 @@ Primary evidence:
 
 ## Gate 5. Demo Credibility
 
-- [ ] demo uses synthetic MRI-safe input only
+- [x] demo uses synthetic MRI-safe input only
 - [ ] demo setup is reproducible in under ten minutes
-- [ ] `docs/demo/demo-script.md` matches the real UI and runtime
+- [x] `docs/demo/demo-script.md` matches the real UI and runtime
 - [ ] screenshots reflect current UI, not mockups
-- [ ] demo path covers intake through delivery state
+- [x] demo path covers intake through delivery state
 
 Primary evidence:
 
@@ -103,7 +111,7 @@ Primary evidence:
 - [x] `CONTRIBUTING.md` exists
 - [x] CI workflow exists and passes
 - [x] workflow permissions are minimized
-- [ ] no stale internal-only docs are presented as public-facing product docs
+- [x] no stale internal-only docs are presented as public-facing product docs
 
 Primary evidence:
 
@@ -118,7 +126,7 @@ Primary evidence:
 - [x] non-goals are explicit
 - [x] API scope matches runtime reality
 - [x] status model matches runtime reality
-- [ ] parent-platform jargon is removed from public product docs
+- [x] parent-platform jargon is removed from public product docs
 
 Primary evidence:
 

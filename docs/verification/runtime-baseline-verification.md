@@ -1,6 +1,6 @@
 # Runtime Baseline Verification
 
-Date: 2026-03-25
+Date: 2026-03-26
 
 ## Scope
 
@@ -65,10 +65,32 @@ The standalone service now exposes and validates these workflow endpoints:
 7. `GET /api/operations/summary`
 8. `POST /api/delivery/:caseId/retry`
 9. `POST /api/internal/ingest`
-10. `POST /api/internal/inference-callback`
-11. `POST /api/internal/delivery-callback`
+10. `POST /api/internal/dispatch/claim`
+11. `POST /api/internal/dispatch/heartbeat`
+12. `POST /api/internal/inference-callback`
+13. `POST /api/internal/delivery-callback`
 
 The route-level tests cover create, review, finalize, delivery retry, delivery callback, inference replay protection, ingest idempotency, and malformed JSON normalization.
+
+Internal mutation routes can now also be protected with an optional shared bearer token via `MRI_INTERNAL_API_TOKEN`.
+
+When configured, the standalone runtime returns `401` for unauthenticated or incorrectly authenticated requests to:
+
+1. `POST /api/internal/ingest`
+2. `POST /api/internal/dispatch/claim`
+3. `POST /api/internal/dispatch/heartbeat`
+4. `POST /api/internal/inference-callback`
+5. `POST /api/internal/delivery-callback`
+
+This is a minimal trust-separation boundary for the current single-process baseline.
+
+It is still not proof of a production worker fleet or stronger service identity beyond the current bounded signed worker scaffold.
+
+The dispatch claim path is intentionally narrow.
+
+It exposes durable queued `inference` and `delivery` work to an authenticated internal caller, records lease metadata on queue entries, renews active leases through `POST /api/internal/dispatch/heartbeat`, and returns expired claims to the queue when their lease window elapses.
+
+It now has one bounded external worker proof path through the signed Python worker scaffold, but it is not yet evidence of a standalone worker fleet or distributed lease coordination beyond the current optional Redis-backed dispatch substrate.
 
 ## 6. Restart-safe local durability
 
@@ -110,8 +132,9 @@ Confirmed locally.
 1. **Restart survival**: a case created and advanced to `AWAITING_REVIEW` through service instance A is visible to a new service instance B on the same backing store
 2. **Full lifecycle persistence**: a case advanced through `SUBMITTED → AWAITING_REVIEW → REVIEWED → DELIVERY_PENDING` survives a simulated restart with all fields intact (review, report, operation log, workflow queue)
 3. **Delete propagation**: a case deleted through the repository is absent when a new service instance loads from the same backing store
+4. **Stale-writer rejection**: PostgreSQL whole-record updates reject an older competing writer instead of overwriting a newer durable queue claim
 
-All 3 tests pass as part of the `35/35` local test suite.
+All 4 tests pass in the local standalone test suite.
 
 ## 10. Durable queue model and operations read model
 
@@ -126,26 +149,53 @@ The queue model currently covers the bounded local stages that already exist in 
 3. delivery queue entry created when a reviewed case is finalized
 4. delivery retry re-queues as a new durable delivery attempt
 5. `GET /api/operations/summary` now returns a rebuildable queue read model with active queue depth by stage plus recent queue transcript entries
+6. `GET /api/operations/summary` now also exposes additive `queueHealth` and `workerHealth` diagnostics for queued, in-flight, abandoned, dead-letter, retry, and active-worker visibility
 
-This is local durable queue state for the standalone baseline. It is not yet evidence of production-grade Redis-backed queue infrastructure or background-worker orchestration.
+This is durable queue state for the standalone baseline. The repository now also supports an optional Redis-backed dispatch substrate for queue transport, but this is not yet evidence of production-grade background-worker orchestration.
 
-## 11. Durable worker artifact contract
+## 11. Internal dispatch-claim seam
+
+Confirmed locally.
+
+The standalone baseline now exposes a bounded internal worker-handoff route at `POST /api/internal/dispatch/claim`.
+
+The current route contract supports:
+
+1. queue-stage claims for `inference` and `delivery`
+2. durable lease metadata persisted on the claimed queue entry
+3. stage-aware dispatch payloads that return the already-persisted workflow package, study context, report payload, and structural artifact context required by the current bounded workflow
+4. expiry-based requeue so an abandoned claim returns to `queued`
+
+The route is verified by the HTTP test suite and the service-level restart tests.
+
+This is still a single-process control-plane seam.
+
+It now supports an optional Redis-backed queue substrate for dispatch transport, but it is not yet evidence of multi-worker lease coordination or external worker runtime closure.
+
+## 12. Durable worker artifact contract
 
 Confirmed locally.
 
 The standalone baseline now persists the minimum truthful worker-facing artifact surfaces that already exist in wave 1 as first-class fields on each durable case record:
 
 1. study-context artifact derived from intake and routing state
-2. QC summary artifact derived from the inference callback
-3. structured findings payload derived from the generated report payload
-4. bounded structural run provenance with package identity, version, and typed artifact refs
-5. branch-execution evidence-card visibility on case detail reads
+2. workflow-package manifest for the selected structural package
+3. structural execution envelope with package identity, resource class, execution status, and produced artifact ids
+4. typed artifact manifest for worker-produced outputs
+5. QC summary artifact derived from the inference callback
+6. structured findings payload derived from the generated report payload
+7. bounded structural run provenance derived from the persisted execution contracts
+8. branch-execution evidence-card visibility on case detail reads
 
 These fields are verified through both snapshot-backed and PostgreSQL-backed restart tests and are visible through `GET /api/cases/:caseId`.
 
-All 3 artifact classes survive restart as part of the `35/35` local test suite.
+These execution-contract fields survive restart in the local standalone test suite.
 
-## 12. Equivalent operator surface
+The durable-state path now also applies optimistic concurrency to existing-record writes in both snapshot and PostgreSQL modes.
+
+For PostgreSQL-backed persistence, the repository rejects stale whole-record updates rather than blindly overwriting a newer durable revision.
+
+## 13. Equivalent operator surface
 
 Confirmed locally.
 
@@ -159,6 +209,43 @@ The standalone baseline now serves `GET /operator` as a minimal browser-facing o
 6. delivery retry
 
 This is an equivalent operator surface inside the standalone app, not a separate frontend build or deployment stack.
+
+## 14. Correlation and structured workflow logs
+
+Confirmed locally.
+
+The standalone baseline now accepts `X-Correlation-Id` on workflow mutation routes, generates one when the header is missing, echoes it back on the HTTP response, and persists that value on durable `operationLog` entries.
+
+The bounded signed Python worker scaffold reuses one correlation id across:
+
+1. `POST /api/internal/dispatch/claim`
+2. `POST /api/internal/dispatch/heartbeat`
+3. `POST /api/internal/inference-callback` or `POST /api/internal/delivery-callback`
+
+Mutation routes and server lifecycle events now also emit one-line JSON stdout logs so the bounded workflow transcript can be joined across HTTP responses, durable case state, and local runtime logs.
+
+Representative stdout sample:
+
+```json
+{"ts":"2026-03-26T18:14:22.110Z","service":"mri-second-opinion","type":"workflow-mutation","event":"inference-callback","correlationId":"corr-worker-transcript-001","method":"POST","path":"/api/internal/inference-callback","caseId":"case-123","outcome":"completed","statusCode":200,"errorCode":null}
+```
+
+This is a bounded local observability seam only.
+
+It is not yet evidence of a production log pipeline, trace backend, or distributed correlation strategy beyond the current standalone runtime.
+
+## 15. PR-17 claim anchors
+
+The current readiness claims are backed by these concrete repository artifacts:
+
+1. **Signed internal routes**: `tests/workflow-api.test.ts` proves signed ingest, signed dispatch claim, and the bounded worker transcript path; `src/app.ts` enforces the route-level HMAC contract
+2. **Replay and idempotency closure**: `tests/workflow-api.test.ts` proves `409 REPLAY_DETECTED` on nonce reuse; `README.md` documents the active replay window and its current in-memory boundary
+3. **Queue substrate and worker transcript**: `tests/fixtures/worker-inference-transcript.json`, `worker/main.py`, and `tests/workflow-api.test.ts` together prove the bounded claim -> heartbeat -> callback path plus persisted correlation and operations-summary diagnostics
+4. **Artifact indirection and version pinning**: `sql/migrations/004_projection_split.sql`, `tests/memory-case-service.test.ts`, `tests/postgres-integration.test.ts`, and `docs/architecture/reporting-and-export-contract.md` prove typed artifact-reference projections plus pinned reviewed and finalized release versions
+
+These anchors are sufficient for evidence-ledger work.
+
+They are not yet sufficient for a verdict upgrade because hosted demo evidence, screenshot capture, and broader operational proof remain incomplete.
 
 ## 9. CI postgres-smoke job
 
@@ -179,7 +266,7 @@ This verification proves runtime baseline independence only.
 It does not prove:
 
 1. release-grade PostgreSQL operational readiness beyond the local clean-database migration smoke and the CI-configured schema verification
-2. a real Python or external worker execution path for QC and structural processing
+2. a production-grade Python or external worker execution runtime beyond the current bounded scaffold and transcript proof
 3. frontend readiness
 4. demo readiness
 5. successful execution of the CI `postgres-smoke` job on GitHub-hosted runners

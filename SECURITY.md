@@ -13,12 +13,12 @@ Do not disclose exploitable details in a public issue.
 Use one of these private reporting routes:
 
 1. if GitHub Private Vulnerability Reporting is enabled for this repository, use the Security tab and submit the report there
-2. otherwise email `security@microphoenix.io` with the subject prefix `[mri-second-opinion][security]`
+2. otherwise email `security@microphoenix.io` with the subject prefix `[mri-second-opinion][security]`; this is the current shared security inbox for the repository until a repo-specific address is published
 
 Current ownership posture is intentionally minimal:
 
 1. no public named security maintainer is declared yet
-2. the valid private routes are the repository Security tab if enabled, or the shared security inbox above
+2. the valid private routes are the repository Security tab if enabled, or the shared repository security inbox above
 3. public issues, pull requests, and discussion threads are not valid channels for exploit details
 
 Expected response windows:

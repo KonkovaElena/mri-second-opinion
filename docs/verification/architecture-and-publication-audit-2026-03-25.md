@@ -19,7 +19,7 @@ That is acceptable for public-preparation work as long as the docs keep distingu
 2. target open-source deployment architecture
 3. still-missing MVP closure
 
-Relative to the full MicroPhoenix 10-layer SSOT, MRI Standalone is still intentionally simpler, but it is no longer entirely collapsed into one concrete file.
+Relative to the fuller target architecture documented in this repository, MRI Standalone is still intentionally simpler, but it is no longer entirely collapsed into one concrete file.
 
 That is reasonable for an extractable subtree, and this continuation wave moves the runtime toward internal seams before adding PostgreSQL, Redis, or worker adapters.
 
@@ -39,9 +39,9 @@ That is reasonable for an extractable subtree, and this continuation wave moves 
 2. the target stack assumes PostgreSQL, Redis, object storage, Orthanc, worker, and frontend boundaries that do not yet exist in runtime
 3. the current durability proof is local-file-based rather than database-backed
 
-## Comparison To MicroPhoenix Architecture
+## Comparison To The Full Target Architecture
 
-The parent MicroPhoenix platform uses a 10-layer SSOT with strict layer boundaries, DI, protocol separation, and infrastructure adapters.
+The fuller target architecture documented for this repository uses explicit component boundaries, protocol separation, persistence seams, and infrastructure adapters.
 
 MRI Standalone does not mirror that architecture yet.
 
@@ -55,7 +55,7 @@ Current posture:
 Interpretation:
 
 1. this is acceptable for a narrow standalone extraction baseline
-2. it is not yet a clean-layer slice of full MicroPhoenix
+2. it is not yet a clean-layer slice of the full target architecture documented here
 3. before adding new runtime dependencies, the subtree should split into repository, router-planner, and orchestrator seams
 
 ## Publication Readiness Audit
@@ -79,7 +79,7 @@ Interpretation:
 ### Remaining blockers
 
 1. hosted CI success evidence still needs to exist on GitHub after publication
-2. security reporting still depends on an umbrella contact or repository settings rather than a repo-specific maintainer channel
+2. security reporting still depends on repository settings or a shared inbox rather than a repo-specific maintainer channel
 3. frontend, queue, database, worker, and demo closure are still absent
 
 ## Recommended Next Runtime Step

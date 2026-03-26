@@ -8,6 +8,14 @@ It is a target-operating document.
 
 It does not claim that the current repository already implements the full orchestrator.
 
+Current runtime truth is narrower.
+
+The standalone baseline now implements a bounded internal dispatch-claim seam for queued `inference` and `delivery` work plus an optional Redis-backed dispatch substrate.
+
+It also persists lease heartbeat metadata (`lastHeartbeatAt`) on claimed attempts and returns abandoned work to the queue when the lease window expires.
+
+It still does not implement a separate worker fleet or full distributed orchestration closure.
+
 ## Governing Model
 
 The orchestrator should be modeled as an event-driven medical reasoning graph.

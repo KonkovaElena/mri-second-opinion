@@ -1,0 +1,36 @@
+{
+  "createCase": {
+    "patientAlias": "worker-transcript-patient",
+    "studyUid": "1.2.840.worker.transcript.1",
+    "sequenceInventory": ["T1w", "FLAIR"],
+    "indication": "bounded worker transcript proof"
+  },
+  "claim": {
+    "workerId": "python-worker-demo",
+    "stage": "inference",
+    "leaseSeconds": 90
+  },
+  "heartbeat": {
+    "leaseSeconds": 180
+  },
+  "callback": {
+    "qcDisposition": "pass",
+    "findings": [
+      "No acute intracranial abnormality."
+    ],
+    "measurements": [
+      {
+        "label": "brain_volume_ml",
+        "value": 1128
+      }
+    ],
+    "artifacts": [
+      "artifact://overlay-preview",
+      "artifact://report-preview"
+    ],
+    "issues": [
+      "Synthetic transcript artifact only."
+    ],
+    "generatedSummary": "Synthetic worker transcript produced a draft structural report."
+  }
+}
