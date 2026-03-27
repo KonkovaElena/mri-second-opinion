@@ -2,10 +2,12 @@
 
 Open-source, clinician-in-the-loop MRI second-opinion workflow.
 
+The current standalone control-plane baseline is cross-platform at the repository and runtime boundary: local state paths and derived-artifact file URIs are resolved canonically rather than through host-specific literals, and the repository is currently proven from Windows authoring plus GitHub-hosted Linux CI. The intended server and GPU-worker deployment baseline remains Linux-first.
+
 ## Repository Snapshot
 
 1. scope: MRI-only workflow baseline
-2. verified today: standalone TypeScript API plus snapshot-backed restart safety, a durable local queue/read-model layer for inference and delivery, a bounded internal dispatch-claim seam for worker handoff, an optional Redis-backed dispatch substrate for `inference` and `delivery` claims, first-class persisted study-context/QC/findings artifacts, a persisted workflow-package manifest plus structural execution envelope and typed artifact manifest, typed artifact references with a local-file or s3-compatible object-store seam, a bounded structural run surface with typed derived artifacts, a minimal equivalent operator surface for queue/review/report work, an optional PostgreSQL persistence mode with stale-writer rejection on whole-record updates, optional bearer-token protection for internal mutation routes, local clean-database migration smoke on PostgreSQL, Postgres restart-survival integration tests, and a CI postgres-smoke job
+2. verified today: standalone TypeScript API plus snapshot-backed restart safety, a durable local queue/read-model layer for inference and delivery, a bounded internal dispatch-claim seam for worker handoff, an optional Redis-backed dispatch substrate for `inference` and `delivery` claims, first-class persisted study-context/QC/findings artifacts, a persisted workflow-package manifest plus structural execution envelope and typed artifact manifest, typed artifact references with a local-file or s3-compatible object-store seam, a bounded structural run surface with typed derived artifacts, a minimal equivalent operator surface for queue/review/report work, an optional PostgreSQL persistence mode with stale-writer rejection on whole-record updates, optional bearer-token protection for internal mutation routes, local clean-database migration smoke on PostgreSQL, Postgres restart-survival integration tests, a CI postgres-smoke job, and cross-platform-safe default path plus file-URI handling for local artifacts and restart state
 3. not present yet: release-grade durable-state evidence beyond local smoke, production worker execution, frontend review workspace, and demo closure
 4. current repository verdict: `NOT_READY`
 
@@ -68,6 +70,8 @@ The runtime can now select snapshot mode or PostgreSQL-backed persistence via `D
 ## Quick Start
 
 Run the standalone subtree directly.
+
+This baseline is intentionally host-path-neutral for contributors. Default snapshot, migration, and artifact locations are derived at runtime, and persisted local artifact references are emitted as canonical file URLs rather than host-specific absolute-string literals. That keeps the standalone repo usable from different development hosts while preserving a Linux-first deployment target for server nodes and worker infrastructure.
 
 ```bash
 npm ci

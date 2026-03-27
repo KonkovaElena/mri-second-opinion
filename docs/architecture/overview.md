@@ -28,6 +28,21 @@ That control plane should decide which workflow package is eligible, explain why
 
 Where a reasoning agent is introduced, it should remain policy-bounded and emit structured plans that are validated by deterministic rules rather than free-form clinical conclusions.
 
+## Cross-Platform Contract
+
+The standalone control plane should be cross-platform at the repository and runtime boundary.
+
+That means:
+
+1. no runtime or verification surface should depend on one host OS path format
+2. default local snapshot, migration, and artifact roots should be derived through runtime path resolution rather than hard-coded absolute paths
+3. persisted local artifact references should be emitted as canonical file URLs rather than host-specific literals
+4. contributors should be able to author and verify the repository from different host environments; the current proof is Windows authoring plus GitHub-hosted Linux CI
+
+This does not mean every deployment target is equally mature on every operating system.
+
+The intended production-style server and GPU-worker topology remains Linux-first even while the repository and bounded local control plane stay host-neutral.
+
 ## Runtime Topology
 
 The intended baseline deployment is seven nodes:

@@ -19,12 +19,14 @@ Use `releases/public-github-and-mvp-path.md` to distinguish safe public publicat
 - [x] no runtime imports depend on parent repository `src/**`
 - [x] `.env.example` is sufficient for first local startup
 - [x] CI proves install and build independently
+- [x] no path, artifact URI, or verification expectation depends on a single host OS path format
 
 Primary evidence:
 
 1. clean-checkout CI run
 2. dependency scan showing no parent runtime imports
 3. local startup transcript
+4. cross-platform path and artifact-URI proof in runtime verification plus hosted CI
 
 ## Gate 2. Backend Workflow Closure
 

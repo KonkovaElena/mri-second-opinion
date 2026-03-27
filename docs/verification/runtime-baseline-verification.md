@@ -136,6 +136,24 @@ Confirmed locally.
 
 All 4 tests pass in the local standalone test suite.
 
+## 9. Cross-platform path and artifact URI semantics
+
+Confirmed across Windows authoring and Linux-hosted verification.
+
+The current standalone baseline derives default local state, migration, and artifact roots through runtime path resolution and emits persisted local artifact references as canonical file URLs rather than host-specific string literals.
+
+This behavior is exercised through:
+
+1. `src/config.ts` for default state-path resolution
+2. `src/artifact-store.ts` for canonical local artifact URI generation
+3. `tests/memory-case-service.test.ts` for restart-safe artifact reference assertions that no longer depend on one host path format
+
+GitHub-hosted `ci` was re-closed on 2026-03-27 after a Linux runner reproduced and then cleared a host-specific artifact-URI expectation in the restart test suite.
+
+This is contributor and control-plane cross-platform evidence for the current baseline.
+
+It is not yet proof of identical deployment packaging across every operating system; the intended server and GPU-worker topology remains Linux-first.
+
 ## 10. Durable queue model and operations read model
 
 Confirmed locally.

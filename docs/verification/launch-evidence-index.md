@@ -7,7 +7,7 @@ Every claim about launch readiness should link back to one or more artifacts lis
 ## Repository Status
 
 - Current verdict: `NOT_READY`
-- Last reviewed: 2026-03-26
+- Last reviewed: 2026-03-27
 - Public repository: `https://github.com/KonkovaElena/mri-second-opinion`
 - Auditor handoff: `docs/verification/ai-auditor-handoff-2026-03-25.md`
 - Repository audit: `docs/verification/repository-audit-2026-03-25.md`
@@ -27,6 +27,10 @@ Recorded hosted evidence today:
   `https://github.com/KonkovaElena/mri-second-opinion/actions/runs/23557754782`
 5. `docs-governance` succeeded on `49b794c` after adding the pending manual GitHub actions runbook:
   `https://github.com/KonkovaElena/mri-second-opinion/actions/runs/23557837645`
+6. `docs-governance` succeeded on `6a47800` after the migration/auth/evidence hardening pass:
+  `https://github.com/KonkovaElena/mri-second-opinion/actions/runs/23632190333`
+7. `ci` succeeded on `e782bf9` on 2026-03-27 after closing a host-specific artifact-URI regression that had failed on Linux runners:
+  `https://github.com/KonkovaElena/mri-second-opinion/actions/runs/23632453358`
 
 ## Priority Tracks
 
@@ -93,6 +97,8 @@ Record:
   - `docs-governance` green on `177094a`: `https://github.com/KonkovaElena/mri-second-opinion/actions/runs/23556374341`
   - `docs-governance` green on `8f851b3`: `https://github.com/KonkovaElena/mri-second-opinion/actions/runs/23557754782`
   - `docs-governance` green on `49b794c`: `https://github.com/KonkovaElena/mri-second-opinion/actions/runs/23557837645`
+  - `docs-governance` green on `6a47800`: `https://github.com/KonkovaElena/mri-second-opinion/actions/runs/23632190333`
+  - `ci` green on `e782bf9`: `https://github.com/KonkovaElena/mri-second-opinion/actions/runs/23632453358`
 - Artifact links:
   - `package.json`
   - `package-lock.json`
@@ -167,6 +173,7 @@ Recorded local evidence on 2026-03-27:
 6. `tests/postgres-integration.test.ts` verifies restart survival, full lifecycle persistence, and delete propagation through the Postgres repository layer, including persisted workflow-queue state
 7. CI `postgres-smoke` job added to `.github/workflows/ci.yml` — runs migration against a `postgres:17-alpine` service container and verifies schema on GitHub-hosted runners
 8. `tests/memory-case-service.test.ts`, `tests/workflow-api.test.ts`, and `tests/postgres-integration.test.ts` verify durable study-context, QC artifact, and findings-payload surfaces across snapshot restart, API detail reads, and PostgreSQL restart
+9. `ci` run `23632453358` on commit `e782bf9` proves the current restart and artifact-reference suite is now host-path-neutral on GitHub-hosted Linux runners after Windows-authored changes
 
 ## 4. Frontend Verification
 
@@ -228,6 +235,8 @@ Record:
   - `docs-governance` green on `177094a`: `https://github.com/KonkovaElena/mri-second-opinion/actions/runs/23556374341`
   - `docs-governance` green on `8f851b3`: `https://github.com/KonkovaElena/mri-second-opinion/actions/runs/23557754782`
   - `docs-governance` green on `49b794c`: `https://github.com/KonkovaElena/mri-second-opinion/actions/runs/23557837645`
+  - `docs-governance` green on `6a47800`: `https://github.com/KonkovaElena/mri-second-opinion/actions/runs/23632190333`
+  - `ci` green on `e782bf9`: `https://github.com/KonkovaElena/mri-second-opinion/actions/runs/23632453358`
   - public repository is live with About metadata applied
 - Artifact links:
   - `README.md`

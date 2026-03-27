@@ -20,6 +20,27 @@ The March 2026 planning baseline assumes a roughly two-year maturation path from
 
 That timeline should be treated as a sequencing aid, not a launch promise.
 
+## Current Wave Transition: Wave 1 To Wave 1.5
+
+The repository has already closed the wave-1 API and durability baseline.
+
+The immediate next wave should harden that baseline before broader clinical-scope expansion.
+
+### Target outcomes
+
+1. remove host-specific absolute-path assumptions from runtime, tests, and release evidence
+2. keep snapshot, migration, and artifact-reference paths canonicalized through runtime helpers rather than host literals
+3. preserve a Windows-friendly contributor workflow while keeping GitHub-hosted Linux CI green
+4. record hosted evidence whenever a platform-sensitive change lands on `main`
+5. advance deeper into Phase 1 only after this cross-platform and evidence-hardening pass is closed
+
+### Proof expectations
+
+1. GitHub-hosted `ci` succeeds on the current `main` commit after platform-sensitive changes
+2. local Windows authoring and Linux container or hosted CI agree on persisted artifact URI semantics
+3. no regression test compares machine-specific absolute paths literally
+4. `docs/verification/launch-evidence-index.md` records the current hosted run URLs and why they matter
+
 ## Phase 0: Foundation
 
 Target outcomes:
