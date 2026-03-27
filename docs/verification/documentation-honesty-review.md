@@ -41,9 +41,10 @@ Confirmed.
 The repository now has subtree-local evidence for:
 
 1. current local workflow routes
-2. local restart-safe file-backed persistence
-3. delivery retry and operations summary behavior
-4. malformed-input normalization
+2. restart-safe local persistence with SQLite as the default runtime path plus local PostgreSQL bootstrap and service-path proof
+3. persisted inference-job and delivery-job queue behavior, including stale-claim recovery on the current bounded slice
+4. workbench-backed case detail, review, report, and delivery visibility
+5. malformed-input normalization and conservative viewer-ready artifact semantics
 
 Those claims are still kept below MVP or launch-ready language.
 
@@ -53,6 +54,11 @@ The docs package is coherent. Hosted CI evidence now exists on the public reposi
 
 1. `ci` green on `177094a`: https://github.com/KonkovaElena/mri-second-opinion/actions/runs/23556374310
 2. `docs-governance` green on `177094a`: https://github.com/KonkovaElena/mri-second-opinion/actions/runs/23556374341
+
+The current pushed head was then reconciled locally on 2026-03-27 after the standalone stash-pop merge and the final docs-governance drift fix:
+
+1. `7bf7ae3` closed the standalone merge and revalidated the build plus full test baseline locally before push
+2. `d352d9c` corrected README release links and `package.json` publication metadata, then re-ran the equivalent local docs-governance checks before push
 
 The target architecture docs remain intentionally ahead of the current single-process implementation. This is mitigated by:
 
@@ -68,13 +74,20 @@ Corrected on 2026-03-27.
 
 The public-facing docs no longer rely on parent-platform or shared-brand wording for the standalone repository's current scope and reporting posture.
 
+The same reconciliation pass also removed current-state drift around:
+
+1. persistence wording that lagged behind the merged SQLite plus local-PostgreSQL proof state
+2. stale `GET /operator` and `dispatch/claim` route names in current verification notes
+3. deleted-file references such as `tests/postgres-integration.test.ts` and `src/artifact-store.ts` inside active current-state docs
+4. README release packet links and `package.json` publication metadata required by `docs-governance`
+
 ## Verdict
 
 Documentation honesty is in acceptable shape for a publicly hosted pre-MVP repository.
 
 The repository has been successfully published on GitHub with:
 
-1. hosted CI evidence (both `ci` and `docs-governance` workflows green)
+1. hosted CI evidence on earlier public commits plus local reconciliation evidence on the current pushed head
 2. conservative `PUBLIC_GITHUB_READY` repository-content verdict maintained
 3. clear separation between local-runtime capability and target architecture
 4. complete governance file set (LICENSE, CODE_OF_CONDUCT, SECURITY, CONTRIBUTING, SUPPORT, GOVERNANCE)

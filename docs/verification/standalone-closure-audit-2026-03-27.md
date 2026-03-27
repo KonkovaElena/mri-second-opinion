@@ -45,14 +45,26 @@ Both blockers were fixed before the final closure decision:
 3. `src/case-presentation.ts` now remains safe when older rows still present partial report payloads during recovery
 4. regression coverage was added in `tests/memory-case-service.test.ts` and `tests/workflow-api.test.ts`
 
+## Post-Closure Reconciliation On Pushed Head
+
+The repository also needed one last reconciliation pass after the standalone stash-pop merge was applied to the public GitHub working tree.
+
+The final reconciliation work closed these follow-on issues:
+
+1. the upstream publication docs and the local SQLite/PostgreSQL/job-based runtime were merged into one coherent standalone state
+2. obsolete projection-layer files and tests were removed so active docs no longer pointed at deleted runtime surfaces
+3. compatibility config fields were kept where they were still needed for stable verification, but runtime truth was re-anchored on the current route and storage model
+4. the final docs-governance drift on `README.md` release links and `package.json` publication metadata was corrected before the pushed head `d352d9c`
+
 ## Validation Performed
 
 Validation completed on 2026-03-27:
 
 1. changed-file diagnostics passed for the final closure-fix code, tests, and contract docs
-2. standalone subtree tests passed via `npm test` with `23` passing tests and `0` failures
+2. the reconciled standalone test suite passed via `npm test` with `53` passing tests and `0` failures
 3. standalone subtree build passed via `npm run build`
-4. the follow-up independent architecture review returned clear after the two closure blockers were fixed
+4. the local equivalent of the `docs-governance` workflow also passed after the README and package-metadata reconciliation on `d352d9c`
+5. the follow-up independent review returned clear after the closure blockers and the post-merge reconciliation drift were fixed
 
 ## Boundary Statement
 
@@ -64,7 +76,7 @@ Open evidence gaps still include:
 
 1. release-linked or hosted workflow verification beyond the local subtree test path
 2. broader real-PostgreSQL runtime durability proof beyond clean bootstrap
-3. distributed or externally brokered worker execution proof beyond the local SQLite-backed queue baseline
+3. distributed or externally brokered worker execution proof beyond the current locally persisted inference and delivery job paths
 
 ## Audit Decision
 

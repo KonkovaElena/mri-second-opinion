@@ -45,7 +45,7 @@ In practical terms, that means:
 |---|---|
 | Scope | MRI-only workflow baseline |
 | Runtime | Standalone Node.js and TypeScript API |
-| Persistence | Restart-safe local SQLite-backed durability |
+| Persistence | Restart-safe local persistence with SQLite as the default path and a locally verified PostgreSQL service path |
 | Human review | Explicit and mandatory in the workflow model |
 | Public verdict | `PUBLIC_GITHUB_READY` |
 | Intended posture | Open-source, research-use-oriented, clinician-in-the-loop |
@@ -55,7 +55,7 @@ In practical terms, that means:
 | Claim type | Meaning in this repository | Example |
 |---|---|---|
 | Implemented | Backed by current runtime or verification evidence | standalone API, route surface, restart-safe local persistence |
-| Target architecture | Intended next runtime shape, not yet implemented truth | PostgreSQL, queue, object store, Orthanc, Python worker, OHIF UI |
+| Target architecture | Intended next runtime shape, not yet implemented truth | managed PostgreSQL operations, distributed queue and object storage, Orthanc, Python worker, OHIF UI |
 | Research-informed | Supported by external evidence, but not promoted to runtime truth here | DICOMweb boundary, BIDS reproducibility seam, MRI-native Python tooling |
 | Excluded | Claims the repository must not make | autonomous diagnosis, clinical validation, launch-ready deployment |
 
@@ -88,7 +88,7 @@ In practical terms, that means:
 | Layer | Implemented now | Target direction |
 |---|---|---|
 | Control plane | standalone TypeScript API | typed workflow core with stronger orchestration seams |
-| Workflow durability | local SQLite-backed durability | PostgreSQL-backed durable workflow truth |
+| Workflow durability | SQLite-backed default store plus a locally verified PostgreSQL path | release-linked PostgreSQL operations and broader durable workflow truth |
 | Async execution | local durable delivery-job queue plus callback completion baseline | broader queue-backed execution and retry dispatch |
 | Imaging boundary | documented only | Orthanc plus DICOMWeb |
 | Compute plane | callback contract only | Python MRI QC and inference workers |
@@ -106,7 +106,7 @@ Implemented and verified in this repository today:
 3. public workflow endpoints for case create, case list, case detail, review, finalize, report retrieval, delivery retry, and operations summary
 4. internal ingest, inference queue, delivery queue, inference callback, and delivery callback endpoints
 5. locked workflow-state vocabulary for the current MRI review path
-6. restart-safe local SQLite-backed persistence for case state, explicit delivery jobs, delivery state, retry history, and operation transcript
+6. restart-safe local persistence for case state, explicit inference and delivery jobs, delivery state, retry history, and operation transcript on the default SQLite path, plus a locally verified PostgreSQL service path
 7. structured JSON error envelopes for malformed or invalid input
 8. baseline operational routes: `GET /`, `GET /healthz`, `GET /readyz`, and `GET /metrics`
 9. report payloads that preserve legacy artifact refs alongside typed derived artifact descriptors with conservative viewer-ready semantics
@@ -119,7 +119,7 @@ Implemented and verified in this repository today:
 
 The repository still does not provide these as implemented runtime truth:
 
-1. PostgreSQL-backed durable workflow state
+1. release-linked or hosted PostgreSQL operational evidence beyond the current local bootstrap and service proofs
 2. distributed or production-grade queue-backed execution infrastructure beyond the local SQLite-backed delivery and inference queue baselines
 3. object-store-backed artifact durability
 4. a real Python worker path for MRI QC and inference
@@ -213,7 +213,7 @@ It does not prove:
 
 1. a hosted deployment path
 2. a production-grade frontend review product
-3. a production PostgreSQL-backed workflow core
+3. a release-linked or managed PostgreSQL deployment path
 4. a production observability stack
 5. clinical readiness
 
@@ -226,7 +226,7 @@ The target architecture is deliberately broader than the current runtime, but it
 Target runtime direction:
 
 1. TypeScript workflow core
-2. PostgreSQL durable state
+2. managed PostgreSQL durable state as the primary deployment path
 3. Redis-backed workflow queue
 4. object storage for derived artifacts and report payloads
 5. Orthanc for DICOM ingress and DICOMWeb serving

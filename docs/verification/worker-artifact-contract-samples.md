@@ -1,10 +1,10 @@
 # Worker Artifact Contract Samples
 
-Date: 2026-03-25
+Date: 2026-03-27
 
 ## Purpose
 
-This note captures the current sample contract surfaces for the wave 1 neuro-first worker-facing artifact layer.
+This note captures the current sample contract surfaces for the wave 1 worker-facing artifact layer after the standalone merge reconciliation.
 
 It is evidence of the implemented local contract shape.
 
@@ -16,7 +16,7 @@ These samples are aligned to the deterministic synthetic flows exercised by:
 
 1. `tests/workflow-api.test.ts`
 2. `tests/memory-case-service.test.ts`
-3. `tests/postgres-integration.test.ts`
+3. `tests/postgres-case-service.test.ts`
 
 ## 1. Sample plan envelope excerpt
 
@@ -49,44 +49,67 @@ This excerpt shows the currently persisted routing and study-context contract fo
 }
 ```
 
-## 2. Sample study-context artifact
+## 2. Sample study-context surface
 
-This field is now persisted directly on each case as `workerArtifacts.studyContext`.
+This shape is persisted directly on each case as `studyContext` and is exposed on case-detail reads.
 
 ```json
 {
-  "studyUid": "1.2.840.0.1",
-  "workflowFamily": "brain-structural",
-  "sequenceInventory": ["T1w", "FLAIR"],
-  "indication": "memory complaints",
-  "selectedPackage": "brain-structural-fastsurfer",
-  "requiredArtifacts": ["qc-summary", "metrics-json", "overlay-preview", "report-preview"],
-  "createdAt": "<iso-timestamp>",
-  "source": "public-api"
+  "studyInstanceUid": "1.2.840.0.1",
+  "dicomStudyInstanceUid": "1.2.840.0.1",
+  "accessionNumber": null,
+  "studyDate": null,
+  "sourceArchive": "orthanc-local",
+  "dicomWebBaseUrl": "http://localhost:8042/dicom-web",
+  "metadataSummary": ["synthetic-demo"],
+  "series": [
+    {
+      "seriesInstanceUid": "1.2.840.0.1.1",
+      "seriesDescription": "3D T1w",
+      "modality": "MR",
+      "sequenceLabel": "T1w",
+      "instanceCount": 160
+    }
+  ]
 }
 ```
 
-## 3. Sample QC artifact
+## 3. Sample QC summary surface
 
-This field is now persisted directly on each case as `workerArtifacts.qcSummary`.
+This shape is persisted directly on each case as `qcSummary` and is exposed on case-detail reads.
 
 ```json
 {
   "disposition": "warn",
   "summary": "Structural draft generated with mild volume-loss finding.",
-  "issues": ["Motion artifact warning."],
-  "artifactRefs": ["artifact://overlay-preview", "artifact://qc-summary"],
-  "generatedAt": "<iso-timestamp>"
+  "checks": [
+    {
+      "checkId": "motion",
+      "status": "warn",
+      "detail": "Motion artifact warning."
+    }
+  ],
+  "metrics": [
+    {
+      "name": "snr",
+      "value": 18.4,
+      "unit": "db"
+    }
+  ]
 }
 ```
 
-## 4. Sample findings payload
+## 4. Sample report payload excerpt
 
-This field is now persisted directly on each case as `workerArtifacts.findingsPayload`.
+This shape is persisted on the report surface and exposed through `GET /api/cases/:caseId/report`.
 
 ```json
 {
-  "summary": "Structural draft generated with mild volume-loss finding.",
+  "reportSchemaVersion": "0.1.0",
+  "caseId": "<case-id>",
+  "workflowFamily": "brain-structural",
+  "processingSummary": "Structural draft generated with mild volume-loss finding.",
+  "qcDisposition": "warn",
   "findings": ["Mild generalized cortical volume loss."],
   "measurements": [
     {
@@ -94,41 +117,44 @@ This field is now persisted directly on each case as `workerArtifacts.findingsPa
       "value": -1.4
     }
   ],
-  "generatedAt": "<iso-timestamp>",
-  "workflowVersion": "brain-structural-fastsurfer@0.1.0"
+  "artifactRefs": ["artifact://overlay-preview", "artifact://qc-summary"],
+  "reviewStatus": "draft",
+  "disclaimerProfile": "RUO_CLINICIAN_REVIEW_REQUIRED"
 }
 ```
 
-## 5. Sample structural run surface
+## 5. Sample derived artifact descriptor
 
-This field is now persisted directly on each case as `workerArtifacts.structuralRun`.
+This shape is exposed under `report.derivedArtifacts`.
 
 ```json
 {
-  "packageId": "brain-structural-fastsurfer",
-  "packageVersion": "0.1.0",
-  "status": "succeeded",
-  "completedAt": "<iso-timestamp>",
-  "artifacts": [
-    {
-      "artifactType": "qc-summary",
-      "storageRef": "artifact://qc-summary",
-      "generatedAt": "<iso-timestamp>",
-      "workflowVersion": "brain-structural-fastsurfer@0.1.0"
-    },
-    {
-      "artifactType": "overlay-preview",
-      "storageRef": "artifact://overlay-preview",
-      "generatedAt": "<iso-timestamp>",
-      "workflowVersion": "brain-structural-fastsurfer@0.1.0"
-    }
-  ]
+  "artifactId": "<case-id>-artifact-1",
+  "artifactType": "overlay-preview",
+  "label": "Viewer overlay preview",
+  "storageUri": "artifact://overlay-preview",
+  "mimeType": "image/png",
+  "archiveLocator": {
+    "sourceArchive": "orthanc-local",
+    "studyInstanceUid": "1.2.840.0.1",
+    "accessionNumber": null,
+    "seriesInstanceUids": ["1.2.840.0.1.1"],
+    "dicomWebBaseUrl": "http://localhost:8042/dicom-web"
+  },
+  "viewerReady": true,
+  "viewerDescriptor": {
+    "viewerMode": "dicom-overlay",
+    "studyInstanceUid": "1.2.840.0.1",
+    "primarySeriesInstanceUid": "1.2.840.0.1.1",
+    "dicomWebBaseUrl": "http://localhost:8042/dicom-web"
+  },
+  "generatedAt": "<iso-timestamp>"
 }
 ```
 
-## 6. Sample branch-execution evidence card
+## 6. Sample evidence card excerpt
 
-This card is now generated as part of `evidenceCards` when a bounded structural run is present.
+This card shape is exposed on case-detail reads as part of `evidenceCards`.
 
 ```json
 {
@@ -138,21 +164,21 @@ This card is now generated as part of `evidenceCards` when a bounded structural 
   "headline": "Structural branch succeeded",
   "severity": "info",
   "status": "good",
-  "summary": "brain-structural-fastsurfer@0.1.0 produced 2 artifact(s).",
+  "summary": "brain-structural-fastsurfer produced bounded local artifacts.",
   "supportingRefs": ["artifact://qc-summary", "artifact://overlay-preview"],
   "recommendedAction": null
 }
 ```
 
-## 7. Honesty Boundary
+## Honesty Boundary
 
 These samples prove the current repository has a durable local contract surface for:
 
 1. study context
 2. QC result summary
-3. structured findings and measurements payload
-4. bounded structural run provenance and typed derived artifacts
-5. branch-execution visibility for case detail reads
+3. report payload and structured findings
+4. typed derived artifacts with conservative viewer semantics
+5. evidence-card visibility on case-detail reads
 
 These samples do not prove:
 

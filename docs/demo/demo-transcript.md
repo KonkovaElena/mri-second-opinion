@@ -2,7 +2,7 @@
 title: "MRI Standalone Demo Transcript"
 status: "active"
 version: "1.0.0"
-last_updated: "2026-03-26"
+last_updated: "2026-03-27"
 tags: [mri, demo, transcript, evidence]
 ---
 
@@ -18,7 +18,7 @@ Record the bounded synthetic demo path that the repository can currently support
 2. `npm run build`
 3. `npm start`
 4. synthetic input from `docs/demo/synthetic-demo-input-provenance.md`
-5. signed-worker proof source from `tests/fixtures/worker-inference-transcript.json`
+5. optional worker identifier used only for bounded local job-claim visibility
 
 ## Start-To-Finish Bounded Flow
 
@@ -29,37 +29,41 @@ Record the bounded synthetic demo path that the repository can currently support
    - call `GET /api/operations/summary`
    - expected result: queue view shows queued inference work and additive `queueHealth` / `workerHealth` diagnostics
 3. **Claim inference work**
-   - call `POST /api/internal/dispatch/claim` with a valid HMAC-signed request from the synthetic worker transcript
-   - expected result: `200`, a lease is issued, and the dispatch payload returns the bounded workflow package and study context
-4. **Renew lease**
-   - call `POST /api/internal/dispatch/heartbeat`
-   - expected result: `200`, the same lease id stays active and expiry moves forward
-5. **Complete inference**
+   - call `POST /api/internal/inference-jobs/claim-next` with an optional `workerId`
+   - expected result: `200`, an inference job is issued, and the response returns the bounded job record for the queued case
+4. **Complete inference**
    - call `POST /api/internal/inference-callback` with the synthetic findings, measurements, and artifact URIs
    - expected result: `200`, case status moves to `AWAITING_REVIEW`, and the draft report plus artifact references become visible on case detail
-6. **Open case detail**
+5. **Open case detail**
    - call `GET /api/cases/:caseId`
    - expected result: detail output exposes study context, QC summary, findings payload, artifact manifest, structural run metadata, and durable operation-log entries
-7. **Clinician review**
+6. **Clinician review**
    - call `POST /api/cases/:caseId/review` with explicit `reviewerId`
    - expected result: `200`, case status moves to `REVIEWED`, and the reviewed release version is pinned
-8. **Finalize report**
-   - call `POST /api/cases/:caseId/finalize` with explicit `clinicianId`
+7. **Finalize report**
+   - call `POST /api/cases/:caseId/finalize` with an explicit `finalSummary`
    - expected result: `200`, case status moves to `DELIVERY_PENDING`, and the finalized release version is pinned for delivery-safe reads
-9. **Show report output**
+8. **Show report output**
    - call `GET /api/cases/:caseId/report`
    - expected result: report payload exposes stable `versionPins` and the finalized review state
-10. **Complete delivery state**
-    - call `POST /api/internal/delivery-callback` with a valid signed request and `deliveryStatus: delivered`
+9. **Show delivery queue state**
+   - call `GET /api/internal/delivery-jobs`
+   - expected result: the finalized case appears as durable delivery work waiting to be claimed
+10. **Claim delivery work**
+    - call `POST /api/internal/delivery-jobs/claim-next` with an optional `workerId`
+    - expected result: `200`, a delivery job is issued for the finalized case
+11. **Complete delivery state**
+    - call `POST /api/internal/delivery-callback` with `deliveryStatus: delivered`
     - expected result: `200`, case status moves to `DELIVERED`
 
 ## Concrete Evidence Anchors
 
 1. route and worker-loop verification: `tests/workflow-api.test.ts`
-2. synthetic worker inputs: `tests/fixtures/worker-inference-transcript.json`
-3. release pinning and restart-safe queue/artifact proof: `tests/memory-case-service.test.ts`
-4. PostgreSQL-backed restart-safe version and artifact proof: `tests/postgres-integration.test.ts`
-5. runtime summary note: `docs/verification/runtime-baseline-verification.md`
+2. release pinning and restart-safe queue and artifact proof: `tests/memory-case-service.test.ts`
+3. PostgreSQL-backed service-path proof: `tests/postgres-case-service.test.ts`
+4. clean-database PostgreSQL bootstrap proof: `tests/postgres-bootstrap.test.ts`
+5. screenshot-backed operator path: `docs/demo/operator-transcript-2026-03-27.md`
+6. runtime summary note: `docs/verification/runtime-baseline-verification.md`
 
 ## Open Gaps
 
@@ -67,6 +71,6 @@ This transcript is sufficient for an honest bounded demo packet.
 
 It is not sufficient for a verdict upgrade because the repository still lacks:
 
-1. a screenshot bundle for queue, case detail, evidence, review, report, and delivery surfaces
-2. a timed operator run proving the path is reproducible in under ten minutes
-3. hosted or broader operational proof beyond the bounded local scaffold
+1. hosted or release-linked workflow execution proof on the current public head
+2. a production worker fleet or distributed lease-coordination runtime beyond the bounded local job paths
+3. launch-ready clinical or operational maturity evidence

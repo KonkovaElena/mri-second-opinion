@@ -55,9 +55,11 @@ Primary evidence:
 
 Primary evidence:
 
-1. restart persistence tests
-2. migration logs
-3. read-model verification
+1. restart persistence tests across the default SQLite runtime path and the PostgreSQL service path
+2. clean-database PostgreSQL bootstrap and migration logs
+3. queue and read-model verification
+
+Current interpretation: this gate is closed by local durable-state proof plus clean-database PostgreSQL bootstrap evidence. Hosted or release-linked PostgreSQL operations remain future work, but they do not reopen the current public GitHub launch gate.
 
 ## Gate 4. Frontend Closure
 
@@ -102,8 +104,8 @@ Primary evidence:
 Primary evidence:
 
 1. repo root file inventory
-2. passing CI
-3. workflow review notes
+2. passing CI plus docs-governance workflow assertions
+3. workflow review notes and README/package metadata reconciliation
 
 ## Gate 7. Documentation Honesty
 

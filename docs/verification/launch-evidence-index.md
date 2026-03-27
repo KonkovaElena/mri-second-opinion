@@ -8,6 +8,7 @@ Every claim about launch readiness should link back to one or more artifacts lis
 
 - Current verdict: `PUBLIC_GITHUB_READY`
 - Last reviewed: 2026-03-27
+- Current remote head: `d352d9c`
 - Public repository: `https://github.com/KonkovaElena/mri-second-opinion`
 - Auditor handoff: `docs/verification/ai-auditor-handoff-2026-03-25.md`
 - Gap audit: `docs/verification/standalone-gap-audit-2026-03-27.md`
@@ -37,6 +38,12 @@ Recorded hosted evidence today:
   `https://github.com/KonkovaElena/mri-second-opinion/actions/runs/23557754782`
 5. `docs-governance` succeeded on `49b794c` after adding the pending manual GitHub actions runbook:
   `https://github.com/KonkovaElena/mri-second-opinion/actions/runs/23557837645`
+
+Local reconciliation now also exists on the pushed `origin/main` head:
+
+1. `7bf7ae3` closed the stash-pop merge and revalidated the full standalone build plus test baseline locally before push
+2. `d352d9c` corrected the final docs-governance drift in `README.md` and `package.json` and re-ran the equivalent local workflow assertions before push
+3. append new hosted workflow URLs here when GitHub Actions records runs for `d352d9c` or later heads
 
 ## Priority Tracks
 
@@ -220,6 +227,7 @@ Record:
   - `docs-governance` green on `177094a`: `https://github.com/KonkovaElena/mri-second-opinion/actions/runs/23556374341`
   - `docs-governance` green on `8f851b3`: `https://github.com/KonkovaElena/mri-second-opinion/actions/runs/23557754782`
   - `docs-governance` green on `49b794c`: `https://github.com/KonkovaElena/mri-second-opinion/actions/runs/23557837645`
+  - current pushed head `d352d9c` also re-closes the same README/package metadata policy locally after the final merge reconciliation
   - public repository is live with About metadata applied
   - remaining GitHub-UI follow-up is tracked separately and does not change the current repository-content verdict
 - Artifact links:
@@ -285,7 +293,8 @@ Required artifacts:
 
 Record:
 
-- Status: partial
+- Status: complete
+- Note: current authority docs were reconciled again on 2026-03-27 after the stash-pop merge and the final docs-governance fix on `d352d9c`; persistence wording, workbench route naming, README release links, and package metadata now match the current repository state
 - Artifact links:
   - `docs/verification/documentation-honesty-review.md`
   - `docs/verification/repository-audit-2026-03-25.md`

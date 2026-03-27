@@ -1,6 +1,6 @@
 # Operator Surface Verification
 
-Date: 2026-03-25
+Date: 2026-03-27
 
 ## Purpose
 
@@ -12,7 +12,7 @@ It is not evidence of a production frontend stack, screenshots, or demo closure.
 
 ## Implemented Surface
 
-The standalone app now serves `GET /operator` as a minimal browser-facing operator workspace.
+The standalone app now serves `GET /workbench` as the built-in browser-facing operator workspace.
 
 The page binds directly to live workflow endpoints for:
 
@@ -27,8 +27,9 @@ The page binds directly to live workflow endpoints for:
 
 The current operator surface is verified by:
 
-1. `tests/workflow-api.test.ts` — HTML route exists and binds queue, case detail, review, finalize, report preview, and retry endpoints
-2. `src/app.ts` — page is served directly by the standalone app with no placeholder-only actions
+1. `tests/workflow-api.test.ts` — the HTML route exists and binds queue, case detail, review, finalize, report preview, and retry endpoints
+2. `src/app.ts` — the page is served directly by the standalone app at `GET /workbench`
+3. `public/workbench/index.html`, `public/workbench/review-workbench.css`, and `public/workbench/review-workbench.js` — the current workbench assets are real repository surfaces rather than placeholder-only markup
 
 ## Honesty Boundary
 
@@ -41,6 +42,8 @@ This surface proves:
 This surface does not prove:
 
 1. a separate frontend build pipeline
-2. screenshot bundle completion
+2. an OHIF deployment or production imaging workstation
 3. polished clinical review UX
-4. demo-path closure
+4. launch-ready frontend or clinical deployment maturity
+
+Screenshot-backed and demo-path evidence are now tracked separately in `docs/demo/operator-transcript-2026-03-27.md` and `docs/verification/workbench-frontend-audit-2026-03-27.md`.
