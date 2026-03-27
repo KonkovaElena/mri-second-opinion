@@ -1,8 +1,9 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import { mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
-import { join } from "node:path";
+import { join, resolve } from "node:path";
 import { tmpdir } from "node:os";
+import { pathToFileURL } from "node:url";
 import { MemoryCaseService } from "../src/cases";
 import type { DispatchQueueAdapter, DispatchQueueClaimInput, DispatchQueueJob } from "../src/dispatch-queue";
 import type { ArtifactReferenceProjection, CaseSummaryProjection, WorkflowJobProjection } from "../src/case-projections";
@@ -744,6 +745,10 @@ test("delivery dispatch claims expose report and structural artifact context", a
 
 test("study context, qc artifact, and findings payload survive service restart", async () => {
   const { tempDir, caseStoreFile } = createStorePath();
+  const expectedArtifactUris = [
+    pathToFileURL(resolve(".mri-data/artifacts/qc-summary")).href,
+    pathToFileURL(resolve(".mri-data/artifacts/overlay-preview")).href,
+  ];
 
   try {
     const first = new MemoryCaseService({ snapshotFilePath: caseStoreFile });
@@ -775,10 +780,7 @@ test("study context, qc artifact, and findings payload survive service restart",
     assert.equal(reloaded.workerArtifacts.qcSummary?.disposition, "warn");
     assert.deepEqual(
       reloaded.workerArtifacts.qcSummary?.artifactRefs.map((artifact) => artifact.uri),
-      [
-        "file:///C:/plans/external/mri-second-opinion/.mri-data/artifacts/qc-summary",
-        "file:///C:/plans/external/mri-second-opinion/.mri-data/artifacts/overlay-preview",
-      ],
+      expectedArtifactUris,
     );
     assert.equal(reloaded.workerArtifacts.findingsPayload?.summary, "Worker artifacts persistence verification.");
     assert.deepEqual(reloaded.workerArtifacts.findingsPayload?.findings, ["Mild chronic microvascular change."]);
