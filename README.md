@@ -318,6 +318,19 @@ Use these files as the current source of truth for readiness:
 4. `docs/verification/launch-evidence-index.md`
 5. `docs/academic/evidence-and-claims-policy.md`
 
+If you are preparing or auditing a public GitHub release, use this packet:
+
+1. `docs/releases/github-publication-playbook.md`
+2. `docs/releases/github-go-live-checklist.md`
+3. `docs/releases/github-metadata-copy.md`
+4. `docs/releases/github-settings-worksheet.md`
+5. `docs/releases/github-live-publication-sequence.md`
+6. `docs/releases/first-public-announcement-draft.md`
+7. `docs/releases/github-operator-packet.md`
+8. `docs/demo/demo-script.md`
+9. `docs/demo/social-preview-brief.md`
+10. `docs/verification/hosted-evidence-capture-template.md`
+
 ## Community And Safety Surfaces
 
 When contributing or evaluating repository hygiene, use:
