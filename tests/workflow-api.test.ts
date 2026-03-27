@@ -31,12 +31,16 @@ function createPostgresTestStore() {
   };
 }
 
-async function startServer(caseStoreFile: string) {
+async function startServer(
+  caseStoreFile: string,
+  configOverrides: Partial<Parameters<typeof createApp>[0]> = {},
+) {
   const app = createApp({
     nodeEnv: "test",
     port: 0,
     caseStoreFile,
     caseStoreMode: "sqlite",
+    ...configOverrides,
   });
   const server = createServer(app);
 
@@ -101,8 +105,9 @@ async function withServer<T>(
     jsonRequest: (path: string, init?: RequestInit) => Promise<{ response: Response; body: any }>;
     textRequest: (path: string, init?: RequestInit) => Promise<{ response: Response; body: string }>;
   }) => Promise<T>,
+  configOverrides: Partial<Parameters<typeof createApp>[0]> = {},
 ) {
-  const { app, server, baseUrl } = await startServer(caseStoreFile);
+  const { app, server, baseUrl } = await startServer(caseStoreFile, configOverrides);
 
   try {
     return await run({
@@ -446,6 +451,133 @@ test("internal ingest rejects a case when T1w is missing", async () => {
   }
 });
 
+test("internal routes stay open when no bearer token is configured", async () => {
+  const { tempDir, caseStoreFile } = createTestStoreFile();
+
+  try {
+    await withServer(caseStoreFile, async ({ jsonRequest }) => {
+      const created = await jsonRequest("/api/internal/ingest", {
+        method: "POST",
+        body: JSON.stringify({
+          patientAlias: "synthetic-patient-auth-open-001",
+          studyUid: "1.2.840.auth.open.1",
+          sequenceInventory: ["T1w", "FLAIR"],
+        }),
+      });
+
+      assert.equal(created.response.status, 201);
+      assert.equal(created.body.case.status, "SUBMITTED");
+    });
+  } finally {
+    rmSync(tempDir, { recursive: true, force: true });
+  }
+});
+
+test("internal routes require a bearer token when configured", async () => {
+  const { tempDir, caseStoreFile } = createTestStoreFile();
+
+  try {
+    await withServer(
+      caseStoreFile,
+      async ({ jsonRequest }) => {
+        const created = await jsonRequest("/api/internal/ingest", {
+          method: "POST",
+          body: JSON.stringify({
+            patientAlias: "synthetic-patient-auth-001",
+            studyUid: "1.2.840.auth.1",
+            sequenceInventory: ["T1w", "FLAIR"],
+          }),
+        });
+
+        assert.equal(created.response.status, 401);
+        assert.equal(created.body.code, "UNAUTHORIZED");
+        assert.equal(created.body.error, "Internal API bearer token is missing or invalid");
+        assert.equal(created.response.headers.get("x-request-id"), created.body.requestId);
+      },
+      {
+        internalApiToken: "internal-token-001",
+      },
+    );
+  } finally {
+    rmSync(tempDir, { recursive: true, force: true });
+  }
+});
+
+test("internal routes reject an invalid bearer token", async () => {
+  const { tempDir, caseStoreFile } = createTestStoreFile();
+
+  try {
+    await withServer(
+      caseStoreFile,
+      async ({ jsonRequest }) => {
+        const created = await jsonRequest("/api/internal/ingest", {
+          method: "POST",
+          headers: {
+            authorization: "Bearer wrong-token",
+          },
+          body: JSON.stringify({
+            patientAlias: "synthetic-patient-auth-002",
+            studyUid: "1.2.840.auth.2",
+            sequenceInventory: ["T1w", "FLAIR"],
+          }),
+        });
+
+        assert.equal(created.response.status, 401);
+        assert.equal(created.body.code, "UNAUTHORIZED");
+        assert.equal(created.body.error, "Internal API bearer token is missing or invalid");
+        assert.equal(created.response.headers.get("x-request-id"), created.body.requestId);
+      },
+      {
+        internalApiToken: "internal-token-002",
+      },
+    );
+  } finally {
+    rmSync(tempDir, { recursive: true, force: true });
+  }
+});
+
+test("internal routes accept a valid bearer token and public routes stay open", async () => {
+  const { tempDir, caseStoreFile } = createTestStoreFile();
+
+  try {
+    await withServer(
+      caseStoreFile,
+      async ({ jsonRequest }) => {
+        const publicCreated = await jsonRequest("/api/cases", {
+          method: "POST",
+          body: JSON.stringify({
+            patientAlias: "synthetic-patient-public-001",
+            studyUid: "1.2.840.public.1",
+            sequenceInventory: ["T1w", "FLAIR"],
+          }),
+        });
+
+        assert.equal(publicCreated.response.status, 201);
+
+        const internalCreated = await jsonRequest("/api/internal/ingest", {
+          method: "POST",
+          headers: {
+            authorization: "Bearer internal-token-003",
+          },
+          body: JSON.stringify({
+            patientAlias: "synthetic-patient-auth-003",
+            studyUid: "1.2.840.auth.3",
+            sequenceInventory: ["T1w", "FLAIR"],
+          }),
+        });
+
+        assert.equal(internalCreated.response.status, 201);
+        assert.equal(internalCreated.body.case.status, "SUBMITTED");
+      },
+      {
+        internalApiToken: "internal-token-003",
+      },
+    );
+  } finally {
+    rmSync(tempDir, { recursive: true, force: true });
+  }
+});
+
 test("review workbench shell is served with real static assets", async () => {
   const { tempDir, caseStoreFile } = createTestStoreFile();
 
@@ -467,6 +599,131 @@ test("review workbench shell is served with real static assets", async () => {
       assert.equal(stylesheet.response.status, 200);
       assert.match(stylesheet.response.headers.get("content-type") ?? "", /text\/css/);
       assert.match(stylesheet.body, /\.workbench|--surface|font-family/i);
+    });
+  } finally {
+    rmSync(tempDir, { recursive: true, force: true });
+  }
+});
+
+test("request ids are generated and echoed on probe responses", async () => {
+  const { tempDir, caseStoreFile } = createTestStoreFile();
+
+  try {
+    await withServer(caseStoreFile, async ({ baseUrl }) => {
+      const generatedProbe = await fetch(`${baseUrl}/healthz`);
+      const generatedBody = await generatedProbe.json();
+
+      assert.equal(generatedProbe.status, 200);
+      assert.equal(typeof generatedProbe.headers.get("x-request-id"), "string");
+      assert.equal(generatedProbe.headers.get("x-request-id"), generatedBody.requestId);
+      assert.equal(generatedBody.status, "ok");
+
+      const explicitRequestId = "req-readyz-0001";
+      const echoedProbe = await fetch(`${baseUrl}/readyz`, {
+        headers: {
+          "x-request-id": explicitRequestId,
+        },
+      });
+      const echoedBody = await echoedProbe.json();
+
+      assert.equal(echoedProbe.status, 200);
+      assert.equal(echoedProbe.headers.get("x-request-id"), explicitRequestId);
+      assert.equal(echoedBody.requestId, explicitRequestId);
+      assert.equal(echoedBody.status, "ready");
+    });
+  } finally {
+    rmSync(tempDir, { recursive: true, force: true });
+  }
+});
+
+test("schema validation rejects empty sequence inventory before workflow logic", async () => {
+  const { tempDir, caseStoreFile } = createTestStoreFile();
+
+  try {
+    await withServer(caseStoreFile, async ({ jsonRequest }) => {
+      const created = await jsonRequest("/api/cases", {
+        method: "POST",
+        body: JSON.stringify({
+          patientAlias: "synthetic-patient-validation-001",
+          studyUid: "1.2.840.validation.1",
+          sequenceInventory: [],
+        }),
+      });
+
+      assert.equal(created.response.status, 400);
+      assert.equal(created.body.code, "INVALID_INPUT");
+      assert.equal(created.body.error, "sequenceInventory must not be empty");
+      assert.equal(typeof created.body.requestId, "string");
+      assert.equal(created.response.headers.get("x-request-id"), created.body.requestId);
+    });
+  } finally {
+    rmSync(tempDir, { recursive: true, force: true });
+  }
+});
+
+test("malformed JSON returns a request-scoped invalid input response", async () => {
+  const { tempDir, caseStoreFile } = createTestStoreFile();
+
+  try {
+    await withServer(caseStoreFile, async ({ baseUrl }) => {
+      const response = await fetch(`${baseUrl}/api/cases`, {
+        method: "POST",
+        headers: {
+          "content-type": "application/json",
+        },
+        body: '{"patientAlias":"broken-json"',
+      });
+      const body = await response.json();
+
+      assert.equal(response.status, 400);
+      assert.equal(body.code, "INVALID_INPUT");
+      assert.equal(body.error, "Malformed JSON body");
+      assert.equal(typeof body.requestId, "string");
+      assert.equal(response.headers.get("x-request-id"), body.requestId);
+    });
+  } finally {
+    rmSync(tempDir, { recursive: true, force: true });
+  }
+});
+
+test("health and readiness probes expose live storage semantics", async () => {
+  const { tempDir, caseStoreFile } = createTestStoreFile();
+
+  try {
+    await withServer(caseStoreFile, async ({ jsonRequest }) => {
+      const created = await jsonRequest("/api/cases", {
+        method: "POST",
+        body: JSON.stringify({
+          patientAlias: "synthetic-patient-probe-001",
+          studyUid: "1.2.840.probe.1",
+          sequenceInventory: ["T1w", "FLAIR"],
+        }),
+      });
+      assert.equal(created.response.status, 201);
+
+      const health = await jsonRequest("/healthz", {
+        method: "GET",
+      });
+      assert.equal(health.response.status, 200);
+      assert.equal(health.body.status, "ok");
+      assert.equal(health.body.service, "mri-second-opinion");
+      assert.equal(health.body.storage.mode, "sqlite");
+      assert.equal(health.body.storage.persistenceMode, "snapshot");
+      assert.equal(health.body.checks.caseStore, "configured");
+      assert.equal(health.response.headers.get("x-request-id"), health.body.requestId);
+
+      const ready = await jsonRequest("/readyz", {
+        method: "GET",
+      });
+      assert.equal(ready.response.status, 200);
+      assert.equal(ready.body.status, "ready");
+      assert.equal(ready.body.storage.mode, "sqlite");
+      assert.equal(ready.body.storage.persistenceMode, "snapshot");
+      assert.equal(ready.body.summary.totalCases, 1);
+      assert.equal(typeof ready.body.summary.totalDeliveryJobs, "number");
+      assert.equal(typeof ready.body.summary.totalInferenceJobs, "number");
+      assert.equal(ready.body.checks.caseStore, "reachable");
+      assert.equal(ready.response.headers.get("x-request-id"), ready.body.requestId);
     });
   } finally {
     rmSync(tempDir, { recursive: true, force: true });
@@ -660,6 +917,61 @@ test("expired claimed inference jobs can be requeued over HTTP", async () => {
       assert.equal(reclaimed.body.job.caseId, caseId);
       assert.equal(reclaimed.body.job.status, "claimed");
       assert.equal(reclaimed.body.job.workerId, "fresh-http-worker");
+      assert.equal(reclaimed.body.job.attemptCount, 2);
+    });
+  } finally {
+    rmSync(tempDir, { recursive: true, force: true });
+  }
+});
+
+test("requeue-expired defaults maxClaimAgeMs when the request body is empty", async () => {
+  const { tempDir, caseStoreFile } = createTestStoreFile();
+
+  try {
+    let caseId = "";
+
+    await withServer(caseStoreFile, async ({ jsonRequest }) => {
+      const created = await jsonRequest("/api/cases", {
+        method: "POST",
+        body: JSON.stringify({
+          patientAlias: "synthetic-patient-inference-requeue-empty-body",
+          studyUid: "1.2.840.0.queue.inference.requeue.empty",
+          sequenceInventory: ["T1w", "FLAIR"],
+        }),
+      });
+
+      assert.equal(created.response.status, 201);
+      caseId = created.body.case.caseId;
+
+      const claim = await jsonRequest("/api/internal/inference-jobs/claim-next", {
+        method: "POST",
+        body: JSON.stringify({ workerId: "stale-empty-body-worker" }),
+      });
+      assert.equal(claim.response.status, 200);
+      assert.equal(claim.body.job.caseId, caseId);
+      assert.equal(claim.body.job.status, "claimed");
+    });
+
+    await withServer(caseStoreFile, async ({ baseUrl, jsonRequest }) => {
+      const requeueResponse = await fetch(`${baseUrl}/api/internal/inference-jobs/requeue-expired`, {
+        method: "POST",
+      });
+      const requeueBody = await requeueResponse.json();
+
+      assert.equal(requeueResponse.status, 200);
+      assert.equal(Array.isArray(requeueBody.jobs), true);
+      assert.equal(requeueBody.jobs.length, 1);
+      assert.equal(requeueBody.jobs[0].caseId, caseId);
+      assert.equal(requeueBody.jobs[0].status, "queued");
+
+      const reclaimed = await jsonRequest("/api/internal/inference-jobs/claim-next", {
+        method: "POST",
+        body: JSON.stringify({ workerId: "fresh-empty-body-worker" }),
+      });
+      assert.equal(reclaimed.response.status, 200);
+      assert.equal(reclaimed.body.job.caseId, caseId);
+      assert.equal(reclaimed.body.job.status, "claimed");
+      assert.equal(reclaimed.body.job.workerId, "fresh-empty-body-worker");
       assert.equal(reclaimed.body.job.attemptCount, 2);
     });
   } finally {

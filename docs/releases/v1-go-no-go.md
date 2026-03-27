@@ -20,6 +20,8 @@ All seven launch gates in `../launch-readiness-checklist.md` are now backed by r
 
 ## Evidence Basis
 
+For the current evidence ledger and the publication reconciliation lessons behind this verdict, use `../verification/launch-evidence-index.md` together with `../verification/publication-retrospective-audit-2026-03-27.md`.
+
 Supporting artifacts that exist now:
 
 1. `../launch-readiness-checklist.md`

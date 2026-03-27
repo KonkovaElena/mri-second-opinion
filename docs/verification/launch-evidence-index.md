@@ -8,9 +8,10 @@ Every claim about launch readiness should link back to one or more artifacts lis
 
 - Current verdict: `PUBLIC_GITHUB_READY`
 - Last reviewed: 2026-03-27
-- Current remote head: `33ac458`
+- Current remote head: `db5e7bb`
 - Public repository: `https://github.com/KonkovaElena/mri-second-opinion`
 - Auditor handoff: `docs/verification/ai-auditor-handoff-2026-03-25.md` (historical snapshot dated 2026-03-25; current verdict advanced later)
+- Repository-status retrospective: `docs/verification/publication-retrospective-audit-2026-03-27.md`
 - Gap audit: `docs/verification/standalone-gap-audit-2026-03-27.md`
 - Archive/viewer seam audit: `docs/verification/archive-viewer-seam-audit-2026-03-27.md`
 - Presentation surface audit: `docs/verification/presentation-surface-audit-2026-03-27.md`
@@ -19,6 +20,7 @@ Every claim about launch readiness should link back to one or more artifacts lis
 - Durable delivery queue audit: `docs/verification/durable-delivery-queue-audit-2026-03-27.md`
 - Inference queue lease audit: `docs/verification/inference-queue-lease-audit-2026-03-27.md`
 - PostgreSQL bootstrap audit: `docs/verification/postgres-bootstrap-audit-2026-03-27.md`
+- Phase-1 governance pack: `docs/security/sbom-policy.md`, `docs/security/threat-model.md`, `docs/academic/bias-analysis-framework.md`, `docs/regulatory/pms-plan.md`
 - Formal system analysis: `docs/academic/formal-system-analysis.md`
 - Standalone closure audit: `docs/verification/standalone-closure-audit-2026-03-27.md`
 - Repository audit: `docs/verification/repository-audit-2026-03-25.md`
@@ -44,7 +46,8 @@ Local reconciliation now also exists on the pushed `origin/main` head:
 1. `7bf7ae3` closed the stash-pop merge and revalidated the full standalone build plus test baseline locally before push
 2. `d352d9c` corrected the final docs-governance drift in `README.md` and `package.json` and re-ran the equivalent local workflow assertions before push
 3. `33ac458` clarified the dated auditor handoff as a historical snapshot and aligned the active evidence routing with the current publication verdict
-4. append new hosted workflow URLs here when GitHub Actions records runs for `33ac458` or later heads
+4. `db5e7bb` aligned the standalone evidence head after publish and external-repository reconciliation
+5. append new hosted workflow URLs here when GitHub Actions records runs for `db5e7bb` or later heads
 
 ## Priority Tracks
 

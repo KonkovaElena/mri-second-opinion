@@ -41,6 +41,27 @@ The immediate next wave should harden that baseline before broader clinical-scop
 3. no regression test compares machine-specific absolute paths literally
 4. `docs/verification/launch-evidence-index.md` records the current hosted run URLs and why they matter
 
+### Post-Publication Sequencing
+
+Use the current repository state in this order.
+
+1. keep `PUBLIC_GITHUB_READY` scoped to conservative repository publication, not MVP closure
+2. close remaining GitHub UI or operator follow-up documented in `docs/releases/pending-manual-github-actions.md`
+3. finish wave 1.5 proof capture before expanding the scope of runtime claims
+4. resume Track B work in the established order: `WP-1`, `WP-2`, `WP-3`, `WP-4`, `WP-6`
+5. revisit deeper phase-1 expansion only after the bounded MVP slice and evidence ledger are current
+
+### Phase 1 Governance Hardening Pack
+
+Before broader clinical-scope expansion, keep one small but explicit governance pack current.
+
+1. `security/sbom-policy.md` defines the software supply-chain transparency seam and the `npm run sbom` operating rule
+2. `security/threat-model.md` turns the existing threat snapshot into a maintained design-control surface
+3. `academic/bias-analysis-framework.md` defines how subgroup and protocol-stratum evaluation must be planned before any stronger performance claims
+4. `regulatory/pms-plan.md` defines the future post-market surveillance transition plan while preserving the current RUO boundary
+
+This pack is documentation hardening, not proof of regulated release.
+
 ## Phase 0: Foundation
 
 Target outcomes:
@@ -198,6 +219,13 @@ The release path should also preserve:
 3. append-only execution logging for routing, fallbacks, overrides, and export generation
 
 Even in RUO mode, those controls improve scientific honesty and reduce future re-architecture cost.
+
+The current governance pack that supports this section is:
+
+1. `academic/bias-analysis-framework.md`
+2. `security/threat-model.md`
+3. `security/sbom-policy.md`
+4. `regulatory/pms-plan.md`
 
 ## Synthetic And Controlled Test Fixtures
 

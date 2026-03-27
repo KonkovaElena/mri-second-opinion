@@ -101,6 +101,8 @@ This is why the repository should preserve:
 3. explicit issue and fallback logs
 4. stable report schemas
 5. versioned workflow definitions
+6. a maintained software-bill-of-materials seam and security-risk register inputs
+7. an explicit bias-analysis and surveillance planning surface for later regulated evidence work
 
 ## Pathway Planning Work Item
 
@@ -147,3 +149,7 @@ Use this document together with:
 2. `evidence-and-claims-policy.md` for claim discipline
 3. `../architecture/overview.md` for human-review and workflow boundaries
 4. `../roadmap-and-validation.md` for the release path from engineering baseline toward stronger evidence
+5. `../security/sbom-policy.md` for software supply-chain documentation rules
+6. `../security/threat-model.md` for the maintained threat surface
+7. `bias-analysis-framework.md` for subgroup-evaluation discipline
+8. `../regulatory/pms-plan.md` for the future surveillance transition plan

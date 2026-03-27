@@ -8,6 +8,26 @@ This repository is ready for conservative public GitHub publication and external
 
 It must not be used for clinical decision-making or patient-care deployment.
 
+## Quick Status Links
+
+Use these entrypoints before reading deeper evidence packs.
+
+1. verdict authority: `docs/releases/v1-go-no-go.md`
+2. launch gates: `docs/launch-readiness-checklist.md`
+3. evidence ledger: `docs/verification/launch-evidence-index.md`
+4. publication vs MVP routing: `docs/releases/public-github-and-mvp-path.md`
+5. current wave sequencing: `docs/roadmap-and-validation.md`
+6. retrospective lessons: `docs/verification/publication-retrospective-audit-2026-03-27.md`
+
+## Phase 1 Governance Pack
+
+These documents harden the RUO baseline without pretending the repository is already clinically or regulatorily complete.
+
+1. software supply-chain baseline: `docs/security/sbom-policy.md`
+2. current threat model: `docs/security/threat-model.md`
+3. bias-analysis contract: `docs/academic/bias-analysis-framework.md`
+4. future post-market surveillance transition plan: `docs/regulatory/pms-plan.md`
+
 ## Why This Project Exists
 
 Many MRI AI projects sit in one of three uncomfortable extremes:
@@ -181,6 +201,14 @@ See `docs/academic/formal-system-analysis.md` for the EFSM, protocol, and proper
 7. `GET /api/internal/delivery-jobs`
 8. `POST /api/internal/delivery-jobs/claim-next`
 9. `POST /api/internal/delivery-callback`
+
+### Internal route auth
+
+If `MRI_INTERNAL_API_TOKEN` is set, every `api/internal/*` route requires `Authorization: Bearer <token>`.
+
+This is the current namespace-level protection seam for worker-facing HTTP routes.
+
+HMAC request signing and replay resistance remain future hardening work.
 
 The root route also exposes the live route inventory and points readers to scope, launch-readiness, and verdict docs.
 

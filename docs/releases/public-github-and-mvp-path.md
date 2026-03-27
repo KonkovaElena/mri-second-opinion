@@ -106,6 +106,15 @@ Do the tracks in this order.
 3. execute Track B work packages until one real demo slice closes
 4. only then revisit a higher product-readiness verdict
 
+## Post-Publication Execution Order
+
+After repository publication is safe, use this order for follow-up work.
+
+1. close the remaining GitHub UI and operator follow-up captured in `pending-manual-github-actions.md`
+2. finish the wave-1.5 cross-platform and evidence-hardening pass described in `../roadmap-and-validation.md`
+3. resume Track B in the current work-package order: `WP-1`, `WP-2`, `WP-3`, `WP-4`, `WP-6`
+4. reopen deeper phase-1 expansion only after the bounded MVP slice and its evidence ledger are current
+
 ## Execution Rule
 
 Do not block GitHub publication on every future export, every workflow family, or every later-phase architecture seam.
