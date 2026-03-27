@@ -1,6 +1,6 @@
 # MRI Standalone v1 Go/No-Go
 
-Date: 2026-03-26
+Date: 2026-03-27
 
 ## Allowed Verdicts
 
@@ -12,11 +12,11 @@ Only these verdicts are allowed:
 
 ## Current Verdict
 
-`NOT_READY`
+`PUBLIC_GITHUB_READY`
 
 ## Why
 
-The standalone repository now has a verified wave1 workflow API baseline, HMAC-signed internal mutation routes, replay rejection for signed nonces, local restart-safe file-backed durability, a durable local queue/read-model layer for inference and delivery stages, explicit queue and worker diagnostics on the operations summary, first-class persisted study-context/QC/findings artifact surfaces, typed artifact-reference projections, pinned reviewed and finalized release versions, a bounded signed worker transcript path, an optional PostgreSQL-backed repository path, local clean-database PostgreSQL migration proof, Postgres restart-survival integration tests, a CI postgres-smoke job, and hosted CI proof for the standalone subtree, but a reproducible synthetic demo packet, screenshot-backed UI closure, hosted or operator-run demo evidence, and broader release-grade operational proof are still incomplete.
+All seven launch gates in `../launch-readiness-checklist.md` are now backed by recorded evidence: the repository is independently buildable, the bounded workflow slice is locally verified, the built-in review workbench and synthetic demo path are real, public repository hygiene is hosted-proof-backed, and documentation honesty is locked to current runtime truth. Remaining gaps are still real, but they belong to higher product-maturity work rather than to safe public GitHub publication.
 
 ## Evidence Basis
 
@@ -26,20 +26,30 @@ Supporting artifacts that exist now:
 2. `../verification/launch-evidence-index.md`
 3. `../demo/demo-script.md`
 4. `../scope-lock.md`
-5. `../status-model.md`
-6. `../api-scope.md`
-7. `../architecture/overview.md`
-8. `../verification/runtime-baseline-verification.md`
-9. `public-github-and-mvp-path.md`
-10. `../architecture/mvp-work-package-map.md`
-11. `../architecture/reporting-and-export-contract.md`
+5. `../scope-inventory.md`
+6. `../public-vocabulary.md`
+7. `../status-model.md`
+8. `../api-scope.md`
+9. `../architecture/overview.md`
+10. `../verification/runtime-baseline-verification.md`
+11. `../verification/archive-viewer-seam-audit-2026-03-27.md`
+12. `../verification/presentation-surface-audit-2026-03-27.md`
+13. `../verification/demo-flow-audit-2026-03-27.md`
+14. `../verification/workbench-frontend-audit-2026-03-27.md`
+15. `../verification/durable-delivery-queue-audit-2026-03-27.md`
+16. `../verification/standalone-closure-audit-2026-03-27.md`
+17. `../demo/operator-transcript-2026-03-27.md`
+18. `public-github-and-mvp-path.md`
+19. `../architecture/mvp-work-package-map.md`
+20. `../verification/public-repository-hygiene-review.md`
+21. `../verification/postgres-bootstrap-audit-2026-03-27.md`
+22. `../verification/inference-queue-lease-audit-2026-03-27.md`
 
-Missing evidence required for a higher verdict:
+Open evidence that still blocks higher product-maturity claims:
 
-1. screenshot bundle for queue, case detail, evidence, review, report, and delivery surfaces
-2. operator runbook proof that the bounded demo can be executed repeatably in the intended local setup and timed under ten minutes
-3. broader worker and operational evidence beyond the current bounded local scaffold
-4. hosted or externally repeatable workflow evidence beyond the current local wave1 baseline
+1. release-linked or hosted workflow execution beyond the local bounded slice
+2. broader real-PostgreSQL runtime durability proof beyond clean bootstrap and targeted queue coverage
+3. distributed or external worker execution proof
 
 ## Upgrade Rules
 
@@ -49,7 +59,7 @@ Move to `INTERNAL_DEMO_READY` only when:
 2. one full synthetic workflow path works
 3. frontend and backend paths used in the demo are real
 
-Move to `PUBLIC_GITHUB_READY` only when:
+Use `PUBLIC_GITHUB_READY` only when:
 
 1. all seven launch gates in `../launch-readiness-checklist.md` are satisfied
 2. evidence is recorded in `../verification/launch-evidence-index.md`
@@ -57,12 +67,8 @@ Move to `PUBLIC_GITHUB_READY` only when:
 
 Use `public-github-and-mvp-path.md` when separating publication readiness from MVP closure work.
 
-That publication path may justify making the repository public earlier, but it does not change the meaning of the formal `PUBLIC_GITHUB_READY` verdict.
+`PUBLIC_GITHUB_READY` means the repository is safe to publish publicly on GitHub without misleading readers about scope or maturity. It does not mean internal MVP closure, launch readiness, clinical readiness, or production deployment readiness.
 
 ## Change Discipline
 
 This file must be updated only when the verdict changes or when new evidence materially changes the justification for the current verdict.
-
-PR-17 updates may expand the evidence basis and tighten the `NOT_READY` justification, but they must not imply a verdict upgrade without the PR-18 demo packet.
-
-The current PR-18 packet adds a synthetic-input provenance note and a bounded end-to-end transcript, but it still does not close the screenshot-backed demo gate.

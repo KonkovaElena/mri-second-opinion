@@ -385,7 +385,7 @@ The v1 product should preserve, but not yet implement as core scope, these futur
 
 ## Immediate Implementation Consequence
 
-The next engineering wave should build around this topology, not around local-file adapters from the parent repository.
+The next engineering wave should build around this topology, not around temporary local-file adapters that only serve the current baseline.
 
 The first physical deliverable should therefore be:
 

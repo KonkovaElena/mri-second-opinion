@@ -22,7 +22,7 @@ Publish the repository as:
 1. MRI-only
 2. clinician-in-the-loop
 3. workflow baseline
-4. open-source and contribution-ready
+4. suitable for conservative public publication and external review
 5. not launch-ready
 
 Do not publish it as:
@@ -31,12 +31,17 @@ Do not publish it as:
 2. a complete frontend-plus-worker platform
 3. an autonomous diagnostic product
 4. a finished imaging platform
+5. software suitable for clinical decision-making
 
 ## Copy-paste GitHub settings
 
 ### About description
 
 Clinician-in-the-loop MRI second-opinion workflow baseline with a standalone TypeScript API and restart-safe local persistence.
+
+### Optional caution line for profiles, releases, or discussions
+
+For research-oriented and external review use only. Not validated for clinical decision-making.
 
 ### Topics
 
@@ -68,7 +73,8 @@ Leave blank until a real public URL exists.
 1. confirm MRI tests pass
 2. confirm docs closure rail passes
 3. confirm README matches runtime truth
-4. confirm `v1-go-no-go.md` still says `NOT_READY`
+4. confirm `v1-go-no-go.md` says `PUBLIC_GITHUB_READY` and still keeps stronger launch or product claims closed
+5. confirm no GitHub-facing summary collapses implemented truth and target architecture into one claim
 
 ## 2. Repository setup
 
@@ -111,6 +117,7 @@ Only after hosted verification passes:
 1. review `first-public-announcement-draft.md`
 2. check that it still matches repo truth
 3. publish the announcement in the intended channel
+4. confirm the announcement keeps the non-clinical and clinician-in-the-loop posture explicit
 
 ## Stop conditions
 

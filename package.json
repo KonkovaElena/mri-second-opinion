@@ -2,7 +2,7 @@
   "name": "mri-second-opinion",
   "version": "0.1.0",
   "private": true,
-  "description": "Clinician-in-the-loop MRI second-opinion workflow baseline with a standalone TypeScript API and restart-safe local persistence",
+  "description": "Clinician-in-the-loop MRI second-opinion workflow baseline with a standalone TypeScript API and restart-safe local SQLite-backed persistence",
   "license": "MIT",
   "type": "commonjs",
   "repository": {
@@ -31,7 +31,8 @@
     "build": "tsc -p tsconfig.json",
     "db:migrate": "tsx scripts/db-migrate.ts",
     "db:migrate:smoke": "tsx scripts/db-migrate-smoke.ts",
-    "test": "node --import tsx --test \"tests/**/*.test.ts\"",
+    "test": "node --import tsx --test tests/**/*.test.ts",
+    "verify:postgres-bootstrap": "tsx scripts/verify-postgres-bootstrap.ts",
     "start": "node dist/index.js",
     "dev": "tsx watch src/index.ts"
   },
@@ -44,6 +45,7 @@
     "@types/express": "^5.0.1",
     "@types/node": "^22.13.10",
     "@types/pg": "^8.20.0",
+    "pg-mem": "^3.0.5",
     "tsx": "^4.19.3",
     "typescript": "^5.8.2"
   }

@@ -6,10 +6,20 @@ Every claim about launch readiness should link back to one or more artifacts lis
 
 ## Repository Status
 
-- Current verdict: `NOT_READY`
+- Current verdict: `PUBLIC_GITHUB_READY`
 - Last reviewed: 2026-03-27
 - Public repository: `https://github.com/KonkovaElena/mri-second-opinion`
 - Auditor handoff: `docs/verification/ai-auditor-handoff-2026-03-25.md`
+- Gap audit: `docs/verification/standalone-gap-audit-2026-03-27.md`
+- Archive/viewer seam audit: `docs/verification/archive-viewer-seam-audit-2026-03-27.md`
+- Presentation surface audit: `docs/verification/presentation-surface-audit-2026-03-27.md`
+- Demo-flow audit: `docs/verification/demo-flow-audit-2026-03-27.md`
+- Workbench frontend audit: `docs/verification/workbench-frontend-audit-2026-03-27.md`
+- Durable delivery queue audit: `docs/verification/durable-delivery-queue-audit-2026-03-27.md`
+- Inference queue lease audit: `docs/verification/inference-queue-lease-audit-2026-03-27.md`
+- PostgreSQL bootstrap audit: `docs/verification/postgres-bootstrap-audit-2026-03-27.md`
+- Formal system analysis: `docs/academic/formal-system-analysis.md`
+- Standalone closure audit: `docs/verification/standalone-closure-audit-2026-03-27.md`
 - Repository audit: `docs/verification/repository-audit-2026-03-25.md`
 - Hosted evidence scaffold: `docs/verification/hosted-evidence-capture-template.md`
 
@@ -27,10 +37,6 @@ Recorded hosted evidence today:
   `https://github.com/KonkovaElena/mri-second-opinion/actions/runs/23557754782`
 5. `docs-governance` succeeded on `49b794c` after adding the pending manual GitHub actions runbook:
   `https://github.com/KonkovaElena/mri-second-opinion/actions/runs/23557837645`
-6. `docs-governance` succeeded on `6a47800` after the migration/auth/evidence hardening pass:
-  `https://github.com/KonkovaElena/mri-second-opinion/actions/runs/23632190333`
-7. `ci` succeeded on `e782bf9` on 2026-03-27 after closing a host-specific artifact-URI regression that had failed on Linux runners:
-  `https://github.com/KonkovaElena/mri-second-opinion/actions/runs/23632453358`
 
 ## Priority Tracks
 
@@ -65,20 +71,6 @@ Primary planning references:
 1. `../architecture/mvp-work-package-map.md`
 2. `../architecture/neuro-first-mvp-slice.md`
 
-## PR-17 Claim-To-Evidence Ledger
-
-| Claim | Status | Concrete artifacts | Boundary |
-|---|---|---|---|
-| Signed internal mutation routes require HMAC-authenticated requests | complete for the current local baseline | `src/app.ts`, `tests/workflow-api.test.ts`, `docs/verification/runtime-baseline-verification.md` | one shared-secret trust boundary only; not hosted multi-service identity proof |
-| Replay and idempotency closure reject duplicate signed nonces and keep duplicate intake safe | partial | `tests/workflow-api.test.ts`, `README.md`, `tests/memory-case-service.test.ts` | nonce replay protection is still in-memory in the current runtime; the PostgreSQL replay store is not yet wired |
-| Queue substrate and worker transcript prove claim, heartbeat, callback, and degraded-worker visibility | partial | `tests/fixtures/worker-inference-transcript.json`, `tests/workflow-api.test.ts`, `worker/main.py`, `docs/verification/runtime-baseline-verification.md` | bounded local scaffold only; not evidence of a production worker fleet |
-| Artifact indirection and version pinning preserve typed artifact references and stable finalized releases | partial | `sql/migrations/004_projection_split.sql`, `tests/memory-case-service.test.ts`, `tests/postgres-integration.test.ts`, `docs/architecture/reporting-and-export-contract.md` | object-store-backed artifacts and export-grade release evidence remain incomplete |
-
-Verdict discipline:
-
-1. any `partial` row above keeps the repository verdict at `NOT_READY`
-2. `docs/releases/v1-go-no-go.md` remains the authority for verdict wording
-
 ## Evidence Categories
 
 ## 1. Clean Checkout And Build
@@ -97,8 +89,6 @@ Record:
   - `docs-governance` green on `177094a`: `https://github.com/KonkovaElena/mri-second-opinion/actions/runs/23556374341`
   - `docs-governance` green on `8f851b3`: `https://github.com/KonkovaElena/mri-second-opinion/actions/runs/23557754782`
   - `docs-governance` green on `49b794c`: `https://github.com/KonkovaElena/mri-second-opinion/actions/runs/23557837645`
-  - `docs-governance` green on `6a47800`: `https://github.com/KonkovaElena/mri-second-opinion/actions/runs/23632190333`
-  - `ci` green on `e782bf9`: `https://github.com/KonkovaElena/mri-second-opinion/actions/runs/23632453358`
 - Artifact links:
   - `package.json`
   - `package-lock.json`
@@ -124,19 +114,18 @@ Required artifacts:
 
 Record:
 
-- Status: partial
+- Status: complete for the local standalone workflow surface
+- Note: route inventory, stable API boundary docs, and deterministic workflow coverage now exist locally; hosted or release-linked capture is still tracked separately under release evidence
 - Artifact links:
-  - `README.md`
+  - `docs/scope-inventory.md`
+  - `docs/api-scope.md`
+  - `docs/public-vocabulary.md`
+  - `docs/status-model.md`
   - `tests/workflow-api.test.ts`
-  - `tests/memory-case-service.test.ts`
-  - `tests/postgres-integration.test.ts`
-  - `tests/fixtures/worker-inference-transcript.json`
-  - `worker/main.py`
-  - `src/cases.ts`
-  - `docs/verification/worker-artifact-contract-samples.md`
   - `docs/verification/runtime-baseline-verification.md`
-  - `docs/verification/repository-audit-2026-03-25.md`
-  - `docs/verification/architecture-and-publication-audit-2026-03-25.md`
+  - `docs/verification/demo-flow-audit-2026-03-27.md`
+  - `docs/verification/presentation-surface-audit-2026-03-27.md`
+  - `docs/verification/standalone-closure-audit-2026-03-27.md`
 
 ## 3. Durable State Verification
 
@@ -149,31 +138,18 @@ Required artifacts:
 
 Record:
 
-- Status: complete for the current local baseline
+- Status: complete for the current standalone launch-gate interpretation
+- Note: local SQLite-backed durability now includes explicit restart-safe delivery jobs, queue rebuild proof, retry persistence, worker-claim coverage, and internal inference-job stale-claim recovery; clean-database PostgreSQL bootstrap is also proven against a real PostgreSQL instance. Broader release-linked persistence evidence and production-grade PostgreSQL runtime maturity remain future work, but they do not block the current public GitHub publication gate.
 - Artifact links:
-  - `sql/migrations/004_projection_split.sql`
   - `tests/memory-case-service.test.ts`
-  - `tests/postgres-case-repository.test.ts`
-  - `tests/postgres-integration.test.ts`
-  - `tests/db-migrations.test.ts`
-  - `src/db-migrations.ts`
-  - `scripts/db-migrate.ts`
-  - `scripts/db-migrate-smoke.ts`
-  - `.github/workflows/ci.yml` (postgres-smoke job)
+  - `tests/workflow-api.test.ts`
+  - `tests/postgres-bootstrap.test.ts`
+  - `tests/postgres-case-service.test.ts`
+  - `docs/verification/durable-delivery-queue-audit-2026-03-27.md`
+  - `docs/verification/inference-queue-lease-audit-2026-03-27.md`
+  - `docs/verification/postgres-bootstrap-audit-2026-03-27.md`
   - `docs/verification/runtime-baseline-verification.md`
-  - `docs/verification/architecture-and-publication-audit-2026-03-25.md`
-
-Recorded local evidence on 2026-03-27:
-
-1. `npm test` passed with `93/93` tests in the standalone subtree on 2026-03-27 after migration hardening and production-auth configuration checks were added
-2. `npm run db:migrate:smoke` re-validated on 2026-03-27 against a clean local `postgres:17-alpine` container
-3. the smoke confirmed `schema_migrations` contains `001_create_case_records`, `002_idempotency_and_replay`, `003_transition_journal`, and `004_projection_split`
-4. the smoke confirmed the `case_records` table exists after migration
-5. `tests/memory-case-service.test.ts` verifies that the workflow queue and operations read model rebuild correctly from durable records across restart
-6. `tests/postgres-integration.test.ts` verifies restart survival, full lifecycle persistence, and delete propagation through the Postgres repository layer, including persisted workflow-queue state
-7. CI `postgres-smoke` job added to `.github/workflows/ci.yml` — runs migration against a `postgres:17-alpine` service container and verifies schema on GitHub-hosted runners
-8. `tests/memory-case-service.test.ts`, `tests/workflow-api.test.ts`, and `tests/postgres-integration.test.ts` verify durable study-context, QC artifact, and findings-payload surfaces across snapshot restart, API detail reads, and PostgreSQL restart
-9. `ci` run `23632453358` on commit `e782bf9` proves the current restart and artifact-reference suite is now host-path-neutral on GitHub-hosted Linux runners after Windows-authored changes
+  - `docs/verification/standalone-closure-audit-2026-03-27.md`
 
 ## 4. Frontend Verification
 
@@ -185,11 +161,18 @@ Required artifacts:
 
 Record:
 
-- Status: partial
+- Status: complete for the built-in standalone workbench surface
+- Note: the current frontend closure is a built-in synthetic-demo workbench over the live API, not an OHIF deployment or production imaging UI
 - Artifact links:
-  - `tests/workflow-api.test.ts`
-  - `src/app.ts`
-  - `docs/verification/operator-surface-verification.md`
+  - `public/workbench/index.html`
+  - `public/workbench/review-workbench.css`
+  - `public/workbench/review-workbench.js`
+  - `docs/verification/workbench-frontend-audit-2026-03-27.md`
+  - `docs/demo/operator-transcript-2026-03-27.md`
+  - `docs/screenshots/workbench-queue.png`
+  - `docs/screenshots/workbench-review.png`
+  - `docs/screenshots/workbench-report.png`
+  - `docs/screenshots/workbench-delivery.png`
   - `docs/architecture/mvp-work-package-map.md`
 
 ## 5. Demo Verification
@@ -203,18 +186,20 @@ Required artifacts:
 
 Record:
 
-- Status: partial
+- Status: complete for the current synthetic internal-demo path
+- Note: the current demo path is screenshot-backed, operator-documented, and routed through the built-in workbench plus existing API and internal callback seams; it does not claim hosted or worker-backed demo closure
 - Artifact links:
+  - `tests/workflow-api.test.ts`
+  - `docs/verification/demo-flow-audit-2026-03-27.md`
+  - `docs/verification/workbench-frontend-audit-2026-03-27.md`
+  - `docs/verification/standalone-closure-audit-2026-03-27.md`
   - `docs/demo/demo-script.md`
-  - `docs/demo/synthetic-demo-input-provenance.md`
-  - `docs/demo/demo-transcript.md`
-  - `docs/releases/v1-go-no-go.md`
+  - `docs/demo/operator-transcript-2026-03-27.md`
+  - `docs/screenshots/workbench-queue.png`
+  - `docs/screenshots/workbench-review.png`
+  - `docs/screenshots/workbench-report.png`
+  - `docs/screenshots/workbench-delivery.png`
   - `docs/architecture/mvp-work-package-map.md`
-
-Current boundary:
-
-1. the synthetic-safe input packet and bounded transcript now exist
-2. the screenshot bundle is still missing, so the verdict remains `NOT_READY`
 
 ## 6. Public Repository Hygiene
 
@@ -235,13 +220,31 @@ Record:
   - `docs-governance` green on `177094a`: `https://github.com/KonkovaElena/mri-second-opinion/actions/runs/23556374341`
   - `docs-governance` green on `8f851b3`: `https://github.com/KonkovaElena/mri-second-opinion/actions/runs/23557754782`
   - `docs-governance` green on `49b794c`: `https://github.com/KonkovaElena/mri-second-opinion/actions/runs/23557837645`
-  - `docs-governance` green on `6a47800`: `https://github.com/KonkovaElena/mri-second-opinion/actions/runs/23632190333`
-  - `ci` green on `e782bf9`: `https://github.com/KonkovaElena/mri-second-opinion/actions/runs/23632453358`
   - public repository is live with About metadata applied
+  - remaining GitHub-UI follow-up is tracked separately and does not change the current repository-content verdict
 - Artifact links:
   - `README.md`
   - `LICENSE`
   - `CODE_OF_CONDUCT.md`
+
+## 7. Formal Workflow Analysis
+
+Required artifacts:
+
+- state-machine definition aligned with the live status vocabulary
+- protocol inventory aligned with the live route surface
+- explicit safety, liveness, and auditability gap map
+
+Record:
+
+- Status: complete for the current standalone repository explanation layer
+- Note: this category clarifies what the repository can formally claim today and which security, liveness, and reproducibility seams remain open; it is supporting evidence, not a release-readiness upgrade by itself
+- Artifact links:
+  - `docs/academic/formal-system-analysis.md`
+  - `docs/status-model.md`
+  - `docs/api-scope.md`
+  - `docs/verification/durable-delivery-queue-audit-2026-03-27.md`
+  - `docs/verification/standalone-closure-audit-2026-03-27.md`
   - `SECURITY.md`
   - `CONTRIBUTING.md`
   - `SUPPORT.md`
@@ -282,7 +285,7 @@ Required artifacts:
 
 Record:
 
-- Status: complete
+- Status: partial
 - Artifact links:
   - `docs/verification/documentation-honesty-review.md`
   - `docs/verification/repository-audit-2026-03-25.md`
@@ -293,12 +296,6 @@ Record:
   - `docs/academic/evidence-and-claims-policy.md`
   - `docs/verification/runtime-baseline-verification.md`
   - `docs/verification/architecture-and-publication-audit-2026-03-25.md`
-
-Recorded closure note on 2026-03-26:
-
-1. public-facing release and product docs keep the repository verdict at `NOT_READY`
-2. public-facing wording no longer depends on parent-platform framing to explain the current standalone state
-3. remaining launch blockers are demo evidence and broader runtime proof, not public-doc honesty drift
 
 ## 8. Academic Rationale Layer
 

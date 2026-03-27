@@ -15,7 +15,7 @@ It is not legal advice and not a substitute for formal regulatory counsel.
 The standalone repository should currently be positioned as:
 
 1. research use only
-2. clinician-reviewed workflow software, not autonomous diagnosis
+2. clinician-in-the-loop workflow software, not autonomous diagnosis
 3. open-source engineering baseline, not a cleared or CE-marked medical device
 
 That means public docs, demos, screenshots, and exports must not imply clinical authorization, safety validation, or unsupervised diagnostic use.

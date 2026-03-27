@@ -1,6 +1,6 @@
 # MRI Standalone Demo Script
 
-Status: draft
+Status: active
 
 This script defines the minimum truthful demo for MRI Standalone v1.
 
@@ -12,59 +12,36 @@ Show the MRI second-opinion workflow from intake to delivery state using synthet
 
 ## Preconditions
 
-1. standalone repository boots locally
-2. synthetic MRI-safe demo package is available
-3. queue screen is operational
-4. case detail screen is operational
-5. final report preview is operational
-6. signed worker scaffold can execute one claim -> heartbeat -> callback transcript
+1. standalone repository boots locally via `npm run build` and `npm start`
+2. built-in workbench is reachable at `GET /workbench`
+3. operator uses only synthetic demo controls and synthetic case payloads
+4. screenshots are captured from the live workbench rather than mockups
 
 ## Target Walk-Through
 
-1. create or ingest a new MRI case
-2. show the case entering the queue
-3. open case detail and inspect metadata
-4. run the bounded worker transcript and show lease heartbeat plus signed callback
-5. show clinician review and amendment or approval
-6. finalize case
-7. show report preview
-8. show delivery state or delivery retry path
+1. open `GET /workbench?demoStage=submitted` and show the seeded queue case
+2. open `GET /workbench?demoStage=awaiting-review` and show case detail, draft report preview, and review workspace
+3. submit review in the workbench or use the pre-seeded review state for evidence capture
+4. open `GET /workbench?demoStage=delivery-failed` and show finalized report preview plus failed delivery state
+5. open `GET /workbench?demoStage=delivery-pending` and show the retry path after delivery requeue
 
 ## Required Evidence Capture
 
 During the first complete demo run, capture:
 
 1. startup command sequence
-2. API transcript or logs for major state transitions, including signed worker claim, heartbeat, and callback
-3. screenshots for queue, case detail, review, report, and delivery state
+2. operator transcript with exact workbench URLs used
+3. screenshots for queue, case detail plus review, report preview, and delivery state
 4. any manual operator steps still required
 
-## Current Gap
+## Authority Note
 
-This script is a staging artifact.
+This script is now authoritative for the current synthetic internal-demo path.
 
-It becomes authoritative only after the standalone runtime and UI can actually execute the walk-through above.
+The runtime proof is split across:
 
-The current worker-loop proof source is `tests/fixtures/worker-inference-transcript.json` plus the HMAC transcript test in `tests/workflow-api.test.ts`.
+1. `tests/workflow-api.test.ts` for deterministic API lifecycle verification
+2. `docs/verification/workbench-frontend-audit-2026-03-27.md` for UI-to-endpoint mapping
+3. `docs/demo/operator-transcript-2026-03-27.md` for the real operator walk-through
 
-## Current Proof Anchors Before PR-18
-
-Use these artifacts when checking whether the future demo script is still truthful:
-
-1. signed worker claim, heartbeat, and callback proof: `tests/workflow-api.test.ts` plus `tests/fixtures/worker-inference-transcript.json`
-2. queue and worker diagnostics proof: `GET /api/operations/summary` assertions in `tests/workflow-api.test.ts` and `tests/memory-case-service.test.ts`
-3. delivery-safe release pin proof: `tests/memory-case-service.test.ts` for pinned finalized release behavior and delivery dispatch claims
-4. current runtime evidence note: `docs/verification/runtime-baseline-verification.md`
-
-These anchors justify planning the demo path.
-
-They do not yet justify changing the repository verdict from `NOT_READY`.
-
-## Active Packet Links
-
-The current bounded demo packet is:
-
-1. `docs/demo/synthetic-demo-input-provenance.md`
-2. `docs/demo/demo-transcript.md`
-
-The screenshot bundle is still missing.
+It does not prove hosted deployment, PostgreSQL durability, queue-backed worker execution, or an OHIF deployment.

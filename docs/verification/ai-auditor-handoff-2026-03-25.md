@@ -52,7 +52,7 @@ That verdict is correct and should be challenged only if the auditor finds evide
 The project is intended to become:
 
 1. an MRI-only second-opinion workflow
-2. clinician-reviewed rather than autonomous
+2. clinician-in-the-loop rather than autonomous
 3. Orthanc plus DICOMWeb aligned at the imaging boundary
 4. TypeScript control plane plus Python compute plane at the execution boundary
 
@@ -147,7 +147,7 @@ Implemented endpoints visible in code:
 
 Important nuance:
 
-The root endpoint still identifies the service as a `wave1-api` baseline.
+The root endpoint still returns the literal runtime identifier `wave1-api`.
 
 That is a strong honesty signal, but it no longer means that workflow routes are absent.
 

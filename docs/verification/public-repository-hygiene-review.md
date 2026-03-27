@@ -91,4 +91,6 @@ Branch protection also remains pending as an operator action after workflow stab
 
 Public repository hygiene is established with hosted CI and docs-governance proof.
 
-The repository is in a credible public state with community-health basics present, publication-card guidance documented, contributor intake clarified, and repeated `docs-governance` hosted passes recorded after publication corrections. The remaining open items are GitHub-UI follow-up actions, not missing repository content.
+The repository is in a credible public state with community-health basics present, publication-card guidance documented, contributor intake clarified, and repeated `docs-governance` hosted passes recorded after publication corrections. This review supports the repository-content verdict `PUBLIC_GITHUB_READY`.
+
+The remaining open items are GitHub-UI follow-up actions, not missing repository content.

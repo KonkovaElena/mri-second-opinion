@@ -18,21 +18,23 @@ This repository is an open-source, clinician-in-the-loop MRI second-opinion work
 
 It is intended as a focused MRI-only workflow foundation, not as a launch-ready clinical system, a complete frontend product, or an autonomous diagnostic platform.
 
+It should not be used for clinical decision-making or patient-care deployment.
+
 Current public baseline includes:
 
 1. standalone install, build, and local test path
 2. workflow API for case intake, review, finalize, report retrieval, and delivery retry
-3. restart-safe local snapshot persistence
-4. explicit readiness and evidence docs
+3. restart-safe local snapshot, SQLite, and PostgreSQL bootstrap persistence evidence
+4. internal inference and delivery queue rails for local durable execution
+5. explicit readiness and evidence docs
 
 What is not included yet:
 
-1. database-backed durability
-2. queue-backed execution
+1. broader production-grade PostgreSQL-backed workflow durability
+2. external or distributed worker execution path
 3. object-store artifact durability
-4. real worker execution path
-5. clinician review UI
-6. launch-ready evidence
+4. OHIF-backed or production-grade imaging review UI
+5. launch-ready evidence
 
 If you want to evaluate or contribute, start with:
 
@@ -45,9 +47,11 @@ If you want to evaluate or contribute, start with:
 
 MRI Standalone is now public as a focused MRI-only open-source repository.
 
-The project is being published conservatively: it exposes a verified workflow API baseline and local restart-safe persistence, while keeping the formal repository verdict at `NOT_READY` until stronger hosted and product-level evidence exists.
+The project is being published conservatively: it exposes a verified workflow API baseline, local durable persistence evidence, and documented internal queue rails, while keeping launch-ready, clinical-ready, and production-ready claims closed. The current repository-content verdict is `PUBLIC_GITHUB_READY`.
 
 The intent of this public release is to make the current baseline inspectable, testable, and discussable without overstating maturity. The repository should be read as a clinician-in-the-loop workflow foundation, not as a production-ready clinical deployment.
+
+Research-informed architectural direction should not be confused with implemented runtime completeness.
 
 Contributors and reviewers should use the governed publication and evidence docs rather than infer readiness from architecture intent alone.
 
@@ -64,6 +68,8 @@ Use the longer announcement and include the "what is not included yet" list.
 ### For social posts
 
 Do not claim launch readiness, production deployment, or diagnostic capability.
+
+Do not imply that a clinician review UI, worker plane, or database-backed production stack already exists.
 
 ## Do not publish this draft unchanged if any of these are false
 

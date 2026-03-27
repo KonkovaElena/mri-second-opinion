@@ -46,7 +46,7 @@ The repository still does not prove:
 2. Redis-backed queue execution
 3. worker-process inference
 4. frontend review closure
-5. main-branch GitHub-hosted CI build and test success history recorded in the evidence pack
+5. full hosted product-closure evidence beyond build, test, and docs governance
 
 ## 3. Documentation honesty
 
@@ -98,7 +98,7 @@ Correction made:
 
 ## Audit Verdict
 
-The MRI standalone repository is in good pre-publication shape for a conservative wave1 baseline.
+The MRI standalone repository is in good pre-publication shape for a conservative first local workflow baseline.
 
 The codebase does not currently need repair for failing build or failing tests.
 

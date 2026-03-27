@@ -15,7 +15,7 @@ It complements the go-live checklist by making the operator order explicit.
 1. confirm local MRI tests pass
 2. confirm repo docs closure rail passes
 3. confirm README still matches runtime truth
-4. confirm `v1-go-no-go.md` still says `NOT_READY`
+4. confirm `v1-go-no-go.md` says `PUBLIC_GITHUB_READY` and still keeps launch or product claims closed
 
 ## 2. Create or prepare the public repository
 

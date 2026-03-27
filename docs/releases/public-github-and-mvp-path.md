@@ -1,6 +1,6 @@
 # Public GitHub And MVP Path
 
-Date: 2026-03-25
+Date: 2026-03-27
 
 ## Purpose
 
@@ -25,10 +25,11 @@ Repository-level verdicts remain governed by `v1-go-no-go.md` and the full launc
 
 The current repository is best understood as:
 
-1. public-repo-preparation in progress
-2. wave1 workflow API baseline verified locally
-3. workflow MVP not yet closed
-4. verdict still `NOT_READY`
+1. publicly hosted on GitHub with a conservative publication posture
+2. local workflow baseline and closure evidence exist for the standalone API path
+3. Track A repository-content work is complete, with remaining GitHub-UI follow-up tracked separately
+4. workflow MVP is not yet closed
+5. repository verdict is `PUBLIC_GITHUB_READY`
 
 ## Track A: Public GitHub Readiness
 
@@ -40,7 +41,7 @@ That means Track A focuses on:
 2. standalone install and build proof
 3. minimal repository hygiene
 4. explicit non-goals and RUO posture
-5. no hidden dependence on internal parent-project runtime pieces
+5. no hidden dependence on broader internal runtime pieces
 6. coherent GitHub-facing metadata and repository-card language
 
 ### Minimum evidence for Track A
@@ -48,7 +49,7 @@ That means Track A focuses on:
 1. passing standalone GitHub Actions install and build workflow
 2. root governance files present and externally readable
 3. launch-readiness docs consistent with actual runtime state
-4. public docs free of parent-platform assumptions that do not apply to the standalone subtree
+4. public docs free of broader-platform assumptions that do not apply to the standalone repository
 5. one current evidence index showing what is real and what is still only planned
 6. support, governance, and contributor-intake surfaces present without invented ownership claims
 7. dependency maintenance posture declared for the standalone repository
@@ -58,7 +59,9 @@ That means Track A focuses on:
 
 Track A is complete when the repository can be published publicly on GitHub without misleading outsiders about runtime completeness, workflow maturity, or current intended use.
 
-This is a publication-safety state, not by itself a higher repository verdict.
+This is a publication-safety state and now supports the repository-level verdict `PUBLIC_GITHUB_READY`.
+
+It still does not imply `INTERNAL_DEMO_READY`, launch readiness, or clinical/product readiness.
 
 Primary planning references:
 
@@ -71,7 +74,7 @@ The MVP track is stricter.
 
 It requires one end-to-end bounded workflow slice that actually works.
 
-For this repository, that slice remains neuro-first, clinician-reviewed, and synthetic-demo-friendly.
+For this repository, that slice remains neuro-first, clinician-in-the-loop, and synthetic-demo-friendly.
 
 Track B focuses on:
 
@@ -112,7 +115,7 @@ Do block it on anything that would mislead external readers about:
 1. what builds today
 2. what runs today
 3. what is only design intent
-4. what remains RUO and clinician-reviewed
+4. what remains RUO and clinician-in-the-loop
 
 ## Interaction With Other Docs
 

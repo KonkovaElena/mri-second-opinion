@@ -1,0 +1,129 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>MRI Review Workbench</title>
+    <link rel="stylesheet" href="/workbench/review-workbench.css" />
+  </head>
+  <body>
+    <div class="page-shell">
+      <header class="hero">
+        <div>
+          <p class="eyebrow">MRI Standalone</p>
+          <h1>MRI Review Workbench</h1>
+          <p class="lede">
+            Built-in operator surface for queue visibility, case review, finalization, report preview, and delivery retry.
+          </p>
+        </div>
+        <div class="hero-card">
+          <p class="hero-label">Current posture</p>
+          <p class="hero-value">Synthetic-demo-friendly, clinician-in-the-loop, not launch-ready</p>
+          <a class="hero-link" href="/">API inventory</a>
+        </div>
+      </header>
+
+      <main class="workbench">
+        <section class="panel panel-controls" data-panel="controls">
+          <div class="panel-header">
+            <h2>Demo Controls</h2>
+            <span class="tag tag-warn">Synthetic only</span>
+          </div>
+          <p class="panel-copy">
+            These controls drive the current API baseline and internal callback seams so the operator flow can be reviewed honestly before a real worker plane exists.
+          </p>
+          <div class="control-grid">
+            <button class="action-button" data-demo-stage="submitted">Seed Queue Case</button>
+            <button class="action-button" data-demo-stage="awaiting-review">Seed Draft Review Case</button>
+            <button class="action-button" data-demo-stage="delivery-failed">Seed Delivery Failure Case</button>
+            <button class="action-button" data-demo-stage="delivery-pending">Seed Delivery Retry Case</button>
+          </div>
+          <p id="flash-message" class="flash-message" aria-live="polite"></p>
+        </section>
+
+        <section class="panel panel-queue" data-panel="queue">
+          <div class="panel-header">
+            <h2>Queue Dashboard</h2>
+            <button id="refresh-button" class="ghost-button" type="button">Refresh</button>
+          </div>
+          <div id="queue-summary" class="summary-strip"></div>
+          <div id="queue-list" class="case-list"></div>
+        </section>
+
+        <section class="panel panel-detail" data-panel="detail">
+          <div class="panel-header">
+            <h2>Case Detail</h2>
+            <span id="selected-case-chip" class="tag">No case selected</span>
+          </div>
+          <div id="case-detail" class="detail-grid empty-state">Select or seed a case to inspect study context, plan summary, QC, and history.</div>
+        </section>
+
+        <section class="panel panel-review" data-panel="review">
+          <div class="panel-header">
+            <h2>Review Workspace</h2>
+            <span class="tag">Clinician step</span>
+          </div>
+          <form id="review-form" class="stack-form">
+            <label>
+              Reviewer ID
+              <input name="reviewerId" value="clinician-demo" required />
+            </label>
+            <label>
+              Reviewer Role
+              <input name="reviewerRole" value="neuroradiologist" />
+            </label>
+            <label>
+              Review Notes
+              <textarea name="comments" rows="3">Synthetic demo review completed.</textarea>
+            </label>
+            <label>
+              Final Impression
+              <textarea name="finalImpression" rows="3">No acute intracranial abnormality. Mild chronic volume loss only.</textarea>
+            </label>
+            <div class="action-row">
+              <button id="review-submit" class="action-button" type="submit">Submit Review</button>
+              <button id="draft-submit" class="ghost-button" type="button">Generate Synthetic Draft</button>
+            </div>
+          </form>
+
+          <form id="finalize-form" class="stack-form compact-top-gap">
+            <label>
+              Final Summary
+              <textarea name="finalSummary" rows="3">Clinician-reviewed summary locked and queued for delivery.</textarea>
+            </label>
+            <label>
+              Delivery Outcome
+              <select name="deliveryOutcome">
+                <option value="pending">pending</option>
+                <option value="failed">failed</option>
+                <option value="delivered">delivered</option>
+              </select>
+            </label>
+            <div class="action-row">
+              <button id="finalize-submit" class="action-button" type="submit">Finalize Case</button>
+              <button id="retry-submit" class="ghost-button" type="button">Retry Delivery</button>
+            </div>
+          </form>
+        </section>
+
+        <section class="panel panel-report" data-panel="report">
+          <div class="panel-header">
+            <h2>Report Preview</h2>
+            <span class="tag">RUO</span>
+          </div>
+          <div id="report-preview" class="report-preview empty-state">Report preview appears here after inference finishes.</div>
+        </section>
+
+        <section class="panel panel-operations" data-panel="operations">
+          <div class="panel-header">
+            <h2>Operations Summary</h2>
+            <span class="tag">Queue + retry</span>
+          </div>
+          <div id="operations-summary" class="operations-grid empty-state">Operations totals and retry history appear here.</div>
+        </section>
+      </main>
+    </div>
+
+    <script type="module" src="/workbench/review-workbench.js"></script>
+  </body>
+</html>

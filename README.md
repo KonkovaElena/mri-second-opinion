@@ -1,77 +1,196 @@
 # MRI Second Opinion
 
-Open-source, clinician-in-the-loop MRI second-opinion workflow.
+Clinician-in-the-loop MRI second-opinion workflow baseline with a standalone TypeScript API and restart-safe local persistence.
 
-The current standalone control-plane baseline is cross-platform at the repository and runtime boundary: local state paths and derived-artifact file URIs are resolved canonically rather than through host-specific literals, and the repository is currently proven from Windows authoring plus GitHub-hosted Linux CI. The intended server and GPU-worker deployment baseline remains Linux-first.
+Current repository verdict: `PUBLIC_GITHUB_READY`
 
-## Repository Snapshot
+This repository is ready for conservative public GitHub publication and external review, but it is not a launch-ready clinical product.
 
-1. scope: MRI-only workflow baseline
-2. verified today: standalone TypeScript API plus snapshot-backed restart safety, a durable local queue/read-model layer for inference and delivery, a bounded internal dispatch-claim seam for worker handoff, an optional Redis-backed dispatch substrate for `inference` and `delivery` claims, first-class persisted study-context/QC/findings artifacts, a persisted workflow-package manifest plus structural execution envelope and typed artifact manifest, typed artifact references with a local-file or s3-compatible object-store seam, a bounded structural run surface with typed derived artifacts, a minimal equivalent operator surface for queue/review/report work, an optional PostgreSQL persistence mode with stale-writer rejection on whole-record updates, optional bearer-token protection for internal mutation routes, local clean-database migration smoke on PostgreSQL, Postgres restart-survival integration tests, a CI postgres-smoke job, and cross-platform-safe default path plus file-URI handling for local artifacts and restart state
-3. not present yet: release-grade durable-state evidence beyond local smoke, production worker execution, frontend review workspace, and demo closure
-4. current repository verdict: `NOT_READY`
+It must not be used for clinical decision-making or patient-care deployment.
 
-## Scope
+## Why This Project Exists
 
-This repository is intended to become a standalone MRI-only product.
+Many MRI AI projects sit in one of three uncomfortable extremes:
 
-It is not:
+1. a research pipeline with weak workflow and audit boundaries
+2. a large imaging platform that is too heavy for a narrow second-opinion product
+3. a model demo that hides uncertainty, review gates, and operational state behind one opaque "AI" surface
+
+MRI Second Opinion takes a different path.
+
+It focuses on the workflow layer around MRI review:
+
+1. intake and eligibility checks
+2. draft generation and machine-output capture
+3. mandatory clinician review
+4. explicit finalization
+5. delivery and retry visibility
+
+The core idea is simple: keep the control plane transparent, keep clinical review mandatory, and keep claims narrower than the evidence.
+
+## Governing Thesis
+
+The governing thesis of this repository is that an MRI second-opinion product should be built as a transparent workflow system before it is described as an AI product.
+
+In practical terms, that means:
+
+1. workflow truth, review gates, and provenance matter as much as model output
+2. MRI should be treated as a family of sequence-dependent workflows, not as one generic input class
+3. specialist quantitative pipelines and broader screening models should remain explicit capability families rather than one undifferentiated engine
+4. the repository must distinguish implemented behavior from target architecture and from research-informed rationale at all times
+
+## At A Glance
+
+| Dimension | Current repository truth |
+|---|---|
+| Scope | MRI-only workflow baseline |
+| Runtime | Standalone Node.js and TypeScript API |
+| Persistence | Restart-safe local SQLite-backed durability |
+| Human review | Explicit and mandatory in the workflow model |
+| Public verdict | `PUBLIC_GITHUB_READY` |
+| Intended posture | Open-source, research-use-oriented, clinician-in-the-loop |
+
+## Claim Boundary
+
+| Claim type | Meaning in this repository | Example |
+|---|---|---|
+| Implemented | Backed by current runtime or verification evidence | standalone API, route surface, restart-safe local persistence |
+| Target architecture | Intended next runtime shape, not yet implemented truth | PostgreSQL, queue, object store, Orthanc, Python worker, OHIF UI |
+| Research-informed | Supported by external evidence, but not promoted to runtime truth here | DICOMweb boundary, BIDS reproducibility seam, MRI-native Python tooling |
+| Excluded | Claims the repository must not make | autonomous diagnosis, clinical validation, launch-ready deployment |
+
+## What This Repository Is
+
+1. a focused MRI-only second-opinion workflow project
+2. a transparent orchestration baseline rather than a model showcase
+3. a standalone API that already exposes a real case lifecycle
+4. a conservative public repository with explicit evidence and readiness rails
+
+## What This Repository Is Not
 
 1. a general PACS
-2. a universal medical imaging platform
+2. a universal medical-imaging platform
 3. an autonomous diagnostic system
-4. a custom imaging viewer engine
+4. a custom viewer engine
+5. a production-ready clinical deployment
+6. a proof that any specific MRI model family is clinically validated
 
-## Intended v1 stack
+## Design Principles
 
-1. TypeScript workflow core
-2. PostgreSQL durable state
-3. Redis-backed workflow queue
-4. MinIO-compatible object storage for derived artifacts and export payloads
-5. Orthanc for DICOM ingress and DICOMWeb serving
-6. Python inference worker for QC and AI processing
-7. OHIF-backed clinician review UI
+1. clinician review stays mandatory
+2. MRI remains sequence-aware and workflow-aware, not one undifferentiated input type
+3. the orchestration layer is separate from the heavy imaging compute layer
+4. DICOM stays the imaging interoperability boundary
+5. public claims must follow implemented evidence, not architectural ambition
 
-## Current status
+## Current Runtime vs Target Runtime
 
-Wave 1 workflow API baseline exists.
+| Layer | Implemented now | Target direction |
+|---|---|---|
+| Control plane | standalone TypeScript API | typed workflow core with stronger orchestration seams |
+| Workflow durability | local SQLite-backed durability | PostgreSQL-backed durable workflow truth |
+| Async execution | local durable delivery-job queue plus callback completion baseline | broader queue-backed execution and retry dispatch |
+| Imaging boundary | documented only | Orthanc plus DICOMWeb |
+| Compute plane | callback contract only | Python MRI QC and inference workers |
+| Review surface | built-in synthetic-demo workbench on top of the current API | OHIF-backed clinician review workspace |
+| Artifact layer | report artifacts plus typed derived descriptors with archive-link metadata | object-store-backed derived artifacts and export payloads |
 
-Currently verified baseline:
+## What Works Today
 
-1. standalone dependency installation
-2. standalone TypeScript build
-3. baseline service startup
-4. public workflow routes for case create, list, detail, review, finalize, report retrieval, delivery retry, and operations summary
-5. internal ingest, dispatch heartbeat, inference callback, and delivery callback endpoints
-6. optional bearer-token protection for internal ingest, dispatch claim, inference callback, and delivery callback endpoints via `MRI_INTERNAL_API_TOKEN`; HMAC-SHA256 signed-request authentication available via `MRI_INTERNAL_HMAC_SECRET` (preferred for production)
-7. clinician-action review and finalize routes require explicit human identity from the request body and reject internal machine credentials on those public routes
-8. restart-safe local snapshot persistence for case state, queue state, delivery state, retry history, and operation transcript
-9. first-class persisted study-context, workflow-package manifest, structural execution envelope, typed artifact manifest, QC summary, findings payload, and bounded structural run surfaces on case detail reads
-10. typed artifact references with URI, checksum, media type, producer, attempt identity, and a local-file or s3-compatible storage seam
-11. structured API error envelopes for invalid transport input
-12. `GET /`, `GET /healthz`, `GET /readyz`, and `GET /metrics`
-13. internal workflow logic is now split across orchestration, planning, and snapshot-repository seams without changing the HTTP contract
-14. `POST /api/internal/dispatch/claim` exposes a bounded internal worker-handoff seam for queued `inference` and `delivery` work with durable lease metadata and expiry-based requeue
-15. PostgreSQL-backed whole-record updates now reject stale writers instead of blindly overwriting a newer durable case revision
-16. `GET /operator` serves a minimal equivalent operator surface for queue, case detail, review, finalize, report preview, and delivery retry
+The current verified baseline is a first verified local workflow API baseline.
 
-The standalone repository still does not provide:
+Implemented and verified in this repository today:
 
-1. release-grade PostgreSQL durability evidence beyond the local integration tests and CI-configured migration verification
-2. background-worker execution, multi-worker lease coordination, or dead-letter governance beyond the current bounded internal dispatch-claim seam and optional Redis queue substrate
-3. release-grade object-store-backed artifact durability beyond the current typed artifact-reference seam
-4. OHIF or other frontend review surfaces
-5. a production-grade Python or external worker runtime beyond the current bounded signed worker scaffold and local structural run contract
-6. demo closure or launch-ready evidence
-7. ~~main-branch GitHub-hosted CI build and test evidence~~ (now recorded — see `docs/verification/launch-evidence-index.md`)
+1. standalone `npm ci`, `npm run build`, and `npm test`
+2. service startup from built output
+3. public workflow endpoints for case create, case list, case detail, review, finalize, report retrieval, delivery retry, and operations summary
+4. internal ingest, inference queue, delivery queue, inference callback, and delivery callback endpoints
+5. locked workflow-state vocabulary for the current MRI review path
+6. restart-safe local SQLite-backed persistence for case state, explicit delivery jobs, delivery state, retry history, and operation transcript
+7. structured JSON error envelopes for malformed or invalid input
+8. baseline operational routes: `GET /`, `GET /healthz`, `GET /readyz`, and `GET /metrics`
+9. report payloads that preserve legacy artifact refs alongside typed derived artifact descriptors with conservative viewer-ready semantics
+10. built-in `GET /workbench` review surface for queue visibility, case detail, review, finalize, report preview, operations summary, and delivery retry over the live API
+11. explicit worker-facing delivery queue claim path backed by durable records and restart survival proof
+12. explicit worker-facing inference queue list, claim, and expired-claim requeue paths backed by durable records and restart survival proof
+13. internal separation between orchestration, planning, and snapshot-repository seams while preserving the HTTP contract
 
-The runtime can now select snapshot mode or PostgreSQL-backed persistence via `DATABASE_URL`. `npm run db:migrate` prepares the current schema, and `npm run db:migrate:smoke` now proves the migration path against a clean local PostgreSQL container. That is useful local evidence, but it still does not by itself establish launch-ready durable-state closure.
+## What Does Not Exist Yet
+
+The repository still does not provide these as implemented runtime truth:
+
+1. PostgreSQL-backed durable workflow state
+2. distributed or production-grade queue-backed execution infrastructure beyond the local SQLite-backed delivery and inference queue baselines
+3. object-store-backed artifact durability
+4. a real Python worker path for MRI QC and inference
+5. an OHIF-backed review workspace or production-grade imaging viewer frontend
+6. hosted or release-linked demo closure for the full intended product path
+7. evidence for launch-ready clinical or operational maturity
+
+## Current Workflow Model
+
+The canonical workflow states are:
+
+1. `INGESTING`
+2. `QC_REJECTED`
+3. `SUBMITTED`
+4. `AWAITING_REVIEW`
+5. `REVIEWED`
+6. `FINALIZED`
+7. `DELIVERY_PENDING`
+8. `DELIVERED`
+9. `DELIVERY_FAILED`
+
+Two constraints matter for understanding the project:
+
+1. human review is mandatory before finalization
+2. no workflow state implies autonomous diagnosis
+
+See `docs/status-model.md` for the locked state machine.
+
+See `docs/scope-inventory.md` for the exact active repository surface.
+
+See `docs/public-vocabulary.md` for the frozen public terms used in runtime and docs.
+
+See `docs/academic/formal-system-analysis.md` for the EFSM, protocol, and property-level reading of the current standalone runtime and its remaining seams.
+
+## API Surface Implemented Today
+
+### Public API
+
+1. `POST /api/cases`
+2. `GET /api/cases`
+3. `GET /api/cases/:caseId`
+4. `POST /api/cases/:caseId/review`
+5. `POST /api/cases/:caseId/finalize`
+6. `GET /api/cases/:caseId/report`
+7. `GET /api/operations/summary`
+8. `POST /api/delivery/:caseId/retry`
+
+### Built-in operator surface
+
+1. `GET /workbench`
+
+### Internal integration endpoints
+
+1. `POST /api/internal/ingest`
+3. `GET /api/internal/inference-jobs`
+4. `POST /api/internal/inference-jobs/claim-next`
+5. `POST /api/internal/inference-jobs/requeue-expired`
+6. `POST /api/internal/inference-callback`
+7. `GET /api/internal/delivery-jobs`
+8. `POST /api/internal/delivery-jobs/claim-next`
+9. `POST /api/internal/delivery-callback`
+
+The root route also exposes the live route inventory and points readers to scope, launch-readiness, and verdict docs.
+
+See `docs/api-scope.md` for the canonical boundary rules.
 
 ## Quick Start
 
-Run the standalone subtree directly.
+Run the standalone subtree directly:
 
-This baseline is intentionally host-path-neutral for contributors. Default snapshot, migration, and artifact locations are derived at runtime, and persisted local artifact references are emitted as canonical file URLs rather than host-specific absolute-string literals. That keeps the standalone repo usable from different development hosts while preserving a Linux-first deployment target for server nodes and worker infrastructure.
+Prerequisite: `Node >=22`
 
 ```bash
 npm ci
@@ -80,79 +199,128 @@ npm test
 npm start
 ```
 
-Optional database setup rail for the future durable-state path:
+Minimum runtime expectation after startup:
 
-```bash
-DATABASE_URL=postgresql://... npm run db:migrate
-npm run db:migrate:smoke
-```
+1. `GET /` returns the repository identity, route map, and doc pointers
+2. `GET /healthz` returns `ok`
+3. `GET /readyz` returns `ready`
+4. `GET /metrics` returns a baseline placeholder metrics payload
+5. `GET /workbench` returns the built-in MRI Review Workbench shell
 
-Optional local infrastructure bring-up for the current Postgres and Redis seams:
+This quick start proves the local workflow API baseline only.
 
-```bash
-docker compose up -d postgres redis
-```
+It does not prove:
 
-When `DATABASE_URL` is present, the API now advertises `persistenceMode: "postgres"` from `GET /` and `GET /readyz` and routes case storage through the PostgreSQL repository.
+1. a hosted deployment path
+2. a production-grade frontend review product
+3. a production PostgreSQL-backed workflow core
+4. a production observability stack
+5. clinical readiness
 
-When `MRI_INTERNAL_API_TOKEN` is present, internal mutation routes require `Authorization: Bearer <token>`.
+Any public demo or screenshot path should be treated as synthetic-only until the repository proves otherwise.
 
-When `MRI_INTERNAL_HMAC_SECRET` is present (≥ 32 bytes), internal mutation routes require HMAC-SHA256 signed requests instead of Bearer tokens. Each request must include three headers:
+## Research-Informed Direction
 
-| Header | Content |
-|--------|---------|
-| `X-MRI-Timestamp` | ISO 8601 UTC timestamp at send time |
-| `X-MRI-Nonce` | Unique random value per request |
-| `X-MRI-Signature` | `HMAC-SHA256(secret, METHOD + "\n" + PATH + "\n" + Timestamp + "\n" + Nonce + "\n" + SHA256(body))` as hex |
+The target architecture is deliberately broader than the current runtime, but it is still narrow by product scope.
 
-Requests outside the clock-skew window (default ±60 s, configurable via `MRI_CLOCK_SKEW_TOLERANCE_MS`) are rejected.
+Target runtime direction:
 
-**Replay protection:** When HMAC signing is active, the server tracks consumed nonces in memory. A repeated nonce within the TTL window (default 120 s, configurable via `MRI_REPLAY_STORE_TTL_MS`) returns `409 REPLAY_DETECTED`. The in-memory store holds up to `MRI_REPLAY_STORE_MAX_ENTRIES` entries (default 10 000) before evicting the oldest. A PostgreSQL-backed replay store is available via migration `002_idempotency_and_replay.sql` (not yet wired — memory mode covers the current baseline).
+1. TypeScript workflow core
+2. PostgreSQL durable state
+3. Redis-backed workflow queue
+4. object storage for derived artifacts and report payloads
+5. Orthanc for DICOM ingress and DICOMWeb serving
+6. Python worker for QC and MRI-native compute pipelines
+7. OHIF-backed clinician review UI
 
-When both `MRI_INTERNAL_HMAC_SECRET` and `MRI_INTERNAL_API_TOKEN` are set, HMAC takes precedence and Bearer is ignored.
+This target stack is not presented as already implemented.
 
-Derived artifacts now flow through a typed reference contract instead of staying only as opaque inline blobs. Configure that seam with:
+It is presented as the most defensible open-source direction given the March 2026 ecosystem and the repository's stated boundaries.
 
-| Variable | Purpose |
-|--------|---------|
-| `MRI_ARTIFACT_STORE_PROVIDER` | `local-file` or `s3-compatible` |
-| `MRI_ARTIFACT_STORE_BASE_PATH` | local artifact root or object-key base path |
-| `MRI_ARTIFACT_STORE_ENDPOINT` | optional explicit endpoint for s3-compatible deployments |
-| `MRI_ARTIFACT_STORE_BUCKET` | optional bucket name for s3-compatible deployments |
+## Methodological Stance
 
-The current implementation still defaults to a local-file artifact root under `.mri-data/artifacts`, but the persisted reference model is now object-store ready without another case-state rewrite.
+This repository follows an evidence-first engineering posture.
 
-Dispatch claims can also move from the default local queue substrate to Redis-backed transport:
+That means:
 
-| Variable | Purpose |
-|--------|---------|
-| `MRI_QUEUE_PROVIDER` | `local` or `redis` |
-| `MRI_REDIS_URL` | Redis connection string used when the provider is `redis` |
-| `MRI_QUEUE_KEY_PREFIX` | stage-specific queue key prefix |
+1. readiness claims are subordinated to runtime and verification evidence
+2. architecture documents explain intended direction, but do not upgrade verdicts on their own
+3. external literature and ecosystem practice can justify design choices, but not product-maturity claims
+4. regulatory and licensing constraints are treated as design inputs, not as post-hoc documentation work
+5. the default external posture remains research-use-oriented and clinician-in-the-loop until stronger evidence exists
 
-The Redis path now covers queue transport for `POST /api/internal/dispatch/claim`, but the durable source of truth for attempts, lease metadata, and operator-visible queue state remains the persisted case record.
+## Why The Architecture Is Defensible
 
-That boundary currently covers `POST /api/internal/ingest`, `POST /api/internal/dispatch/claim`, `POST /api/internal/dispatch/heartbeat`, `POST /api/internal/inference-callback`, and `POST /api/internal/delivery-callback`.
+The current academic and ecosystem position behind this repository is:
 
-One minimal external worker loop now exists under `worker/`.
+1. DICOM and DICOMweb remain the correct imaging interoperability boundary
+2. MRI compute ecosystems are strongest in Python-native tooling rather than in TypeScript-only inference stacks
+3. clinician review should remain explicit even when AI draft generation exists
+4. MRI workflows are sequence-sensitive and failure-sensitive, so routing and QC cannot be collapsed into one generic model claim
+5. BIDS-like organization remains useful as a reproducibility scaffold even when the clinical ingress boundary stays DICOM-native
 
-It signs claim, heartbeat, and callback requests against the current HMAC contract so the repository no longer depends only on local callback simulation to prove worker-loop closure.
+Concrete external reference points currently used in the repository's evidence pack include:
 
-It is a bounded scaffold, not a production inference runtime.
+1. FDA AI-enabled medical-device transparency surfaces and lifecycle framing
+2. the DICOMweb standard pages for QIDO-RS, WADO-RS, and STOW-RS
+3. OHIF v3.12 release notes for clinician-review and segmentation workflow capability
+4. Orthanc Team deployment guidance for the DICOM boundary
+5. Prefect v3 documentation as an event-driven orchestration reference
+6. FastSurfer as an MRI-native quantitative pipeline reference with explicit research-use boundaries
+7. BIDS as a standardized reproducibility and validation scaffold
 
-Public clinician-action routes stay separate from that machine boundary. `POST /api/cases/:caseId/review` requires `reviewerId` in the request body, `POST /api/cases/:caseId/finalize` requires `clinicianId`, and both routes reject internal bearer or HMAC credentials with `403 MACHINE_CREDENTIAL_REJECTED`.
+The canonical source pack is `docs/academic/external-evidence-register-march-2026.md`.
 
-Use this quick start to verify the current baseline only.
+## Repository Map
 
-It does not prove a launch-ready product, a hosted deployment path, or a full MRI review stack.
+If you are new to the project, start here:
 
-The repository includes standalone `.github/workflows/ci.yml` and `.github/workflows/docs-governance.yml` workflows. Both now have recorded hosted success on GitHub-hosted runners. See `docs/verification/launch-evidence-index.md` for run URLs.
+1. `docs/scope-lock.md` for scope and non-goals
+2. `docs/status-model.md` for workflow states
+3. `docs/api-scope.md` for public and internal API boundaries
+4. `docs/architecture/overview.md` for the target operating model
+5. `docs/verification/runtime-baseline-verification.md` for what is actually verified today
+6. `docs/launch-readiness-checklist.md` for the release gate
+7. `docs/releases/v1-go-no-go.md` for the formal verdict
 
-## Community Health
+For deeper architecture and evidence work:
 
-Public publication is live and intentionally conservative.
+1. `docs/open-source-target-architecture.md`
+2. `docs/roadmap-and-validation.md`
+3. `docs/academic/evidence-and-claims-policy.md`
+4. `docs/academic/open-source-rationale.md`
+5. `docs/academic/ecosystem-landscape-march-2026.md`
+6. `docs/academic/model-licensing-and-deployment-gates.md`
+7. `docs/academic/regulatory-positioning.md`
 
-Use these repository-health files when contributing or evaluating readiness:
+## Evidence And Readiness
+
+This repository uses explicit claim discipline.
+
+Every strong statement should be understood as one of four things:
+
+1. implemented claim
+2. design claim
+3. research-informed claim
+4. excluded claim
+
+That distinction exists to prevent three common failures:
+
+1. presenting architecture as if it were runtime proof
+2. presenting academic familiarity as if it were product validation
+3. presenting demo capability as if it were deployment readiness
+
+Use these files as the current source of truth for readiness:
+
+1. `docs/launch-readiness-checklist.md`
+2. `docs/releases/v1-go-no-go.md`
+3. `docs/verification/runtime-baseline-verification.md`
+4. `docs/verification/launch-evidence-index.md`
+5. `docs/academic/evidence-and-claims-policy.md`
+
+## Community And Safety Surfaces
+
+When contributing or evaluating repository hygiene, use:
 
 1. `CONTRIBUTING.md`
 2. `SECURITY.md`
@@ -162,93 +330,15 @@ Use these repository-health files when contributing or evaluating readiness:
 6. `.github/ISSUE_TEMPLATE/bug-report.yml`
 7. `.github/ISSUE_TEMPLATE/feature-request.yml`
 8. `.github/ISSUE_TEMPLATE/docs-scope.yml`
-9. `.github/ISSUE_TEMPLATE/config.yml`
-10. `.github/PULL_REQUEST_TEMPLATE.md`
-11. `.github/dependabot.yml`
+9. `.github/PULL_REQUEST_TEMPLATE.md`
+10. `.github/dependabot.yml`
 
-Canonical design artifacts currently live in `docs/`.
+## Bottom Line
 
-Core standalone documents:
+MRI Second Opinion is best understood today as a truthful, technically real, MRI-only workflow baseline.
 
-1. `docs/scope-lock.md`
-2. `docs/status-model.md`
-3. `docs/api-scope.md`
-4. `docs/architecture/overview.md`
-5. `docs/architecture/orchestrator-control-plane.md`
-6. `docs/architecture/orchestrator-reference-contracts.md`
-7. `docs/architecture/neuro-first-mvp-slice.md`
-8. `docs/architecture/reasoning-agent-safety-and-validation.md`
-9. `docs/architecture/mvp-work-package-map.md`
-10. `docs/architecture/reference-workflow-routing.md`
-11. `docs/architecture/reporting-and-export-contract.md`
-12. `docs/architecture/queue-substrate-adr.md`
-13. `docs/open-source-target-architecture.md`
-14. `docs/academic/ecosystem-landscape-march-2026.md`
-15. `docs/academic/external-evidence-register-march-2026.md`
-16. `docs/academic/model-licensing-and-deployment-gates.md`
-17. `docs/academic/regulatory-positioning.md`
-18. `docs/roadmap-and-validation.md`
+It already has a runnable API and durable local workflow state.
 
-## Launch Readiness
+It does not yet have the database, queue, worker, viewer, or evidence package required for a higher readiness verdict.
 
-The standalone repository should not be described as launch-ready from design intent alone.
-
-Use these documents as the current release gate:
-
-1. `docs/launch-readiness-checklist.md`
-2. `docs/verification/launch-evidence-index.md`
-3. `docs/demo/demo-script.md`
-4. `docs/demo/synthetic-demo-input-provenance.md`
-5. `docs/demo/demo-transcript.md`
-6. `docs/releases/v1-go-no-go.md`
-7. `docs/verification/documentation-honesty-review.md`
-8. `docs/verification/runtime-baseline-verification.md`
-9. `docs/releases/public-github-and-mvp-path.md`
-10. `docs/releases/github-publication-playbook.md`
-11. `docs/releases/github-go-live-checklist.md`
-12. `docs/releases/github-metadata-copy.md`
-13. `docs/releases/github-settings-worksheet.md`
-14. `docs/releases/github-live-publication-sequence.md`
-15. `docs/releases/first-public-announcement-draft.md`
-16. `docs/releases/github-operator-packet.md`
-17. `docs/demo/social-preview-brief.md`
-18. `docs/verification/hosted-evidence-capture-template.md`
-19. `docs/verification/ai-auditor-handoff-2026-03-25.md`
-20. `docs/verification/repository-audit-2026-03-25.md`
-
-## Academic Position
-
-The repository is intentionally grounded in explicit claim discipline and open-source MRI ecosystem rationale.
-
-Use these documents when evaluating whether a statement is implemented truth, design intent, or research-informed guidance:
-
-1. `docs/academic/evidence-and-claims-policy.md`
-2. `docs/academic/open-source-rationale.md`
-3. `docs/academic/external-evidence-register-march-2026.md`
-4. `docs/releases/public-github-and-mvp-path.md`
-5. `docs/releases/github-publication-playbook.md`
-6. `docs/releases/github-metadata-copy.md`
-7. `docs/releases/github-settings-worksheet.md`
-
-Current expected verdict:
-
-1. `NOT_READY` until repository independence, workflow closure, durable state, frontend closure, and demo evidence are all present
-
-## Reference Design Map
-
-Use the standalone docs as a layered design set rather than as one narrative document:
-
-1. `docs/architecture/overview.md` for operating boundaries and node responsibilities
-2. `docs/architecture/orchestrator-control-plane.md` for the transparent control-plane model that binds routing, workflow packages, policy gates, and human review
-3. `docs/architecture/orchestrator-reference-contracts.md` for the schema-level contract set behind package manifests, plan envelopes, evidence cards, policy gates, and downgrade records
-4. `docs/architecture/neuro-first-mvp-slice.md` for the narrowest credible first delivery slice and proof package
-5. `docs/architecture/reasoning-agent-safety-and-validation.md` for deterministic fallback, DAG validation, reproducibility mode, and uncertainty-budget rules around adaptive planning
-6. `docs/architecture/mvp-work-package-map.md` for the implementation-sized package order that turns the neuro-first target into execution work
-7. `docs/open-source-target-architecture.md` for the target open-source deployment topology
-8. `docs/architecture/reference-workflow-routing.md` for study classification, pipeline routing, fallback behavior, and GPU-aware execution constraints
-9. `docs/architecture/reporting-and-export-contract.md` for result envelopes, derived artifacts, and DICOM SR or SEG plus FHIR export seams
-10. `docs/academic/ecosystem-landscape-march-2026.md` for the March 2026 model and framework baseline
-11. `docs/academic/external-evidence-register-march-2026.md` for the current official and authoritative source pack behind architectural claims
-12. `docs/academic/model-licensing-and-deployment-gates.md` for the boundary between open code, model-weight terms, and deployable baseline status
-13. `docs/academic/regulatory-positioning.md` for RUO-first positioning and regulatory-ready-by-design constraints
-14. `docs/roadmap-and-validation.md` for phased delivery and validation expectations
+That gap is intentional, visible, and documented.

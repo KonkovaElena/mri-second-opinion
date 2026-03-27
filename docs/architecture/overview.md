@@ -2,7 +2,7 @@
 
 ## Product Role
 
-MRI Standalone is a workflow orchestrator for clinician-reviewed MRI second-opinion processing.
+MRI Standalone is a workflow orchestrator for clinician-in-the-loop MRI second-opinion processing.
 
 It is not a PACS replacement, not a custom imaging viewer, and not an autonomous diagnostic product.
 

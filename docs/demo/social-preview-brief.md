@@ -52,3 +52,5 @@ Reject the asset if it suggests:
 2. a clinically validated product
 3. autonomous diagnosis
 4. a polished production deployment beyond the verified baseline
+5. real patient data or real clinical output
+6. a non-synthetic demo surface that the repository cannot currently evidence

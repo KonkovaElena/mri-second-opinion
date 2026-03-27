@@ -11,7 +11,7 @@
 
 ## Explicitly Excluded From Standalone v1
 
-1. diagnosis-support API from the parent repository
+1. broader diagnosis-support APIs or runtime surfaces outside this standalone repository
 2. custom PACS implementation
 3. custom medical image viewer engine
 4. autonomous diagnosis claims
@@ -23,3 +23,5 @@
 The product is a workflow orchestrator around MRI second-opinion review.
 
 It is not a replacement for enterprise radiology infrastructure.
+
+For the exact active repository surface, see `docs/scope-inventory.md`.

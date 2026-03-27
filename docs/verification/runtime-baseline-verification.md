@@ -48,7 +48,7 @@ The following endpoints returned `200` during the runtime smoke check:
 3. `/readyz`
 4. `/metrics`
 
-The root endpoint identified the service as a `wave1-api` baseline and exposed the current public and internal route inventory. The `/metrics` surface is still a placeholder export, which is useful for baseline operability checks but not yet evidence of a production metrics program.
+The root endpoint returned the literal runtime mode string `wave1-api` and exposed the current public and internal route inventory. The `/metrics` surface is still a placeholder export, which is useful for baseline operability checks but not yet evidence of a production metrics program.
 
 ## 5. Workflow API closure
 
@@ -96,7 +96,7 @@ It now has one bounded external worker proof path through the signed Python work
 
 Confirmed locally.
 
-The current standalone baseline persists local case snapshots to a configured file and survives process restart for:
+The current standalone baseline persists workflow state into a configured local SQLite store and survives process restart for:
 
 1. case records
 2. queue-state transcript
@@ -105,7 +105,7 @@ The current standalone baseline persists local case snapshots to a configured fi
 5. operation transcript
 6. operations summary rebuild
 
-This is local file-backed durability only. It is not evidence of PostgreSQL migration readiness.
+This is local SQLite-backed durability only. It is not evidence of PostgreSQL migration readiness.
 
 ## 7. Local PostgreSQL migration smoke
 
@@ -297,4 +297,4 @@ This runtime note should be read together with `docs/verification/repository-aud
 
 This note upgrades the repository from documentation-only skeleton to a workflow-capable local runtime baseline.
 
-It does not change the repository verdict beyond `NOT_READY`.
+By itself, it does not decide the repository-level verdict. The current repository-content verdict remains governed by `docs/releases/v1-go-no-go.md` and the full launch-evidence set.

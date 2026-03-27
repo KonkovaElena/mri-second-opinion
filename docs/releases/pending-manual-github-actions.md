@@ -30,7 +30,7 @@ Requirements (from `docs/demo/social-preview-brief.md`):
 - Title: "MRI Second Opinion"
 - Subtitle: "Clinician-in-the-loop workflow baseline"
 - Footer: "MRI-only | TypeScript API | Not launch-ready"
-- 1280×640, under 1 MB
+- PNG, JPG, or GIF; under 1 MB; at least 640×320, with 1280×640 preferred
 - No fake dashboard, no diagnostic wording, no patient imagery
 
 Prepared asset in the repository:
@@ -38,6 +38,8 @@ Prepared asset in the repository:
 - `docs/demo/social-preview.png`
 
 **Manual action still required**: upload that file through the GitHub UI.
+
+Use a solid background unless transparency has been checked against multiple platform backgrounds.
 
 ## 4. Add Branch Protection Rules
 

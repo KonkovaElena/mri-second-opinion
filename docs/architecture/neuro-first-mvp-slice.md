@@ -130,7 +130,7 @@ The repository can preserve workflow version, package version, and artifact refe
 
 ### 6. Honesty gate
 
-Public docs and demo materials still describe the slice as RUO-first and clinician-reviewed rather than clinically validated autonomy.
+Public docs and demo materials still describe the slice as RUO-first and clinician-in-the-loop rather than clinically validated autonomy.
 
 ## Proof Package
 

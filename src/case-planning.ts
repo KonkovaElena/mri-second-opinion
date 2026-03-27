@@ -1,5 +1,4 @@
 import type {
-  ArtifactReference,
   CaseRecord,
   CaseStatus,
   EvidenceCard,
@@ -8,7 +7,9 @@ import type {
   PolicyGateRecord,
   ReportPayload,
 } from "./cases";
-import { missingRequiredSequences, nowIso, type ReportVersionPins } from "./case-common";
+import type { StudyContextRecord } from "./case-imaging";
+import { createDerivedArtifactDescriptors } from "./case-artifacts";
+import { missingRequiredSequences, nowIso } from "./case-common";
 
 export const ALLOWED_TRANSITIONS: Readonly<Record<CaseStatus, readonly CaseStatus[]>> = {
   INGESTING: ["SUBMITTED", "QC_REJECTED"],
@@ -27,10 +28,24 @@ export function createPlanEnvelope(input: {
   studyUid: string;
   indication: string | null;
   sequenceInventory: string[];
+  studyContext?: StudyContextRecord;
+  qcDisposition: InferenceCallbackInput["qcDisposition"] | "pending";
   source: "public-api" | "internal-ingest";
   isEligible: boolean;
 }): PlanEnvelope {
   const createdAt = nowIso();
+  const studyContext = input.studyContext ?? {
+    studyInstanceUid: input.studyUid,
+    dicomStudyInstanceUid: input.studyUid,
+    accessionNumber: null,
+    studyDate: null,
+    sourceArchive: null,
+    dicomWebBaseUrl: null,
+    metadataSummary: [],
+    series: [],
+    receivedAt: createdAt,
+    source: input.source,
+  };
   const blockedPackages = input.isEligible ? [] : ["brain-structural-fastsurfer"];
   const selectedPackage = input.isEligible ? "brain-structural-fastsurfer" : null;
   const downgradeState = input.isEligible
@@ -65,6 +80,16 @@ export function createPlanEnvelope(input: {
       workflowCandidates: ["brain-structural"],
       sequenceInventory: input.sequenceInventory,
       indication: input.indication,
+      qcDisposition: input.qcDisposition,
+      metadataSummary: studyContext.metadataSummary,
+      dicomStudy: {
+        studyInstanceUid: studyContext.dicomStudyInstanceUid,
+        accessionNumber: studyContext.accessionNumber,
+        studyDate: studyContext.studyDate,
+        sourceArchive: studyContext.sourceArchive,
+        dicomWebBaseUrl: studyContext.dicomWebBaseUrl,
+        seriesCount: studyContext.series.length,
+      },
     },
     routingDecision: {
       workflowFamily: "brain-structural",
@@ -112,8 +137,6 @@ export function createEvidenceCards(caseRecord: CaseRecord): EvidenceCard[] {
   const cards: EvidenceCard[] = [];
   const missingRequired = missingRequiredSequences(caseRecord.sequenceInventory);
   const selectedPackage = caseRecord.planEnvelope.packageResolution.selectedPackage;
-  const structuralExecution = caseRecord.workerArtifacts.structuralExecution;
-  const artifactManifest = caseRecord.workerArtifacts.artifactManifest;
 
   cards.push({
     cardType: "routing",
@@ -174,48 +197,55 @@ export function createEvidenceCards(caseRecord: CaseRecord): EvidenceCard[] {
           : null,
   });
 
-  if (caseRecord.report) {
-    cards.push({
-      cardType: "qc",
-      cardVersion: "0.1.0",
-      caseId: caseRecord.caseId,
-      headline: `QC disposition: ${caseRecord.report.qcDisposition}`,
-      severity: caseRecord.report.qcDisposition === "warn" ? "warn" : "info",
-      status: caseRecord.report.qcDisposition === "warn" ? "warn" : "good",
-      summary: caseRecord.report.processingSummary,
-      supportingRefs: caseRecord.report.artifacts.map((artifact) => artifact.uri),
-      recommendedAction:
-        caseRecord.report.qcDisposition === "warn"
-          ? "Review QC warnings before release."
+  cards.push({
+    cardType: "qc",
+    cardVersion: "0.1.0",
+    caseId: caseRecord.caseId,
+    headline: `QC disposition: ${caseRecord.qcSummary.disposition}`,
+    severity:
+      caseRecord.qcSummary.disposition === "reject"
+        ? "blocked"
+        : caseRecord.qcSummary.disposition === "warn"
+          ? "warn"
+          : "info",
+    status:
+      caseRecord.qcSummary.disposition === "reject"
+        ? "blocked"
+        : caseRecord.qcSummary.disposition === "warn"
+          ? "warn"
+          : caseRecord.qcSummary.disposition === "pending"
+            ? "review-required"
+            : "good",
+    summary:
+      caseRecord.qcSummary.summary ??
+      (caseRecord.report
+        ? caseRecord.report.processingSummary
+        : "QC has not been completed yet for this case."),
+    supportingRefs: [
+      ...caseRecord.qcSummary.checks.map((check) => `${check.checkId}:${check.status}`),
+      ...(caseRecord.report?.derivedArtifacts.map((artifact) => artifact.artifactType) ?? []),
+    ],
+    recommendedAction:
+      caseRecord.qcSummary.disposition === "warn"
+        ? "Review QC warnings before release."
+        : caseRecord.qcSummary.disposition === "reject"
+          ? "Do not release until study quality or completeness issues are resolved."
           : null,
-    });
-  }
-
-  if (structuralExecution) {
-    cards.push({
-      cardType: "branch-execution",
-      cardVersion: "0.1.0",
-      caseId: caseRecord.caseId,
-      headline: `Structural branch ${structuralExecution.status}`,
-      severity: "info",
-      status: "good",
-      summary: `${structuralExecution.packageId}@${structuralExecution.packageVersion} produced ${artifactManifest.length} artifact(s).`,
-      supportingRefs: artifactManifest.map((artifact) => artifact.artifact.uri),
-      recommendedAction: null,
-    });
-  }
+  });
 
   return cards;
 }
 
-export function createDraftReport(
-  caseRecord: CaseRecord,
-  input: InferenceCallbackInput,
-  artifacts: ArtifactReference[],
-  workflowVersion: string,
-  versionPins: ReportVersionPins,
-  generatedAt: string = nowIso(),
-): ReportPayload {
+export function createDraftReport(caseRecord: CaseRecord, input: InferenceCallbackInput): ReportPayload {
+  const generatedAt = nowIso();
+  const derivedArtifacts = createDerivedArtifactDescriptors({
+    caseId: caseRecord.caseId,
+    studyUid: caseRecord.studyUid,
+    artifactRefs: input.artifacts,
+    studyContext: caseRecord.studyContext,
+    generatedAt,
+  });
+
   return {
     reportSchemaVersion: "0.1.0",
     caseId: caseRecord.caseId,
@@ -233,13 +263,13 @@ export function createDraftReport(
     measurements: input.measurements,
     uncertaintySummary: "Human review remains mandatory for all machine findings.",
     issues: input.issues ?? [],
-    artifacts: artifacts.map((artifact) => ({ ...artifact })),
+    artifacts: input.artifacts,
+    derivedArtifacts,
     provenance: {
-      workflowVersion,
+      workflowVersion: "brain-structural-fastsurfer@0.1.0",
       plannerVersion: caseRecord.planEnvelope.provenance.plannerVersion,
       generatedAt,
     },
-    versionPins,
     reviewStatus: "draft",
     disclaimerProfile: "RUO_CLINICIAN_REVIEW_REQUIRED",
   };

@@ -20,7 +20,7 @@ Use it in two passes:
 ## Phase 1. Pre-push repository check
 
 - [x] README explains what exists today and what is still missing
-- [x] `docs/releases/v1-go-no-go.md` still says `NOT_READY`
+- [x] `docs/releases/v1-go-no-go.md` says `PUBLIC_GITHUB_READY` while still keeping launch-ready, clinical-ready, and production-ready claims closed
 - [x] `docs/releases/public-github-and-mvp-path.md` separates Track A publication from Track B MVP closure
 - [x] `docs/releases/github-publication-playbook.md` defines About metadata, topics, and social-preview posture
 - [x] contributor intake covers bug, feature, and docs or scope drift
@@ -75,4 +75,4 @@ Manual-only follow-up is consolidated in `docs/releases/pending-manual-github-ac
 
 ## Completion rule
 
-This checklist may be marked complete only when all GitHub-hosted items are complete and the repository still truthfully remains `NOT_READY` unless the higher readiness evidence says otherwise.
+This checklist may be marked complete only when all GitHub-hosted items are complete and the repository metadata, README, and readiness docs still truthfully support the current repository verdict `PUBLIC_GITHUB_READY` without implying launch readiness, clinical readiness, or production deployment readiness.

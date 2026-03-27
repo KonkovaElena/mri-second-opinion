@@ -1,6 +1,6 @@
 # GitHub Publication Playbook
 
-Date: 2026-03-25
+Date: 2026-03-27
 
 ## Purpose
 
@@ -37,18 +37,20 @@ Clinician-in-the-loop MRI second-opinion workflow baseline with a standalone Typ
 
 1. standalone install, build, and local tests
 2. public workflow API for case intake, list, detail, review, finalize, report retrieval, and delivery retry
-3. internal ingest, inference callback, and delivery callback endpoints
-4. restart-safe local snapshot persistence
-5. conservative release verdict discipline
+3. built-in review workbench over the live API
+4. internal ingest, inference queue, delivery queue, inference callback, and delivery callback endpoints
+5. restart-safe local SQLite-backed persistence
+6. hosted CI and docs-governance proof recorded in the evidence ledger
+6. conservative release verdict discipline
 
 ### Not included yet
 
-1. PostgreSQL durability
+1. broader production-grade PostgreSQL-backed workflow durability
 2. Redis queueing
 3. object-store artifact durability
 4. real worker execution path
-5. frontend review workspace
-6. hosted evidence of public CI success history
+5. OHIF-backed or production-grade imaging review frontend
+6. higher readiness evidence beyond the current publication-safe state
 
 ### Intended audience
 
@@ -137,7 +139,7 @@ The preferred section order is:
 1. confirm local build and test pass from clean checkout
 2. keep README, scope docs, and readiness docs aligned
 3. ensure contributor-intake surfaces cover bug, feature, and docs or scope drift
-4. keep the verdict `NOT_READY` until hosted evidence exists and the higher gates close
+4. keep the formal verdict and evidence ledger aligned with the current gate state, and keep stronger launch or product claims closed until higher evidence exists
 
 ## Phase 2. First GitHub push
 

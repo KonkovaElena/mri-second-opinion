@@ -23,7 +23,7 @@ The first target remains a bounded neuro structural workflow with:
 3. QC plus structural processing path
 4. reviewable evidence surface
 5. report preview
-6. clinician-reviewed finalize path
+6. clinician-in-the-loop finalize path
 
 ## Work Package Set
 
@@ -110,7 +110,7 @@ Launch gates advanced:
 
 Goal:
 
-Make the clinician-reviewed release loop real.
+Make the clinician-in-the-loop release loop real.
 
 Primary outputs:
 
