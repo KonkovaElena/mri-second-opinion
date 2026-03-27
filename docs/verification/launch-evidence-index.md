@@ -8,9 +8,9 @@ Every claim about launch readiness should link back to one or more artifacts lis
 
 - Current verdict: `PUBLIC_GITHUB_READY`
 - Last reviewed: 2026-03-27
-- Current remote head: `d352d9c`
+- Current remote head: `f9771e6`
 - Public repository: `https://github.com/KonkovaElena/mri-second-opinion`
-- Auditor handoff: `docs/verification/ai-auditor-handoff-2026-03-25.md`
+- Auditor handoff: `docs/verification/ai-auditor-handoff-2026-03-25.md` (historical snapshot dated 2026-03-25; current verdict advanced later)
 - Gap audit: `docs/verification/standalone-gap-audit-2026-03-27.md`
 - Archive/viewer seam audit: `docs/verification/archive-viewer-seam-audit-2026-03-27.md`
 - Presentation surface audit: `docs/verification/presentation-surface-audit-2026-03-27.md`

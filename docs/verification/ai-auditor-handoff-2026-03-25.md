@@ -10,6 +10,18 @@ tags: [mri, audit, verification, handoff, github, mvp]
 
 Date: 2026-03-25
 
+## Current Status Notice
+
+This file is a point-in-time evidence snapshot dated 2026-03-25.
+
+It should not be read as the current repository verdict.
+
+For the current publication status, use:
+
+1. `README.md`
+2. `docs/releases/v1-go-no-go.md`
+3. `docs/verification/launch-evidence-index.md`
+
 ## Purpose
 
 This report is a verification handoff for an independent AI auditor.
