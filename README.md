@@ -46,12 +46,12 @@ Currently verified baseline:
 8. restart-safe local snapshot persistence for case state, queue state, delivery state, retry history, and operation transcript
 9. first-class persisted study-context, workflow-package manifest, structural execution envelope, typed artifact manifest, QC summary, findings payload, and bounded structural run surfaces on case detail reads
 10. typed artifact references with URI, checksum, media type, producer, attempt identity, and a local-file or s3-compatible storage seam
-10. structured API error envelopes for invalid transport input
-11. `GET /`, `GET /healthz`, `GET /readyz`, and `GET /metrics`
-12. internal workflow logic is now split across orchestration, planning, and snapshot-repository seams without changing the HTTP contract
-13. `POST /api/internal/dispatch/claim` exposes a bounded internal worker-handoff seam for queued `inference` and `delivery` work with durable lease metadata and expiry-based requeue
-14. PostgreSQL-backed whole-record updates now reject stale writers instead of blindly overwriting a newer durable case revision
-15. `GET /operator` serves a minimal equivalent operator surface for queue, case detail, review, finalize, report preview, and delivery retry
+11. structured API error envelopes for invalid transport input
+12. `GET /`, `GET /healthz`, `GET /readyz`, and `GET /metrics`
+13. internal workflow logic is now split across orchestration, planning, and snapshot-repository seams without changing the HTTP contract
+14. `POST /api/internal/dispatch/claim` exposes a bounded internal worker-handoff seam for queued `inference` and `delivery` work with durable lease metadata and expiry-based requeue
+15. PostgreSQL-backed whole-record updates now reject stale writers instead of blindly overwriting a newer durable case revision
+16. `GET /operator` serves a minimal equivalent operator surface for queue, case detail, review, finalize, report preview, and delivery retry
 
 The standalone repository still does not provide:
 
@@ -103,7 +103,7 @@ When `MRI_INTERNAL_HMAC_SECRET` is present (≥ 32 bytes), internal mutation rou
 
 Requests outside the clock-skew window (default ±60 s, configurable via `MRI_CLOCK_SKEW_TOLERANCE_MS`) are rejected.
 
-**Replay protection:** When HMAC signing is active, the server tracks consumed nonces in memory. A repeated nonce within the TTL window (default 120 s, configurable via `MRI_REPLAY_STORE_TTL_MS`) returns `409 REPLAY_DETECTED`. The in-memory store holds up to `MRI_REPLAY_STORE_MAX_ENTRIES` entries (default 10 000) before evicting the oldest. A PostgreSQL-backed replay store is available via migration `002-replay-nonces.sql` (not yet wired — memory mode covers the current baseline).
+**Replay protection:** When HMAC signing is active, the server tracks consumed nonces in memory. A repeated nonce within the TTL window (default 120 s, configurable via `MRI_REPLAY_STORE_TTL_MS`) returns `409 REPLAY_DETECTED`. The in-memory store holds up to `MRI_REPLAY_STORE_MAX_ENTRIES` entries (default 10 000) before evicting the oldest. A PostgreSQL-backed replay store is available via migration `002_idempotency_and_replay.sql` (not yet wired — memory mode covers the current baseline).
 
 When both `MRI_INTERNAL_HMAC_SECRET` and `MRI_INTERNAL_API_TOKEN` are set, HMAC takes precedence and Bearer is ignored.
 
@@ -176,16 +176,14 @@ Core standalone documents:
 8. `docs/architecture/reasoning-agent-safety-and-validation.md`
 9. `docs/architecture/mvp-work-package-map.md`
 10. `docs/architecture/reference-workflow-routing.md`
-9. `docs/architecture/reporting-and-export-contract.md`
-10. `docs/architecture/queue-substrate-adr.md`
-11. `docs/open-source-target-architecture.md`
-12. `docs/academic/ecosystem-landscape-march-2026.md`
-13. `docs/academic/external-evidence-register-march-2026.md`
-14. `docs/academic/model-licensing-and-deployment-gates.md`
-15. `docs/academic/regulatory-positioning.md`
-16. `docs/roadmap-and-validation.md`
-18. `docs/academic/regulatory-positioning.md`
-19. `docs/roadmap-and-validation.md`
+11. `docs/architecture/reporting-and-export-contract.md`
+12. `docs/architecture/queue-substrate-adr.md`
+13. `docs/open-source-target-architecture.md`
+14. `docs/academic/ecosystem-landscape-march-2026.md`
+15. `docs/academic/external-evidence-register-march-2026.md`
+16. `docs/academic/model-licensing-and-deployment-gates.md`
+17. `docs/academic/regulatory-positioning.md`
+18. `docs/roadmap-and-validation.md`
 
 ## Launch Readiness
 

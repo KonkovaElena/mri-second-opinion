@@ -100,10 +100,10 @@ The current standalone baseline persists local case snapshots to a configured fi
 
 1. case records
 2. queue-state transcript
-2. delivery state
-3. retry history
-4. operation transcript
-5. operations summary rebuild
+3. delivery state
+4. retry history
+5. operation transcript
+6. operations summary rebuild
 
 This is local file-backed durability only. It is not evidence of PostgreSQL migration readiness.
 
@@ -111,13 +111,13 @@ This is local file-backed durability only. It is not evidence of PostgreSQL migr
 
 Confirmed locally.
 
-`npm run db:migrate:smoke` succeeded on 2026-03-25 against a clean local `postgres:17-alpine` container.
+`npm run db:migrate:smoke` was re-validated on 2026-03-27 against a clean local `postgres:17-alpine` container.
 
 The smoke did all of the following:
 
 1. started a disposable PostgreSQL container on a local port
 2. applied the current SQL migration set through `applyPendingMigrations`
-3. verified `schema_migrations` contains `001_create_case_records`
+3. verified `schema_migrations` contains `001_create_case_records`, `002_idempotency_and_replay`, `003_transition_journal`, and `004_projection_split`
 4. verified the `case_records` table exists after migration
 5. cleaned up the disposable container after verification
 

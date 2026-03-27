@@ -110,3 +110,69 @@ test("getConfig rejects unsupported reviewer identity source", () => {
     }
   }
 });
+test("getConfig rejects production mode without internal route auth", () => {
+  const previousPort = process.env.PORT;
+  const previousNodeEnv = process.env.NODE_ENV;
+  const previousHmac = process.env.MRI_INTERNAL_HMAC_SECRET;
+  const previousToken = process.env.MRI_INTERNAL_API_TOKEN;
+
+  process.env.PORT = "4010";
+  process.env.NODE_ENV = "production";
+  delete process.env.MRI_INTERNAL_HMAC_SECRET;
+  delete process.env.MRI_INTERNAL_API_TOKEN;
+
+  try {
+    assert.throws(
+      () => getConfig(),
+      /set MRI_INTERNAL_HMAC_SECRET or MRI_INTERNAL_API_TOKEN/,
+    );
+  } finally {
+    process.env.PORT = previousPort;
+    if (previousNodeEnv === undefined) {
+      delete process.env.NODE_ENV;
+    } else {
+      process.env.NODE_ENV = previousNodeEnv;
+    }
+    if (previousHmac === undefined) {
+      delete process.env.MRI_INTERNAL_HMAC_SECRET;
+    } else {
+      process.env.MRI_INTERNAL_HMAC_SECRET = previousHmac;
+    }
+    if (previousToken === undefined) {
+      delete process.env.MRI_INTERNAL_API_TOKEN;
+    } else {
+      process.env.MRI_INTERNAL_API_TOKEN = previousToken;
+    }
+  }
+});
+
+test("getConfig accepts production mode with HMAC auth configured", () => {
+  const previousPort = process.env.PORT;
+  const previousNodeEnv = process.env.NODE_ENV;
+  const previousHmac = process.env.MRI_INTERNAL_HMAC_SECRET;
+
+  process.env.PORT = "4010";
+  process.env.NODE_ENV = "production";
+  process.env.MRI_INTERNAL_HMAC_SECRET = "0123456789abcdef0123456789abcdef";
+
+  try {
+    const config = getConfig();
+    assert.equal(config.hmacSecret, "0123456789abcdef0123456789abcdef");
+  } finally {
+    if (previousPort === undefined) {
+      delete process.env.PORT;
+    } else {
+      process.env.PORT = previousPort;
+    }
+    if (previousNodeEnv === undefined) {
+      delete process.env.NODE_ENV;
+    } else {
+      process.env.NODE_ENV = previousNodeEnv;
+    }
+    if (previousHmac === undefined) {
+      delete process.env.MRI_INTERNAL_HMAC_SECRET;
+    } else {
+      process.env.MRI_INTERNAL_HMAC_SECRET = previousHmac;
+    }
+  }
+});

@@ -157,11 +157,11 @@ Record:
   - `docs/verification/runtime-baseline-verification.md`
   - `docs/verification/architecture-and-publication-audit-2026-03-25.md`
 
-Recorded local evidence on 2026-03-25:
+Recorded local evidence on 2026-03-27:
 
-1. `npm test` passed with `91/91` tests in the standalone subtree on 2026-03-26 after queue diagnostics and correlation persistence updates
-2. `npm run db:migrate:smoke` succeeded against a clean local `postgres:17-alpine` container
-3. the smoke confirmed `schema_migrations` contains `001_create_case_records`
+1. `npm test` passed with `93/93` tests in the standalone subtree on 2026-03-27 after migration hardening and production-auth configuration checks were added
+2. `npm run db:migrate:smoke` re-validated on 2026-03-27 against a clean local `postgres:17-alpine` container
+3. the smoke confirmed `schema_migrations` contains `001_create_case_records`, `002_idempotency_and_replay`, `003_transition_journal`, and `004_projection_split`
 4. the smoke confirmed the `case_records` table exists after migration
 5. `tests/memory-case-service.test.ts` verifies that the workflow queue and operations read model rebuild correctly from durable records across restart
 6. `tests/postgres-integration.test.ts` verifies restart survival, full lifecycle persistence, and delete propagation through the Postgres repository layer, including persisted workflow-queue state

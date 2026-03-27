@@ -3,7 +3,7 @@
 
 CREATE TABLE IF NOT EXISTS transition_journal (
   journal_id        UUID PRIMARY KEY,
-  case_id           UUID NOT NULL REFERENCES cases(case_id) ON DELETE CASCADE,
+  case_id           TEXT NOT NULL REFERENCES case_records(case_id) ON DELETE CASCADE,
   sequence          INTEGER NOT NULL,
   transition_type   TEXT NOT NULL,
   from_status       TEXT,

@@ -92,7 +92,7 @@ export function getConfig(): AppConfig {
   const nodeEnv = process.env.NODE_ENV ?? "development";
 
   if (nodeEnv === "production" && !hmacSecret && !internalApiToken) {
-    process.stderr.write("[mri-second-opinion] WARNING: Neither MRI_INTERNAL_HMAC_SECRET nor MRI_INTERNAL_API_TOKEN set in production — internal routes are unprotected\n");
+    throw new Error("In production, set MRI_INTERNAL_HMAC_SECRET or MRI_INTERNAL_API_TOKEN to protect internal mutation routes");
   }
 
   return {
