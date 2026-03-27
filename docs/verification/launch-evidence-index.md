@@ -8,7 +8,7 @@ Every claim about launch readiness should link back to one or more artifacts lis
 
 - Current verdict: `PUBLIC_GITHUB_READY`
 - Last reviewed: 2026-03-27
-- Current remote head: `f9771e6`
+- Current remote head: `33ac458`
 - Public repository: `https://github.com/KonkovaElena/mri-second-opinion`
 - Auditor handoff: `docs/verification/ai-auditor-handoff-2026-03-25.md` (historical snapshot dated 2026-03-25; current verdict advanced later)
 - Gap audit: `docs/verification/standalone-gap-audit-2026-03-27.md`
@@ -43,7 +43,8 @@ Local reconciliation now also exists on the pushed `origin/main` head:
 
 1. `7bf7ae3` closed the stash-pop merge and revalidated the full standalone build plus test baseline locally before push
 2. `d352d9c` corrected the final docs-governance drift in `README.md` and `package.json` and re-ran the equivalent local workflow assertions before push
-3. append new hosted workflow URLs here when GitHub Actions records runs for `d352d9c` or later heads
+3. `33ac458` clarified the dated auditor handoff as a historical snapshot and aligned the active evidence routing with the current publication verdict
+4. append new hosted workflow URLs here when GitHub Actions records runs for `33ac458` or later heads
 
 ## Priority Tracks
 
