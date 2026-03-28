@@ -123,7 +123,7 @@ Implemented and verified in this repository today:
 
 1. standalone `npm ci`, `npm run build`, and `npm test`
 2. service startup from built output
-3. public workflow endpoints for case create, case list, case detail, review, finalize, report retrieval, delivery retry, and operations summary
+3. public workflow endpoints for case create, case list, case detail, review, finalize, report retrieval, artifact retrieval, delivery retry, and operations summary
 4. internal ingest, inference queue, delivery queue, inference callback, and delivery callback endpoints
 5. locked workflow-state vocabulary for the current MRI review path
 6. restart-safe local persistence for case state, explicit inference and delivery jobs, delivery state, retry history, and operation transcript on the default SQLite path, plus a locally verified PostgreSQL service path
@@ -134,7 +134,7 @@ Implemented and verified in this repository today:
 11. explicit worker-facing delivery queue claim path backed by durable records and restart survival proof
 12. explicit worker-facing inference queue list, claim, expired-claim requeue, dispatch claim, and dispatch heartbeat paths backed by durable records and restart survival proof
 13. HMAC-signed protection for `/api/internal/dispatch/*` when `MRI_HMAC_SECRET` is configured, layered on top of namespace bearer-token protection
-14. persisted workflow package manifest, structural execution envelope, and package-provenance artifact manifest surfaces on case detail and report responses
+14. persisted workflow package manifest, structural execution envelope, package-provenance artifact manifest surfaces, and public artifact retrieval URLs backed by local file persistence on case detail and report responses
 15. internal separation between orchestration, planning, and snapshot-repository seams while preserving the HTTP contract
 16. Wave 1 public-edge hardening with request-size limits, public API rate limiting, Node HTTP timeout guards, and graceful shutdown hooks
 17. root container packaging plus a compose app-service bring-up path for the current standalone runtime baseline

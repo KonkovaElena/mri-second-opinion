@@ -1,6 +1,6 @@
 # MVP Work Package Map
 
-Date: 2026-03-25
+Date: 2026-03-29
 
 ## Purpose
 
@@ -84,12 +84,13 @@ Goal:
 
 Close one real processing branch for the neuro-first slice.
 
-Current execution note 2026-03-28:
+Current execution note 2026-03-29:
 
 1. Wave 2A boundary truth is already in place and publicly evidenced
 2. Wave 2B contract layering on inference-job claim responses and HMAC-protected dispatch lease closure are already in place
-3. the current smallest honest WP-3 step is persisted execution-contract truth on case detail and report surfaces
-4. that step should keep package identity, execution state, and artifact inventory durable before any real worker or object-store runtime is introduced
+3. local file-backed artifact persistence and public artifact retrieval are already in place on the current pushed head
+4. the current smallest honest WP-3 step is to replace the Python worker scaffold with one real neuro-first compute path while preserving the existing callback and artifact contract
+5. that step should keep the TypeScript control-plane contract stable and avoid object-store or archive claims before the worker path is real
 
 Primary outputs:
 

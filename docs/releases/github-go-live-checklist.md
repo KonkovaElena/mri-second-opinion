@@ -1,6 +1,6 @@
 # GitHub Go-Live Checklist
 
-Date: 2026-03-28
+Date: 2026-03-29
 
 ## Purpose
 
@@ -57,6 +57,11 @@ Current hosted proof recorded:
 5. `docs-governance` success on `49b794c`: `https://github.com/KonkovaElena/mri-second-opinion/actions/runs/23557837645`
 6. `ci` success on `6c2cfee`: `https://github.com/KonkovaElena/mri-second-opinion/actions/runs/23682412690`
 7. `docs-governance` success on `6c2cfee`: `https://github.com/KonkovaElena/mri-second-opinion/actions/runs/23682412696`
+8. `ci` success on `1e340b978bfa35a2ed339adcdb0d2add56cc08c3`: `https://github.com/KonkovaElena/mri-second-opinion/actions/runs/23684738474`
+9. `docs-governance` success on `1e340b978bfa35a2ed339adcdb0d2add56cc08c3`: `https://github.com/KonkovaElena/mri-second-opinion/actions/runs/23684738468`
+10. `ci` success on `f6021ecdb45f4ecf5aece2c52cc0e6f462361d49`: `https://github.com/KonkovaElena/mri-second-opinion/actions/runs/23693425627`
+
+The current pushed head is `f6021ecdb45f4ecf5aece2c52cc0e6f462361d49`; the latest head with both hosted `ci` and `docs-governance` proof is `1e340b978bfa35a2ed339adcdb0d2add56cc08c3`, and `f6021ecdb45f4ecf5aece2c52cc0e6f462361d49` only has hosted `ci` so far because the commit touched code and test paths rather than docs-governance surfaces. Wave 1.5 therefore remains open until the next docs-reconciliation head carries both hosted workflows even though the publication verdict stays conservative and unchanged.
 
 ## Phase 4. Publication safety review
 
@@ -77,4 +82,4 @@ Manual-only follow-up is consolidated in `docs/releases/pending-manual-github-ac
 
 ## Completion rule
 
-This checklist may be marked complete only when all GitHub-hosted items are complete and the repository metadata, README, and readiness docs still truthfully support the current repository verdict `PUBLIC_GITHUB_READY` without implying launch readiness, clinical readiness, or production deployment readiness.
+This checklist may be marked complete only when all GitHub-hosted items are complete, any newer current head is either hosted-validated or explicitly called out in the evidence ledger, and the repository metadata, README, and readiness docs still truthfully support the current repository verdict `PUBLIC_GITHUB_READY` without implying launch readiness, clinical readiness, or production deployment readiness.

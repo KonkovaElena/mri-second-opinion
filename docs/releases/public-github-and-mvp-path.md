@@ -1,6 +1,6 @@
 # Public GitHub And MVP Path
 
-Date: 2026-03-27
+Date: 2026-03-29
 
 ## Purpose
 
@@ -28,8 +28,9 @@ The current repository is best understood as:
 1. publicly hosted on GitHub with a conservative publication posture
 2. local workflow baseline and closure evidence exist for the standalone API path
 3. Track A repository-content work is complete, with remaining GitHub-UI follow-up tracked separately
-4. workflow MVP is not yet closed
-5. repository verdict is `PUBLIC_GITHUB_READY`
+4. Wave 1.5 same-head hosted evidence closure is still open even though the current pushed head `f6021ecdb45f4ecf5aece2c52cc0e6f462361d49` already has hosted `ci` proof and the publication verdict remains `PUBLIC_GITHUB_READY`
+5. workflow MVP is not yet closed
+6. repository verdict is `PUBLIC_GITHUB_READY`
 
 ## Track A: Public GitHub Readiness
 
@@ -111,7 +112,7 @@ Do the tracks in this order.
 After repository publication is safe, use this order for follow-up work.
 
 1. close the remaining GitHub UI and operator follow-up captured in `pending-manual-github-actions.md`
-2. finish the wave-1.5 cross-platform and evidence-hardening pass described in `../roadmap-and-validation.md`
+2. finish the remaining Wave 1.5 same-head hosted evidence closure described in `../roadmap-and-validation.md`
 3. resume Track B in the current work-package order: `WP-1`, `WP-2`, `WP-3`, `WP-4`, `WP-6`
 4. reopen deeper phase-1 expansion only after the bounded MVP slice and its evidence ledger are current
 
@@ -119,14 +120,13 @@ After repository publication is safe, use this order for follow-up work.
 
 After Wave 1.5, the project should not branch into multiple major implementation waves at once.
 
-Use `../academic/action-plan.md` as the authority for the remaining order:
+Use `../academic/action-plan.md` as the authority for the remaining order. The current pushed head already closes Wave 2A locally through file-backed artifact persistence and public artifact retrieval, so the next runtime wave after Wave 1.5 is:
 
-1. execution truth
-2. real compute path
-3. archive and viewer truth
-4. artifact and report closure
-5. exports and regulatory hardening
-6. clinical evidence
+1. real compute path
+2. archive and viewer truth
+3. artifact and report closure
+4. exports and regulatory hardening
+5. clinical evidence
 
 This prevents a false impression that public publication safety is the same thing as product maturity.
 

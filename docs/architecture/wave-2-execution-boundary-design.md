@@ -1,6 +1,6 @@
 # Wave 2 Execution Boundary Design
 
-Date: 2026-03-26
+Date: 2026-03-29
 
 ## Purpose
 
@@ -8,18 +8,22 @@ This document defines the first implementation wave after the hyperdeep audit.
 
 Its purpose is to convert the current truthful control-plane baseline into a minimally trust-separated execution boundary without pretending that the full worker, queue, and object-store planes already exist.
 
-## Status 2026-03-28
+## Status 2026-03-29
 
-Wave 2A is closed.
+The full local execution-truth slice of Wave 2A is now closed on the current pushed head.
+
+Authority-doc reconciliation and same-head hosted Wave 1.5 closure still remain open.
 
 The repository now proves:
 
 1. internal-route bearer-token protection for worker-facing mutations
 2. durable package, plan-envelope, and artifact-manifest state on case reads
 3. restart-safe inference and delivery queue state
-4. hosted `ci` and `docs-governance` proof for the current public head
+4. hosted `ci` and `docs-governance` proof for the latest fully hosted-validated head `1e340b978bfa35a2ed339adcdb0d2add56cc08c3`
+5. HMAC-authenticated `/api/internal/dispatch/claim` and `/api/internal/dispatch/heartbeat` routes that return or renew a bounded execution lease
+6. local file-backed artifact persistence plus public artifact retrieval on the current pushed head `f6021ecdb45f4ecf5aece2c52cc0e6f462361d49`
 
-The next active Wave 2 authority is Wave 2B contract layering, not a full worker split.
+The next runtime wave after the current docs and evidence reconciliation is Wave 2B real Python compute path. Wave 2A no longer needs another artifact or retrieval implementation slice.
 
 The minimal additive contract implemented in this slice is:
 
@@ -71,6 +75,8 @@ Implemented now:
 5. persisted structural execution envelope on case detail reads
 6. persisted typed artifact manifest on case detail reads
 7. documentation updates describing the new boundary honestly
+8. local file-backed persistence for bounded artifact payloads accepted by the inference callback
+9. public artifact retrieval via `GET /api/cases/:caseId/artifacts/:artifactId` plus retrieval URLs on case-detail and report surfaces
 
 Do not implement yet:
 
@@ -155,7 +161,9 @@ This slice is complete when:
 
 ## Follow-On Step
 
-After this slice, the next Wave 2 step should move the new execution contracts from single-process durability into real worker handoff and object-store-backed artifact persistence.
+After this slice, the next Wave 2A step should move the new execution contracts from single-process durability into real artifact write and read paths behind the already-implemented dispatch contract.
+
+Only after that execution-truth closure lands should Wave 2B move the same contract into a real worker handoff and compute plane.
 
 The key truth boundary is now explicit:
 
