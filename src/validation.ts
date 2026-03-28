@@ -343,3 +343,39 @@ export function parseDeliveryCallbackInput(body: unknown): {
     },
   };
 }
+
+const dispatchClaimSchema = z.object({
+  workerId: optionalTrimmedString,
+  capabilities: optionalStringArrayField("capabilities"),
+});
+
+const dispatchHeartbeatSchema = z.object({
+  leaseId: requiredTrimmedString("leaseId"),
+  progress: optionalTrimmedString,
+});
+
+export function parseDispatchClaimInput(body: unknown): {
+  workerId?: string;
+  capabilities?: string[];
+} {
+  if (typeof body === "undefined" || body === null || body === "") {
+    return {};
+  }
+
+  const parsed = parseWithSchema(body, dispatchClaimSchema);
+  return {
+    workerId: parsed.workerId as string | undefined,
+    capabilities: parsed.capabilities as string[] | undefined,
+  };
+}
+
+export function parseDispatchHeartbeatInput(body: unknown): {
+  leaseId: string;
+  progress?: string;
+} {
+  const parsed = parseWithSchema(body, dispatchHeartbeatSchema);
+  return {
+    leaseId: parsed.leaseId,
+    progress: parsed.progress as string | undefined,
+  };
+}

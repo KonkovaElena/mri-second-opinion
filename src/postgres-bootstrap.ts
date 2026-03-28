@@ -112,8 +112,14 @@ export function buildPostgresBootstrapStatements(schema: string): string[] {
       worker_id TEXT,
       claimed_at TEXT,
       completed_at TEXT,
-      last_error TEXT
+      last_error TEXT,
+      lease_id TEXT,
+      lease_expires_at TEXT
     );`,
+    `ALTER TABLE ${qualifiedInferenceJobs}
+     ADD COLUMN IF NOT EXISTS lease_id TEXT;`,
+    `ALTER TABLE ${qualifiedInferenceJobs}
+     ADD COLUMN IF NOT EXISTS lease_expires_at TEXT;`,
     `CREATE INDEX IF NOT EXISTS ${inferenceStatusIndex}
      ON ${qualifiedInferenceJobs} (status, available_at);`,
     `CREATE INDEX IF NOT EXISTS ${inferenceCaseIndex}

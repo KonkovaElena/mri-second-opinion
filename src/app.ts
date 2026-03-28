@@ -14,11 +14,14 @@ import {
 } from "./case-presentation";
 import { buildHealthSnapshot, buildReadinessSnapshot } from "./health";
 import { createInternalAuthMiddleware } from "./internal-auth";
+import { createHmacAuthMiddleware } from "./hmac-auth";
 import { getRequestId, requestContextMiddleware, requestLoggingMiddleware } from "./request-context";
 import {
   parseClaimJobInput,
   parseCreateCaseInput,
   parseDeliveryCallbackInput,
+  parseDispatchClaimInput,
+  parseDispatchHeartbeatInput,
   parseFinalizeCaseInput,
   parseInferenceCallbackInput,
   parseReviewCaseInput,
@@ -100,6 +103,8 @@ export function createApp(config: AppConfig, options: CreateAppOptions = {}) {
           "GET /api/internal/delivery-jobs",
           "POST /api/internal/delivery-jobs/claim-next",
           "POST /api/internal/delivery-callback",
+          "POST /api/internal/dispatch/claim",
+          "POST /api/internal/dispatch/heartbeat",
         ],
       },
       docs: {
@@ -280,6 +285,51 @@ export function createApp(config: AppConfig, options: CreateAppOptions = {}) {
 
       res.json({
         case: await caseService.completeDelivery(parsed.caseId, parsed.input),
+      });
+    } catch (error) {
+      handleError(res, error);
+    }
+  });
+
+  // --- Dispatch routes (HMAC-authenticated for external workers) ---
+
+  const hmacAuth = createHmacAuthMiddleware(config);
+
+  app.post("/api/internal/dispatch/claim", hmacAuth, async (req, res) => {
+    try {
+      const input = parseDispatchClaimInput(req.body);
+      const claimed = await caseService.claimNextInferenceJob(input.workerId);
+      const claimedCase = claimed ? await caseService.getCase(claimed.caseId) : null;
+      res.json({
+        dispatch: claimed
+          ? {
+              caseId: claimed.caseId,
+              jobId: claimed.jobId,
+              leaseId: claimed.leaseId,
+              leaseExpiresAt: claimed.leaseExpiresAt,
+            }
+          : null,
+        execution:
+          claimed && claimedCase
+            ? presentInferenceExecutionContract({
+                caseRecord: claimedCase,
+                inferenceJob: claimed,
+              })
+            : null,
+      });
+    } catch (error) {
+      handleError(res, error);
+    }
+  });
+
+  app.post("/api/internal/dispatch/heartbeat", hmacAuth, async (req, res) => {
+    try {
+      const input = parseDispatchHeartbeatInput(req.body);
+      const renewed = await caseService.renewLease(input.leaseId);
+      res.json({
+        leaseId: renewed.leaseId,
+        leaseExpiresAt: renewed.leaseExpiresAt,
+        jobId: renewed.jobId,
       });
     } catch (error) {
       handleError(res, error);

@@ -1,4 +1,7 @@
 import { createHmac, createHash, timingSafeEqual } from "node:crypto";
+import type express from "express";
+import { WorkflowError } from "./cases";
+import type { AppConfig } from "./config";
 
 /**
  * Canonical header names for HMAC signed requests.
@@ -103,4 +106,42 @@ export function verifySignedRequest(opts: {
   }
 
   return { ok: true };
+}
+
+/**
+ * Express middleware that verifies HMAC-signed requests.
+ *
+ * Requires the raw body to be available — call express.json() BEFORE this
+ * middleware and ensure req.body is parsed, but we reconstruct raw bytes
+ * from the parsed body for canonical signing.
+ */
+export function createHmacAuthMiddleware(
+  config: Pick<AppConfig, "hmacSecret" | "clockSkewToleranceMs">,
+): express.RequestHandler {
+  return (req, _res, next) => {
+    const hmacSecret = config.hmacSecret;
+
+    if (!hmacSecret) {
+      next();
+      return;
+    }
+
+    const rawBody = Buffer.from(JSON.stringify(req.body ?? {}), "utf-8");
+    const result = verifySignedRequest({
+      method: req.method,
+      path: req.originalUrl,
+      headers: req.headers as Record<string, string | undefined>,
+      rawBody,
+      hmacSecret,
+      clockSkewToleranceMs: config.clockSkewToleranceMs,
+    });
+
+    if (!result.ok) {
+      const statusCode = result.code === "MISSING_SIGNATURE_HEADERS" ? 401 : 403;
+      next(new WorkflowError(statusCode, result.message ?? "HMAC verification failed", "HMAC_VERIFICATION_FAILED"));
+      return;
+    }
+
+    next();
+  };
 }

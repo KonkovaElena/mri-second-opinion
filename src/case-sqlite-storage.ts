@@ -78,7 +78,9 @@ export function openCaseDatabase(databaseFilePath: string) {
       worker_id TEXT,
       claimed_at TEXT,
       completed_at TEXT,
-      last_error TEXT
+      last_error TEXT,
+      lease_id TEXT,
+      lease_expires_at TEXT
     );
 
     CREATE INDEX IF NOT EXISTS idx_inference_jobs_status_available
@@ -87,6 +89,22 @@ export function openCaseDatabase(databaseFilePath: string) {
     CREATE INDEX IF NOT EXISTS idx_inference_jobs_case_id
     ON inference_jobs (case_id, updated_at DESC);
   `);
+
+  const inferenceJobColumns = new Set(
+    (
+      database.prepare("PRAGMA table_info(inference_jobs)").all() as Array<{
+        name: string;
+      }>
+    ).map((column) => column.name),
+  );
+
+  if (!inferenceJobColumns.has("lease_id")) {
+    database.exec("ALTER TABLE inference_jobs ADD COLUMN lease_id TEXT;");
+  }
+
+  if (!inferenceJobColumns.has("lease_expires_at")) {
+    database.exec("ALTER TABLE inference_jobs ADD COLUMN lease_expires_at TEXT;");
+  }
 
   return database;
 }
@@ -178,6 +196,8 @@ export function parseStoredInferenceJobRecord(row: {
   claimed_at: string | null;
   completed_at: string | null;
   last_error: string | null;
+  lease_id?: string | null;
+  lease_expires_at?: string | null;
 }): LoadedSqliteInferenceJobRecord {
   return {
     inferenceJob: {
@@ -192,6 +212,8 @@ export function parseStoredInferenceJobRecord(row: {
       claimedAt: row.claimed_at ?? null,
       completedAt: row.completed_at ?? null,
       lastError: row.last_error ?? null,
+      leaseId: row.lease_id ?? null,
+      leaseExpiresAt: row.lease_expires_at ?? null,
     },
   };
 }

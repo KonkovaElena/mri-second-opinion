@@ -221,8 +221,10 @@ export class PostgresCaseRepository {
       claimed_at: string | null;
       completed_at: string | null;
       last_error: string | null;
+      lease_id: string | null;
+      lease_expires_at: string | null;
     }>(
-      `SELECT job_id, case_id, status, attempt_count, enqueued_at, available_at, updated_at, worker_id, claimed_at, completed_at, last_error
+      `SELECT job_id, case_id, status, attempt_count, enqueued_at, available_at, updated_at, worker_id, claimed_at, completed_at, last_error, lease_id, lease_expires_at
        FROM ${inferenceTable}
        ORDER BY updated_at DESC, enqueued_at DESC`,
     );
@@ -357,8 +359,10 @@ export class PostgresCaseRepository {
              worker_id,
              claimed_at,
              completed_at,
-             last_error
-           ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
+             last_error,
+             lease_id,
+             lease_expires_at
+           ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13)
            ON CONFLICT (job_id) DO UPDATE SET
              case_id = EXCLUDED.case_id,
              status = EXCLUDED.status,
@@ -369,7 +373,9 @@ export class PostgresCaseRepository {
              worker_id = EXCLUDED.worker_id,
              claimed_at = EXCLUDED.claimed_at,
              completed_at = EXCLUDED.completed_at,
-             last_error = EXCLUDED.last_error`,
+             last_error = EXCLUDED.last_error,
+             lease_id = EXCLUDED.lease_id,
+             lease_expires_at = EXCLUDED.lease_expires_at`,
           [
             jobId,
             inferenceJob.caseId,
@@ -382,6 +388,8 @@ export class PostgresCaseRepository {
             inferenceJob.claimedAt,
             inferenceJob.completedAt,
             inferenceJob.lastError,
+            inferenceJob.leaseId,
+            inferenceJob.leaseExpiresAt,
           ],
         );
       }

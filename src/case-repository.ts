@@ -261,7 +261,7 @@ class SqliteCaseRepository implements CaseRepository {
       `SELECT job_id FROM delivery_jobs WHERE job_id = ?`,
     );
     this.selectAllInferenceJobsStatement = this.database.prepare(
-      `SELECT job_id, case_id, status, attempt_count, enqueued_at, available_at, updated_at, worker_id, claimed_at, completed_at, last_error
+      `SELECT job_id, case_id, status, attempt_count, enqueued_at, available_at, updated_at, worker_id, claimed_at, completed_at, last_error, lease_id, lease_expires_at
        FROM inference_jobs
        ORDER BY updated_at DESC, enqueued_at DESC`,
     );
@@ -328,8 +328,10 @@ class SqliteCaseRepository implements CaseRepository {
         worker_id,
         claimed_at,
         completed_at,
-        last_error
-       ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+        last_error,
+        lease_id,
+        lease_expires_at
+       ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
      );
      this.updateInferenceJobStatement = this.database.prepare(
       `UPDATE inference_jobs
@@ -342,8 +344,10 @@ class SqliteCaseRepository implements CaseRepository {
           worker_id = ?,
           claimed_at = ?,
           completed_at = ?,
-          last_error = ?
-       WHERE job_id = ?`,
+           last_error = ?,
+           lease_id = ?,
+           lease_expires_at = ?
+         WHERE job_id = ?`,
      );
     this.deleteCaseStatement = this.database.prepare(
       `DELETE FROM case_records WHERE case_id = ?`,
@@ -487,6 +491,8 @@ class SqliteCaseRepository implements CaseRepository {
       claimed_at: string | null;
       completed_at: string | null;
       last_error: string | null;
+      lease_id: string | null;
+      lease_expires_at: string | null;
     }>) {
       const { inferenceJob } = parseStoredInferenceJobRecord(row);
       this.inferenceJobs.set(row.job_id, inferenceJob);
@@ -593,6 +599,8 @@ class SqliteCaseRepository implements CaseRepository {
             inferenceJob.claimedAt,
             inferenceJob.completedAt,
             inferenceJob.lastError,
+            inferenceJob.leaseId,
+            inferenceJob.leaseExpiresAt,
             jobId,
           );
         } else {
@@ -608,6 +616,8 @@ class SqliteCaseRepository implements CaseRepository {
             inferenceJob.claimedAt,
             inferenceJob.completedAt,
             inferenceJob.lastError,
+            inferenceJob.leaseId,
+            inferenceJob.leaseExpiresAt,
           );
         }
       }

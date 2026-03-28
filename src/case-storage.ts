@@ -65,6 +65,8 @@ export function loadPersistedCaseSnapshot(snapshotFilePath?: string) {
           claimedAt: inferenceJob.claimedAt ?? null,
           completedAt: inferenceJob.completedAt ?? null,
           lastError: inferenceJob.lastError ?? null,
+          leaseId: inferenceJob.leaseId ?? null,
+          leaseExpiresAt: inferenceJob.leaseExpiresAt ?? null,
         }))
       : ([] as InferenceJobRecord[]),
   };

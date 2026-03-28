@@ -150,6 +150,8 @@ export interface InferenceJobRecord {
   claimedAt: string | null;
   completedAt: string | null;
   lastError: string | null;
+  leaseId: string | null;
+  leaseExpiresAt: string | null;
 }
 
 export interface EvidenceCard {
@@ -387,6 +389,8 @@ function createInferenceJobRecord(caseId: string): InferenceJobRecord {
     claimedAt: null,
     completedAt: null,
     lastError: null,
+    leaseId: null,
+    leaseExpiresAt: null,
   };
 }
 
@@ -760,6 +764,8 @@ export class MemoryCaseService {
 
       return this.persistQueueMutation(async () => {
         const claimedAt = nowIso();
+        const leaseId = randomUUID();
+        const leaseExpiresAt = new Date(Date.now() + 5 * 60 * 1000).toISOString();
         const claimedJob: InferenceJobRecord = {
           ...nextJob,
           status: "claimed",
@@ -767,6 +773,8 @@ export class MemoryCaseService {
           workerId: worker,
           claimedAt,
           updatedAt: claimedAt,
+          leaseId,
+          leaseExpiresAt,
         };
         this.repository.setInferenceJob(claimedJob);
         return cloneCase(claimedJob);
@@ -783,6 +791,31 @@ export class MemoryCaseService {
 
       throw error;
     }
+  }
+
+  async renewLease(leaseId: string, extensionMs = 5 * 60 * 1000) {
+    const inferenceJobs = await this.repository.listInferenceJobs();
+    const job = inferenceJobs.find((j) => j.leaseId === leaseId && j.status === "claimed");
+
+    if (!job) {
+      throw new WorkflowError(404, "No active lease found for the given leaseId", "LEASE_NOT_FOUND");
+    }
+
+    if (job.leaseExpiresAt && new Date(job.leaseExpiresAt).getTime() < Date.now()) {
+      throw new WorkflowError(409, "Lease has already expired", "LEASE_EXPIRED");
+    }
+
+    return this.persistQueueMutation(async () => {
+      const now = nowIso();
+      const newExpiry = new Date(Date.now() + extensionMs).toISOString();
+      const updated: InferenceJobRecord = {
+        ...job,
+        leaseExpiresAt: newExpiry,
+        updatedAt: now,
+      };
+      this.repository.setInferenceJob(updated);
+      return cloneCase(updated);
+    });
   }
 
   async requeueExpiredInferenceJobs(maxClaimAgeMs: number) {
@@ -809,6 +842,8 @@ export class MemoryCaseService {
             claimedAt: null,
             completedAt: null,
             lastError: "Inference job claim expired and was requeued.",
+            leaseId: null,
+            leaseExpiresAt: null,
           };
           this.repository.setInferenceJob(requeuedJob);
           return cloneCase(requeuedJob);
@@ -1226,6 +1261,8 @@ export class MemoryCaseService {
       claimedAt: activeJob?.claimedAt ?? completedAt,
       completedAt,
       lastError: null,
+      leaseId: null,
+      leaseExpiresAt: null,
     });
   }
 

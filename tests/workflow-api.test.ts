@@ -8,6 +8,13 @@ import { tmpdir } from "node:os";
 import { DatabaseSync } from "node:sqlite";
 import { newDb } from "pg-mem";
 import { createApp } from "../src/app";
+import {
+  HMAC_HEADER_NONCE,
+  HMAC_HEADER_SIGNATURE,
+  HMAC_HEADER_TIMESTAMP,
+  canonicalizeRequest,
+  computeSignature,
+} from "../src/hmac-auth";
 
 function createTestStoreFile() {
   const tempDir = mkdtempSync(join(tmpdir(), "mri-second-opinion-"));
@@ -56,7 +63,10 @@ async function startServer(
   };
 }
 
-async function startPostgresServer(store: ReturnType<typeof createPostgresTestStore>) {
+async function startPostgresServer(
+  store: ReturnType<typeof createPostgresTestStore>,
+  configOverrides: Partial<Parameters<typeof createApp>[0]> = {},
+) {
   const app = createApp(
     {
       nodeEnv: "test",
@@ -65,6 +75,7 @@ async function startPostgresServer(store: ReturnType<typeof createPostgresTestSt
       caseStoreMode: "postgres",
       caseStoreDatabaseUrl: store.caseStoreDatabaseUrl,
       caseStoreSchema: store.caseStoreSchema,
+      ...configOverrides,
     },
     {
       postgresPoolFactory: store.postgresPoolFactory,
@@ -149,8 +160,9 @@ async function withPostgresServer<T>(
     jsonRequest: (path: string, init?: RequestInit) => Promise<{ response: Response; body: any }>;
     textRequest: (path: string, init?: RequestInit) => Promise<{ response: Response; body: string }>;
   }) => Promise<T>,
+  configOverrides: Partial<Parameters<typeof createApp>[0]> = {},
 ) {
-  const { app, server, baseUrl } = await startPostgresServer(store);
+  const { app, server, baseUrl } = await startPostgresServer(store, configOverrides);
 
   try {
     return await run({
@@ -183,6 +195,53 @@ async function withPostgresServer<T>(
       await app.locals.caseService.close();
     });
   }
+}
+
+const DEFAULT_INTERNAL_API_TOKEN = "dispatch-internal-token-0001";
+const DEFAULT_HMAC_SECRET = "dispatch-hmac-secret-0123456789abcdef";
+
+function createSignedDispatchRequest(
+  path: string,
+  options: {
+    method?: string;
+    body?: unknown;
+    bearerToken?: string;
+    hmacSecret?: string;
+    timestamp?: string;
+    nonce?: string;
+  } = {},
+): RequestInit {
+  const method = options.method ?? "POST";
+  const payload = typeof options.body === "undefined" ? {} : options.body;
+  const rawBody = Buffer.from(JSON.stringify(payload), "utf-8");
+  const timestamp = options.timestamp ?? new Date().toISOString();
+  const nonce = options.nonce ?? "dispatch-nonce-001";
+  const hmacSecret = options.hmacSecret ?? DEFAULT_HMAC_SECRET;
+  const bearerToken = options.bearerToken ?? DEFAULT_INTERNAL_API_TOKEN;
+  const signature = computeSignature(hmacSecret, canonicalizeRequest(method, path, timestamp, nonce, rawBody));
+
+  return {
+    method,
+    headers: {
+      authorization: `Bearer ${bearerToken}`,
+      "content-type": "application/json",
+      [HMAC_HEADER_TIMESTAMP]: timestamp,
+      [HMAC_HEADER_NONCE]: nonce,
+      [HMAC_HEADER_SIGNATURE]: signature,
+    },
+    body: rawBody.toString("utf-8"),
+  };
+}
+
+async function signedJsonRequest(
+  baseUrl: string,
+  path: string,
+  options: Parameters<typeof createSignedDispatchRequest>[1] = {},
+) {
+  const response = await fetch(`${baseUrl}${path}`, createSignedDispatchRequest(path, options));
+  const bodyText = await response.text();
+  const body = bodyText.length > 0 ? JSON.parse(bodyText) : null;
+  return { response, body };
 }
 
 async function createReviewedCase(
@@ -582,6 +641,49 @@ test("internal routes accept a valid bearer token and public routes stay open", 
   }
 });
 
+test("dispatch routes require HMAC headers when a secret is configured", async () => {
+  const { tempDir, caseStoreFile } = createTestStoreFile();
+
+  try {
+    await withServer(
+      caseStoreFile,
+      async ({ jsonRequest }) => {
+        const created = await jsonRequest("/api/cases", {
+          method: "POST",
+          body: JSON.stringify({
+            patientAlias: "synthetic-patient-dispatch-auth-001",
+            studyUid: "1.2.840.dispatch.auth.1",
+            sequenceInventory: ["T1w", "FLAIR"],
+          }),
+        });
+
+        assert.equal(created.response.status, 201);
+
+        const claim = await jsonRequest("/api/internal/dispatch/claim", {
+          method: "POST",
+          headers: {
+            authorization: `Bearer ${DEFAULT_INTERNAL_API_TOKEN}`,
+          },
+          body: JSON.stringify({
+            workerId: "dispatch-worker-missing-hmac",
+          }),
+        });
+
+        assert.equal(claim.response.status, 401);
+        assert.equal(claim.body.code, "HMAC_VERIFICATION_FAILED");
+        assert.match(claim.body.error, /X-MRI-Timestamp, X-MRI-Nonce, and X-MRI-Signature headers are required/);
+        assert.equal(claim.response.headers.get("x-request-id"), claim.body.requestId);
+      },
+      {
+        internalApiToken: DEFAULT_INTERNAL_API_TOKEN,
+        hmacSecret: DEFAULT_HMAC_SECRET,
+      },
+    );
+  } finally {
+    rmSync(tempDir, { recursive: true, force: true });
+  }
+});
+
 test("review workbench shell is served with real static assets", async () => {
   const { tempDir, caseStoreFile } = createTestStoreFile();
 
@@ -887,6 +989,94 @@ test("inference jobs are persisted, restart-safe, and worker-claimable over HTTP
   }
 });
 
+test("dispatch claim leases survive sqlite restart and can be renewed over HTTP", async () => {
+  const { tempDir, caseStoreFile } = createTestStoreFile();
+
+  try {
+    let caseId = "";
+    let jobId = "";
+    let leaseId = "";
+    let leaseExpiresAt = "";
+
+    await withServer(
+      caseStoreFile,
+      async ({ baseUrl, jsonRequest }) => {
+        const created = await jsonRequest("/api/cases", {
+          method: "POST",
+          body: JSON.stringify({
+            patientAlias: "synthetic-patient-dispatch-sqlite-001",
+            studyUid: "1.2.840.dispatch.sqlite.1",
+            sequenceInventory: ["T1w", "FLAIR"],
+          }),
+        });
+
+        assert.equal(created.response.status, 201);
+        caseId = created.body.case.caseId as string;
+
+        const claim = await signedJsonRequest(baseUrl, "/api/internal/dispatch/claim", {
+          body: {
+            workerId: "dispatch-worker-sqlite-001",
+          },
+        });
+
+        assert.equal(claim.response.status, 200);
+        assert.notEqual(claim.body.dispatch, null);
+        assert.equal(claim.body.dispatch.caseId, caseId);
+        assert.equal(claim.body.dispatch.jobId, claim.body.execution.claim.jobId);
+        assert.equal(claim.body.execution.claim.workerId, "dispatch-worker-sqlite-001");
+        assert.equal(typeof claim.body.dispatch.leaseId, "string");
+        assert.equal(typeof claim.body.dispatch.leaseExpiresAt, "string");
+
+        jobId = claim.body.dispatch.jobId as string;
+        leaseId = claim.body.dispatch.leaseId as string;
+        leaseExpiresAt = claim.body.dispatch.leaseExpiresAt as string;
+      },
+      {
+        internalApiToken: DEFAULT_INTERNAL_API_TOKEN,
+        hmacSecret: DEFAULT_HMAC_SECRET,
+      },
+    );
+
+    await withServer(
+      caseStoreFile,
+      async ({ baseUrl }) => {
+        const heartbeat = await signedJsonRequest(baseUrl, "/api/internal/dispatch/heartbeat", {
+          body: {
+            leaseId,
+            progress: "halfway",
+          },
+        });
+
+        assert.equal(heartbeat.response.status, 200);
+        assert.equal(heartbeat.body.leaseId, leaseId);
+        assert.equal(heartbeat.body.jobId, jobId);
+        assert.equal(typeof heartbeat.body.leaseExpiresAt, "string");
+        assert.equal(new Date(heartbeat.body.leaseExpiresAt).getTime() > new Date(leaseExpiresAt).getTime(), true);
+      },
+      {
+        internalApiToken: DEFAULT_INTERNAL_API_TOKEN,
+        hmacSecret: DEFAULT_HMAC_SECRET,
+      },
+    );
+
+    await withServer(
+      caseStoreFile,
+      async ({ jsonRequest }) => {
+        const detail = await jsonRequest(`/api/cases/${caseId}`);
+
+        assert.equal(detail.response.status, 200);
+        assert.equal(detail.body.case.caseId, caseId);
+      },
+      {
+        internalApiToken: DEFAULT_INTERNAL_API_TOKEN,
+        hmacSecret: DEFAULT_HMAC_SECRET,
+      },
+    );
+  } finally {
+    rmSync(tempDir, { recursive: true, force: true });
+  }
+});
+
 test("expired claimed inference jobs can be requeued over HTTP", async () => {
   const { tempDir, caseStoreFile } = createTestStoreFile();
 
@@ -1068,6 +1258,84 @@ test("postgres delivery jobs are persisted, restart-safe, and worker-claimable o
       assert.equal(jobsAfterCompletion.body.jobs[0].status, "delivered");
       assert.equal(jobsAfterCompletion.body.jobs[0].attemptCount, 1);
     });
+  } finally {
+    rmSync(store.tempDir, { recursive: true, force: true });
+  }
+});
+
+test("dispatch claim leases survive postgres restart and can be renewed over HTTP", async () => {
+  const store = createPostgresTestStore();
+
+  try {
+    let caseId = "";
+    let jobId = "";
+    let leaseId = "";
+    let leaseExpiresAt = "";
+
+    await withPostgresServer(
+      store,
+      async ({ baseUrl, jsonRequest }) => {
+        const created = await jsonRequest("/api/cases", {
+          method: "POST",
+          body: JSON.stringify({
+            patientAlias: "synthetic-patient-dispatch-postgres-001",
+            studyUid: "1.2.840.dispatch.postgres.1",
+            sequenceInventory: ["T1w", "FLAIR"],
+          }),
+        });
+
+        assert.equal(created.response.status, 201);
+        caseId = created.body.case.caseId as string;
+
+        const claim = await signedJsonRequest(baseUrl, "/api/internal/dispatch/claim", {
+          body: {
+            workerId: "dispatch-worker-postgres-001",
+          },
+        });
+
+        assert.equal(claim.response.status, 200);
+        assert.notEqual(claim.body.dispatch, null);
+        assert.equal(claim.body.dispatch.caseId, caseId);
+        assert.equal(claim.body.dispatch.jobId, claim.body.execution.claim.jobId);
+        assert.equal(claim.body.execution.claim.workerId, "dispatch-worker-postgres-001");
+        assert.equal(typeof claim.body.dispatch.leaseId, "string");
+        assert.equal(typeof claim.body.dispatch.leaseExpiresAt, "string");
+
+        jobId = claim.body.dispatch.jobId as string;
+        leaseId = claim.body.dispatch.leaseId as string;
+        leaseExpiresAt = claim.body.dispatch.leaseExpiresAt as string;
+      },
+      {
+        internalApiToken: DEFAULT_INTERNAL_API_TOKEN,
+        hmacSecret: DEFAULT_HMAC_SECRET,
+      },
+    );
+
+    await withPostgresServer(
+      store,
+      async ({ baseUrl, jsonRequest }) => {
+        const heartbeat = await signedJsonRequest(baseUrl, "/api/internal/dispatch/heartbeat", {
+          body: {
+            leaseId,
+            progress: "persisted-postgres",
+          },
+        });
+
+        assert.equal(heartbeat.response.status, 200);
+        assert.equal(heartbeat.body.leaseId, leaseId);
+        assert.equal(heartbeat.body.jobId, jobId);
+        assert.equal(typeof heartbeat.body.leaseExpiresAt, "string");
+        assert.equal(new Date(heartbeat.body.leaseExpiresAt).getTime() > new Date(leaseExpiresAt).getTime(), true);
+
+        const detail = await jsonRequest(`/api/cases/${caseId}`);
+        assert.equal(detail.response.status, 200);
+        assert.equal(detail.body.case.caseId, caseId);
+      },
+      {
+        internalApiToken: DEFAULT_INTERNAL_API_TOKEN,
+        hmacSecret: DEFAULT_HMAC_SECRET,
+      },
+    );
   } finally {
     rmSync(store.tempDir, { recursive: true, force: true });
   }
