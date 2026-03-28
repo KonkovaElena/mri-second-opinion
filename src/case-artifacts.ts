@@ -34,6 +34,14 @@ export interface DerivedArtifactDescriptor {
   generatedAt: string;
 }
 
+export interface PlannedArtifactPersistenceTarget {
+  artifactType: DerivedArtifactType;
+  label: string;
+  mimeType: string;
+  plannedStorageKey: string;
+  plannedStorageUri: string;
+}
+
 function classifyArtifactType(reference: string): DerivedArtifactType {
   if (reference.includes("qc-summary")) {
     return "qc-summary";
@@ -77,6 +85,34 @@ function mimeTypeForArtifactType(artifactType: DerivedArtifactType) {
     default:
       return "application/octet-stream";
   }
+}
+
+function fileExtensionForArtifactType(artifactType: DerivedArtifactType) {
+  switch (artifactType) {
+    case "qc-summary":
+    case "metrics-json":
+      return ".json";
+    case "overlay-preview":
+      return ".png";
+    case "report-preview":
+      return ".html";
+    default:
+      return ".bin";
+  }
+}
+
+function toArtifactType(reference: string): DerivedArtifactType {
+  if (
+    reference === "qc-summary" ||
+    reference === "metrics-json" ||
+    reference === "overlay-preview" ||
+    reference === "report-preview" ||
+    reference === "generic-artifact"
+  ) {
+    return reference;
+  }
+
+  return classifyArtifactType(reference);
 }
 
 function isSyntheticSeriesInstanceUid(seriesInstanceUid: string) {
@@ -166,6 +202,25 @@ export function createDerivedArtifactDescriptors(input: {
       viewerReady: viewerDescriptor !== null,
       viewerDescriptor,
       generatedAt: input.generatedAt,
+    };
+  });
+}
+
+export function createPlannedArtifactPersistenceTargets(input: {
+  caseId: string;
+  artifactTypes: string[];
+}): PlannedArtifactPersistenceTarget[] {
+  return input.artifactTypes.map((artifactTypeRef) => {
+    const artifactType = toArtifactType(artifactTypeRef);
+    const extension = fileExtensionForArtifactType(artifactType);
+    const plannedStorageKey = `${input.caseId}/${artifactType}${extension}`;
+
+    return {
+      artifactType,
+      label: labelForArtifactType(artifactType),
+      mimeType: mimeTypeForArtifactType(artifactType),
+      plannedStorageKey,
+      plannedStorageUri: `object-store://case-artifacts/${plannedStorageKey}`,
     };
   });
 }

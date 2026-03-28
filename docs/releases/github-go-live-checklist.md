@@ -1,6 +1,6 @@
 # GitHub Go-Live Checklist
 
-Date: 2026-03-27
+Date: 2026-03-28
 
 ## Purpose
 
@@ -55,6 +55,8 @@ Current hosted proof recorded:
 3. `docs-governance` success on `177094a`: `https://github.com/KonkovaElena/mri-second-opinion/actions/runs/23556374341`
 4. `docs-governance` success on `8f851b3`: `https://github.com/KonkovaElena/mri-second-opinion/actions/runs/23557754782`
 5. `docs-governance` success on `49b794c`: `https://github.com/KonkovaElena/mri-second-opinion/actions/runs/23557837645`
+6. `ci` success on `6c2cfee`: `https://github.com/KonkovaElena/mri-second-opinion/actions/runs/23682412690`
+7. `docs-governance` success on `6c2cfee`: `https://github.com/KonkovaElena/mri-second-opinion/actions/runs/23682412696`
 
 ## Phase 4. Publication safety review
 

@@ -1,4 +1,8 @@
+import {
+  createPlannedArtifactPersistenceTargets,
+} from "./case-artifacts";
 import type { CaseRecord, DeliveryJobRecord, InferenceJobRecord, ReportPayload } from "./cases";
+import { getWorkflowPackageManifest } from "./workflow-packages";
 
 type OperationsSummary = Awaited<
   ReturnType<import("./cases").MemoryCaseService["getOperationsSummary"]>
@@ -104,6 +108,35 @@ export function presentInferenceJob(inferenceJob: InferenceJobRecord) {
     claimedAt: inferenceJob.claimedAt,
     completedAt: inferenceJob.completedAt,
     lastError: inferenceJob.lastError,
+  };
+}
+
+export function presentInferenceExecutionContract(input: {
+  caseRecord: CaseRecord;
+  inferenceJob: InferenceJobRecord;
+}) {
+  const selectedPackage = input.caseRecord.planEnvelope.packageResolution.selectedPackage;
+
+  return {
+    claim: {
+      jobId: input.inferenceJob.jobId,
+      caseId: input.inferenceJob.caseId,
+      workerId: input.inferenceJob.workerId,
+      claimedAt: input.inferenceJob.claimedAt,
+      attemptCount: input.inferenceJob.attemptCount,
+      status: input.inferenceJob.status,
+    },
+    workflowFamily: input.caseRecord.workflowFamily,
+    selectedPackage,
+    dispatchProfile: {
+      ...input.caseRecord.planEnvelope.dispatchProfile,
+    },
+    packageManifest: getWorkflowPackageManifest(selectedPackage),
+    requiredArtifacts: [...input.caseRecord.planEnvelope.requiredArtifacts],
+    persistenceTargets: createPlannedArtifactPersistenceTargets({
+      caseId: input.caseRecord.caseId,
+      artifactTypes: input.caseRecord.planEnvelope.requiredArtifacts,
+    }),
   };
 }
 

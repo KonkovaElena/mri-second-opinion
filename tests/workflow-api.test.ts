@@ -842,6 +842,25 @@ test("inference jobs are persisted, restart-safe, and worker-claimable over HTTP
       assert.equal(claim.body.job.caseId, caseId);
       assert.equal(claim.body.job.status, "claimed");
       assert.equal(claim.body.job.workerId, "inference-worker-1");
+      assert.equal(claim.body.execution.claim.jobId, claim.body.job.jobId);
+      assert.equal(claim.body.execution.claim.caseId, caseId);
+      assert.equal(claim.body.execution.claim.workerId, "inference-worker-1");
+      assert.equal(claim.body.execution.dispatchProfile.resourceClass, "light-gpu");
+      assert.equal(claim.body.execution.dispatchProfile.retryTier, "standard");
+      assert.equal(claim.body.execution.packageManifest.packageId, "brain-structural-fastsurfer");
+      assert.deepEqual(claim.body.execution.requiredArtifacts, [
+        "qc-summary",
+        "metrics-json",
+        "overlay-preview",
+        "report-preview",
+      ]);
+      assert.equal(Array.isArray(claim.body.execution.persistenceTargets), true);
+      assert.equal(claim.body.execution.persistenceTargets.length, 4);
+      assert.equal(claim.body.execution.persistenceTargets[0].artifactType, "qc-summary");
+      assert.equal(
+        claim.body.execution.persistenceTargets[0].plannedStorageUri,
+        `object-store://case-artifacts/${caseId}/qc-summary.json`,
+      );
 
       const inferred = await jsonRequest("/api/internal/inference-callback", {
         method: "POST",

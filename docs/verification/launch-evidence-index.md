@@ -7,8 +7,8 @@ Every claim about launch readiness should link back to one or more artifacts lis
 ## Repository Status
 
 - Current verdict: `PUBLIC_GITHUB_READY`
-- Last reviewed: 2026-03-27
-- Current remote head: `db5e7bb`
+- Last reviewed: 2026-03-28
+- Current remote head: `6c2cfee`
 - Public repository: `https://github.com/KonkovaElena/mri-second-opinion`
 - Auditor handoff: `docs/verification/ai-auditor-handoff-2026-03-25.md` (historical snapshot dated 2026-03-25; current verdict advanced later)
 - Repository-status retrospective: `docs/verification/publication-retrospective-audit-2026-03-27.md`
@@ -40,6 +40,10 @@ Recorded hosted evidence today:
   `https://github.com/KonkovaElena/mri-second-opinion/actions/runs/23557754782`
 5. `docs-governance` succeeded on `49b794c` after adding the pending manual GitHub actions runbook:
   `https://github.com/KonkovaElena/mri-second-opinion/actions/runs/23557837645`
+6. `ci` succeeded on `6c2cfee` after the artifact-truth promotion and runtime-hardening reconciliation:
+  `https://github.com/KonkovaElena/mri-second-opinion/actions/runs/23682412690`
+7. `docs-governance` succeeded on `6c2cfee`:
+  `https://github.com/KonkovaElena/mri-second-opinion/actions/runs/23682412696`
 
 Local reconciliation now also exists on the pushed `origin/main` head:
 
@@ -47,7 +51,7 @@ Local reconciliation now also exists on the pushed `origin/main` head:
 2. `d352d9c` corrected the final docs-governance drift in `README.md` and `package.json` and re-ran the equivalent local workflow assertions before push
 3. `33ac458` clarified the dated auditor handoff as a historical snapshot and aligned the active evidence routing with the current publication verdict
 4. `db5e7bb` aligned the standalone evidence head after publish and external-repository reconciliation
-5. append new hosted workflow URLs here when GitHub Actions records runs for `db5e7bb` or later heads
+5. `6c2cfee` hardened the runtime further and promoted typed artifact truth to first-class durable case state before the new hosted workflow closure
 
 ## Priority Tracks
 
@@ -100,6 +104,8 @@ Record:
   - `docs-governance` green on `177094a`: `https://github.com/KonkovaElena/mri-second-opinion/actions/runs/23556374341`
   - `docs-governance` green on `8f851b3`: `https://github.com/KonkovaElena/mri-second-opinion/actions/runs/23557754782`
   - `docs-governance` green on `49b794c`: `https://github.com/KonkovaElena/mri-second-opinion/actions/runs/23557837645`
+  - `ci` green on `6c2cfee`: `https://github.com/KonkovaElena/mri-second-opinion/actions/runs/23682412690`
+  - `docs-governance` green on `6c2cfee`: `https://github.com/KonkovaElena/mri-second-opinion/actions/runs/23682412696`
 - Artifact links:
   - `package.json`
   - `package-lock.json`
@@ -231,7 +237,9 @@ Record:
   - `docs-governance` green on `177094a`: `https://github.com/KonkovaElena/mri-second-opinion/actions/runs/23556374341`
   - `docs-governance` green on `8f851b3`: `https://github.com/KonkovaElena/mri-second-opinion/actions/runs/23557754782`
   - `docs-governance` green on `49b794c`: `https://github.com/KonkovaElena/mri-second-opinion/actions/runs/23557837645`
-  - current pushed head `d352d9c` also re-closes the same README/package metadata policy locally after the final merge reconciliation
+  - `ci` green on `6c2cfee`: `https://github.com/KonkovaElena/mri-second-opinion/actions/runs/23682412690`
+  - `docs-governance` green on `6c2cfee`: `https://github.com/KonkovaElena/mri-second-opinion/actions/runs/23682412696`
+  - current pushed head `6c2cfee` also re-closes the same README/package metadata policy locally after the final merge reconciliation and artifact-truth promotion
   - public repository is live with About metadata applied
   - remaining GitHub-UI follow-up is tracked separately and does not change the current repository-content verdict
 - Artifact links:

@@ -8,6 +8,27 @@ This document defines the first implementation wave after the hyperdeep audit.
 
 Its purpose is to convert the current truthful control-plane baseline into a minimally trust-separated execution boundary without pretending that the full worker, queue, and object-store planes already exist.
 
+## Status 2026-03-28
+
+Wave 2A is closed.
+
+The repository now proves:
+
+1. internal-route bearer-token protection for worker-facing mutations
+2. durable package, plan-envelope, and artifact-manifest state on case reads
+3. restart-safe inference and delivery queue state
+4. hosted `ci` and `docs-governance` proof for the current public head
+
+The next active Wave 2 authority is Wave 2B contract layering, not a full worker split.
+
+The minimal additive contract implemented in this slice is:
+
+1. `/api/internal/inference-jobs/claim-next` still returns the durable `job` envelope for compatibility
+2. the same response now also returns an `execution` block with claim metadata, selected package manifest, dispatch profile, required artifacts, and planned object-store persistence targets
+3. the persistence targets remain declarative only; they do not claim that MinIO, S3, or another object store is already wired
+
+This keeps the current single-process runtime honest while moving the worker handoff surface onto stable, testable contracts.
+
 ## Problem Statement
 
 The current repository already proves:

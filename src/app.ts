@@ -6,6 +6,7 @@ import { MemoryCaseService, WorkflowError } from "./cases";
 import {
   presentCaseDetail,
   presentDeliveryJob,
+  presentInferenceExecutionContract,
   presentInferenceJob,
   presentCaseListItem,
   presentOperationsSummary,
@@ -228,8 +229,16 @@ export function createApp(config: AppConfig, options: CreateAppOptions = {}) {
     try {
       const input = parseClaimJobInput(req.body);
       const claimed = await caseService.claimNextInferenceJob(input.workerId);
+      const claimedCase = claimed ? await caseService.getCase(claimed.caseId) : null;
       res.json({
         job: claimed ? presentInferenceJob(claimed) : null,
+        execution:
+          claimed && claimedCase
+            ? presentInferenceExecutionContract({
+                caseRecord: claimedCase,
+                inferenceJob: claimed,
+              })
+            : null,
       });
     } catch (error) {
       handleError(res, error);
