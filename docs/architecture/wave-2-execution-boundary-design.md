@@ -37,7 +37,7 @@ The current implemented slice is:
 1. explicit internal-callback authentication
 2. worker-facing package declaration surface
 3. a durable execution envelope that can later be handed to a real worker process
-4. a typed artifact manifest that can later map to object-store-backed durability
+4. a typed artifact manifest promoted to first-class case state that can later map to object-store-backed durability
 
 ## Scope For This First Wave 2 Slice
 
@@ -135,3 +135,8 @@ This slice is complete when:
 ## Follow-On Step
 
 After this slice, the next Wave 2 step should move the new execution contracts from single-process durability into real worker handoff and object-store-backed artifact persistence.
+
+The key truth boundary is now explicit:
+
+1. artifact manifest state is read from durable case state, not reconstructed only as report decoration
+2. report responses can stay stable while the runtime moves toward real worker and object-store boundaries

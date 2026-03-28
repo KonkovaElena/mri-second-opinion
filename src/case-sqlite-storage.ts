@@ -106,18 +106,22 @@ export function parseStoredCaseRecord(payloadJson: string): LoadedSqliteCaseReco
     series: parsed.studyContext.series ?? [],
     metadataSummary: parsed.studyContext.metadataSummary ?? [],
   };
+  const artifactManifest =
+    parsed.artifactManifest ??
+    parsed.report?.derivedArtifacts ??
+    (parsed.report
+      ? createDerivedArtifactDescriptors({
+          caseId: parsed.caseId,
+          studyUid: parsed.studyUid,
+          artifactRefs: parsed.report.artifacts ?? [],
+          studyContext,
+          generatedAt: parsed.report.provenance.generatedAt,
+        })
+      : []);
   const report = parsed.report
     ? {
         ...parsed.report,
-        derivedArtifacts:
-          parsed.report.derivedArtifacts ??
-          createDerivedArtifactDescriptors({
-            caseId: parsed.caseId,
-            studyUid: parsed.studyUid,
-            artifactRefs: parsed.report.artifacts ?? [],
-            studyContext,
-            generatedAt: parsed.report.provenance.generatedAt,
-          }),
+        derivedArtifacts: undefined,
       }
     : null;
 
@@ -125,6 +129,7 @@ export function parseStoredCaseRecord(payloadJson: string): LoadedSqliteCaseReco
     caseRecord: {
       ...parsed,
       studyContext,
+      artifactManifest,
       report,
       lastInferenceFingerprint: parsed.lastInferenceFingerprint ?? null,
     },

@@ -4,6 +4,9 @@ on:
   workflow_dispatch:
   push:
     paths:
+      - 'Dockerfile'
+      - '.dockerignore'
+      - 'docker-compose.yml'
       - 'package.json'
       - 'package-lock.json'
       - 'tsconfig.json'
@@ -15,6 +18,9 @@ on:
       - '.github/workflows/ci.yml'
   pull_request:
     paths:
+      - 'Dockerfile'
+      - '.dockerignore'
+      - 'docker-compose.yml'
       - 'package.json'
       - 'package-lock.json'
       - 'tsconfig.json'
@@ -49,6 +55,61 @@ jobs:
 
       - name: Test
         run: npm test
+
+      - name: Validate Docker Compose config
+        run: docker compose -f docker-compose.yml config --quiet
+
+      - name: Build container image
+        run: docker build -t mri-second-opinion:ci .
+
+      - name: Smoke test compose app service
+        env:
+          PORT: 4110
+        run: |
+          docker compose -p mri-ci -f docker-compose.yml up -d --build app
+          trap 'docker compose -p mri-ci -f docker-compose.yml down --volumes --remove-orphans' EXIT
+          node <<'EOF'
+          const { execSync } = require('node:child_process');
+
+          const port = process.env.PORT || '4110';
+          const deadline = Date.now() + 120000;
+
+          async function waitForReadyAndHealthy() {
+            while (Date.now() < deadline) {
+              let ready = false;
+              let health = '';
+
+              try {
+                const response = await fetch(`http://127.0.0.1:${port}/readyz`);
+                ready = response.ok;
+              } catch {
+                ready = false;
+              }
+
+              try {
+                health = execSync(
+                  "docker inspect --format='{{if .State.Health}}{{.State.Health.Status}}{{else}}none{{end}}' mri-ci-app-1",
+                  { encoding: 'utf8' },
+                ).trim();
+              } catch {
+                health = '';
+              }
+
+              if (ready && health === 'healthy') {
+                return;
+              }
+
+              await new Promise((resolve) => setTimeout(resolve, 2000));
+            }
+
+            throw new Error('Compose app service did not become ready and healthy within 120 seconds');
+          }
+
+          waitForReadyAndHealthy().catch((error) => {
+            console.error(error instanceof Error ? error.message : String(error));
+            process.exit(1);
+          });
+          EOF
 
       - name: Generate CycloneDX SBOM
         run: npm run sbom

@@ -1,6 +1,7 @@
 import { randomUUID } from "node:crypto";
 import {
   ALLOWED_TRANSITIONS,
+  createArtifactManifest,
   createDraftReport,
   createEvidenceCards,
   createPlanEnvelope,
@@ -252,7 +253,7 @@ export interface ReportPayload {
   uncertaintySummary: string;
   issues: string[];
   artifacts: string[];
-  derivedArtifacts: DerivedArtifactDescriptor[];
+  derivedArtifacts?: DerivedArtifactDescriptor[];
   provenance: {
     workflowVersion: string;
     plannerVersion: string;
@@ -279,6 +280,7 @@ export interface CaseRecord {
   operationLog: OperationLogEntry[];
   planEnvelope: PlanEnvelope;
   evidenceCards: EvidenceCard[];
+  artifactManifest: DerivedArtifactDescriptor[];
   report: ReportPayload | null;
   lastInferenceFingerprint: string | null;
   review: {
@@ -546,6 +548,7 @@ export class MemoryCaseService {
           issues: normalizedInput.issues,
           qcSummary: normalizedInput.qcSummary,
         });
+        record.artifactManifest = [];
         record.planEnvelope.studyContext.qcDisposition = record.qcSummary.disposition;
         record.lastInferenceFingerprint = fingerprint;
         this.transition(record, "QC_REJECTED", "QC gate rejected the study");
@@ -568,6 +571,7 @@ export class MemoryCaseService {
         issues: normalizedInput.issues,
         qcSummary: normalizedInput.qcSummary,
       });
+      record.artifactManifest = createArtifactManifest(record, normalizedInput);
       record.planEnvelope.studyContext.qcDisposition = record.qcSummary.disposition;
       record.lastInferenceFingerprint = fingerprint;
       record.report = createDraftReport(record, normalizedInput);
@@ -966,7 +970,12 @@ export class MemoryCaseService {
       throw new WorkflowError(404, "Report is not available for this case", "REPORT_NOT_READY");
     }
 
-    return JSON.parse(JSON.stringify(record.report)) as ReportPayload;
+    return JSON.parse(
+      JSON.stringify({
+        ...record.report,
+        derivedArtifacts: record.artifactManifest,
+      }),
+    ) as ReportPayload;
   }
 
   async getOperationsSummary() {
@@ -1107,6 +1116,7 @@ export class MemoryCaseService {
         isEligible,
       }),
       evidenceCards: [],
+      artifactManifest: [],
       report: null,
       lastInferenceFingerprint: null,
       review: {

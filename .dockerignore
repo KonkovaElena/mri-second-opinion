@@ -1,0 +1,10 @@
+.git
+.github
+artifacts
+dist
+docs
+.env
+.mri-data
+node_modules
+tests
+npm-debug.log*

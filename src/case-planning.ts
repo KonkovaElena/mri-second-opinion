@@ -223,7 +223,7 @@ export function createEvidenceCards(caseRecord: CaseRecord): EvidenceCard[] {
         : "QC has not been completed yet for this case."),
     supportingRefs: [
       ...caseRecord.qcSummary.checks.map((check) => `${check.checkId}:${check.status}`),
-      ...(caseRecord.report?.derivedArtifacts.map((artifact) => artifact.artifactType) ?? []),
+      ...caseRecord.artifactManifest.map((artifact) => artifact.artifactType),
     ],
     recommendedAction:
       caseRecord.qcSummary.disposition === "warn"
@@ -236,15 +236,20 @@ export function createEvidenceCards(caseRecord: CaseRecord): EvidenceCard[] {
   return cards;
 }
 
-export function createDraftReport(caseRecord: CaseRecord, input: InferenceCallbackInput): ReportPayload {
+export function createArtifactManifest(caseRecord: CaseRecord, input: InferenceCallbackInput) {
   const generatedAt = nowIso();
-  const derivedArtifacts = createDerivedArtifactDescriptors({
+
+  return createDerivedArtifactDescriptors({
     caseId: caseRecord.caseId,
     studyUid: caseRecord.studyUid,
     artifactRefs: input.artifacts,
     studyContext: caseRecord.studyContext,
     generatedAt,
   });
+}
+
+export function createDraftReport(caseRecord: CaseRecord, input: InferenceCallbackInput): ReportPayload {
+  const generatedAt = nowIso();
 
   return {
     reportSchemaVersion: "0.1.0",
@@ -264,7 +269,6 @@ export function createDraftReport(caseRecord: CaseRecord, input: InferenceCallba
     uncertaintySummary: "Human review remains mandatory for all machine findings.",
     issues: input.issues ?? [],
     artifacts: input.artifacts,
-    derivedArtifacts,
     provenance: {
       workflowVersion: "brain-structural-fastsurfer@0.1.0",
       plannerVersion: caseRecord.planEnvelope.provenance.plannerVersion,

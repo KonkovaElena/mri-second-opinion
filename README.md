@@ -128,12 +128,14 @@ Implemented and verified in this repository today:
 5. locked workflow-state vocabulary for the current MRI review path
 6. restart-safe local persistence for case state, explicit inference and delivery jobs, delivery state, retry history, and operation transcript on the default SQLite path, plus a locally verified PostgreSQL service path
 7. structured JSON error envelopes for malformed or invalid input
-8. baseline operational routes: `GET /`, `GET /healthz`, `GET /readyz`, and `GET /metrics`
+8. baseline operational routes: `GET /`, `GET /healthz`, `GET /readyz`, and a real Prometheus-compatible `GET /metrics`
 9. report payloads that preserve legacy artifact refs alongside typed derived artifact descriptors with conservative viewer-ready semantics
 10. built-in `GET /workbench` review surface for queue visibility, case detail, review, finalize, report preview, operations summary, and delivery retry over the live API
 11. explicit worker-facing delivery queue claim path backed by durable records and restart survival proof
 12. explicit worker-facing inference queue list, claim, and expired-claim requeue paths backed by durable records and restart survival proof
 13. internal separation between orchestration, planning, and snapshot-repository seams while preserving the HTTP contract
+14. Wave 1 public-edge hardening with request-size limits, public API rate limiting, Node HTTP timeout guards, and graceful shutdown hooks
+15. root container packaging plus a compose app-service bring-up path for the current standalone runtime baseline
 
 ## What Does Not Exist Yet
 
@@ -227,22 +229,36 @@ npm test
 npm start
 ```
 
+Container bring-up for the same standalone runtime baseline:
+
+```bash
+docker compose up --build app
+```
+
+This path keeps the verified standalone API shape intact and persists the default case store in the named volume mounted at `/data` inside the container.
+
+It intentionally defaults to the current local-development runtime posture rather than pretending this repository already proves a hardened production deployment path.
+
+`docker compose up --build` also starts the adjacent `postgres` and `redis` services that remain available for future persistence and queue seams, but the current app-service baseline does not require them.
+
 Minimum runtime expectation after startup:
 
 1. `GET /` returns the repository identity, route map, and doc pointers
 2. `GET /healthz` returns `ok`
 3. `GET /readyz` returns `ready`
-4. `GET /metrics` returns a baseline placeholder metrics payload
+4. `GET /metrics` returns Prometheus exposition data for runtime and request metrics
 5. `GET /workbench` returns the built-in MRI Review Workbench shell
 
 This quick start proves the local workflow API baseline only.
+
+The compose app-service path is part of the same baseline and adds portable packaging proof, not a new product claim.
 
 It does not prove:
 
 1. a hosted deployment path
 2. a production-grade frontend review product
 3. a release-linked or managed PostgreSQL deployment path
-4. a production observability stack
+4. a full production observability stack with dashboards, alert routing, and hosted scrape topology
 5. clinical readiness
 
 Any public demo or screenshot path should be treated as synthetic-only until the repository proves otherwise.

@@ -115,6 +115,21 @@ After repository publication is safe, use this order for follow-up work.
 3. resume Track B in the current work-package order: `WP-1`, `WP-2`, `WP-3`, `WP-4`, `WP-6`
 4. reopen deeper phase-1 expansion only after the bounded MVP slice and its evidence ledger are current
 
+## Remaining-Wave Rule
+
+After Wave 1.5, the project should not branch into multiple major implementation waves at once.
+
+Use `../academic/action-plan.md` as the authority for the remaining order:
+
+1. execution truth
+2. real compute path
+3. archive and viewer truth
+4. artifact and report closure
+5. exports and regulatory hardening
+6. clinical evidence
+
+This prevents a false impression that public publication safety is the same thing as product maturity.
+
 ## Execution Rule
 
 Do not block GitHub publication on every future export, every workflow family, or every later-phase architecture seam.

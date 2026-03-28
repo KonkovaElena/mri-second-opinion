@@ -14,6 +14,20 @@ The project should grow from a narrow, verifiable MRI workflow baseline rather t
 
 Each phase should add one clinically meaningful capability family and the validation surface needed to keep claims honest.
 
+## Execution Governance
+
+The remaining work is governed by a sequential wave program.
+
+Use `academic/action-plan.md` as the execution authority for:
+
+1. which wave is active now
+2. what blocks the next wave
+3. what the exit gate is for each wave
+
+This document remains the validation and sequencing rationale, not the task tracker.
+
+No future wave should be implemented in parallel with another wave unless an explicit design review proves the dependency graph is independent.
+
 ## Delivery Window
 
 The March 2026 planning baseline assumes a roughly two-year maturation path from initial repository foundation to a stronger clinical-integration-ready engineering state.
@@ -50,6 +64,19 @@ Use the current repository state in this order.
 3. finish wave 1.5 proof capture before expanding the scope of runtime claims
 4. resume Track B work in the established order: `WP-1`, `WP-2`, `WP-3`, `WP-4`, `WP-6`
 5. revisit deeper phase-1 expansion only after the bounded MVP slice and evidence ledger are current
+
+### Execution Discipline After Wave 1.5
+
+After wave 1.5 closes, use this dependency order:
+
+1. execution truth
+2. real compute path
+3. archive and viewer truth
+4. artifact and report closure
+5. exports and regulatory hardening
+6. clinical validation
+
+That order is mandatory because later waves depend on the runtime truth created by earlier ones.
 
 ### Phase 1 Governance Hardening Pack
 

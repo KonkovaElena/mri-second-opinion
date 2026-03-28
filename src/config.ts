@@ -16,9 +16,28 @@ export interface AppConfig {
   replayStoreMaxEntries: number;
   persistenceMode: "snapshot" | "postgres";
   reviewerIdentitySource: "request-body";
+  jsonBodyLimit: string;
+  publicApiRateLimitWindowMs: number;
+  publicApiRateLimitMaxRequests: number;
+  serverHeadersTimeoutMs: number;
+  serverRequestTimeoutMs: number;
+  serverSocketTimeoutMs: number;
+  serverKeepAliveTimeoutMs: number;
+  serverMaxRequestsPerSocket: number;
+  gracefulShutdownTimeoutMs: number;
 }
 
 const DEFAULT_PORT = 4010;
+
+function parsePositiveInteger(value: string, name: string) {
+  const parsed = Number(value);
+
+  if (!Number.isInteger(parsed) || parsed <= 0) {
+    throw new Error(`${name} must be a positive integer`);
+  }
+
+  return parsed;
+}
 
 export function getConfig(): AppConfig {
   const rawPort = process.env.PORT;
@@ -44,6 +63,39 @@ export function getConfig(): AppConfig {
   const replayStoreTtlMs = Number(process.env.MRI_REPLAY_STORE_TTL_MS ?? "120000");
   const replayStoreMaxEntries = Number(process.env.MRI_REPLAY_STORE_MAX_ENTRIES ?? "10000");
   const persistenceMode: "snapshot" | "postgres" = databaseUrl ? "postgres" : "snapshot";
+  const jsonBodyLimit = process.env.MRI_JSON_BODY_LIMIT?.trim() || "1mb";
+  const publicApiRateLimitWindowMs = parsePositiveInteger(
+    process.env.MRI_PUBLIC_RATE_LIMIT_WINDOW_MS ?? "900000",
+    "MRI_PUBLIC_RATE_LIMIT_WINDOW_MS",
+  );
+  const publicApiRateLimitMaxRequests = parsePositiveInteger(
+    process.env.MRI_PUBLIC_RATE_LIMIT_MAX_REQUESTS ?? "300",
+    "MRI_PUBLIC_RATE_LIMIT_MAX_REQUESTS",
+  );
+  const serverHeadersTimeoutMs = parsePositiveInteger(
+    process.env.MRI_SERVER_HEADERS_TIMEOUT_MS ?? "30000",
+    "MRI_SERVER_HEADERS_TIMEOUT_MS",
+  );
+  const serverRequestTimeoutMs = parsePositiveInteger(
+    process.env.MRI_SERVER_REQUEST_TIMEOUT_MS ?? "120000",
+    "MRI_SERVER_REQUEST_TIMEOUT_MS",
+  );
+  const serverSocketTimeoutMs = parsePositiveInteger(
+    process.env.MRI_SERVER_SOCKET_TIMEOUT_MS ?? "120000",
+    "MRI_SERVER_SOCKET_TIMEOUT_MS",
+  );
+  const serverKeepAliveTimeoutMs = parsePositiveInteger(
+    process.env.MRI_SERVER_KEEP_ALIVE_TIMEOUT_MS ?? "5000",
+    "MRI_SERVER_KEEP_ALIVE_TIMEOUT_MS",
+  );
+  const serverMaxRequestsPerSocket = parsePositiveInteger(
+    process.env.MRI_SERVER_MAX_REQUESTS_PER_SOCKET ?? "100",
+    "MRI_SERVER_MAX_REQUESTS_PER_SOCKET",
+  );
+  const gracefulShutdownTimeoutMs = parsePositiveInteger(
+    process.env.MRI_GRACEFUL_SHUTDOWN_TIMEOUT_MS ?? "10000",
+    "MRI_GRACEFUL_SHUTDOWN_TIMEOUT_MS",
+  );
 
   if (!Number.isInteger(port) || port <= 0 || port > 65535) {
     throw new Error(`Invalid PORT value: ${rawPort}`);
@@ -55,6 +107,10 @@ export function getConfig(): AppConfig {
 
   if (reviewerIdentitySource !== "request-body") {
     throw new Error("MRI_REVIEWER_IDENTITY_SOURCE must be request-body");
+  }
+
+  if (jsonBodyLimit.length === 0) {
+    throw new Error("MRI_JSON_BODY_LIMIT must not be empty");
   }
 
   if (hmacSecret && Buffer.byteLength(hmacSecret, "utf-8") < 32) {
@@ -94,5 +150,14 @@ export function getConfig(): AppConfig {
     replayStoreMaxEntries,
     persistenceMode,
     reviewerIdentitySource,
+    jsonBodyLimit,
+    publicApiRateLimitWindowMs,
+    publicApiRateLimitMaxRequests,
+    serverHeadersTimeoutMs,
+    serverRequestTimeoutMs,
+    serverSocketTimeoutMs,
+    serverKeepAliveTimeoutMs,
+    serverMaxRequestsPerSocket,
+    gracefulShutdownTimeoutMs,
   };
 }

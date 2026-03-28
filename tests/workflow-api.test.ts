@@ -416,6 +416,10 @@ test("public case lifecycle reaches delivery failure and retry path", async () =
       assert.equal(detail.body.case.studyContext.series.length, 2);
       assert.equal(detail.body.case.planSummary.qcDisposition, "warn");
       assert.deepEqual(detail.body.case.planSummary.metadataSummary, ["3 series imported", "Axial T1 present"]);
+      assert.equal(Array.isArray(detail.body.case.artifactManifest), true);
+      assert.equal(detail.body.case.artifactManifest.length, 2);
+      assert.equal(detail.body.case.artifactManifest[0].archiveLocator.studyInstanceUid, "2.25.12345");
+      assert.equal(detail.body.case.artifactManifest[1].artifactType, "qc-summary");
       assert.equal(detail.body.case.qcSummary.summary, "Motion degraded but interpretable.");
       assert.equal(detail.body.case.qcSummary.checks[0].status, "warn");
       assert.equal(detail.body.case.qcSummary.metrics[0].name, "snr");
@@ -1678,7 +1682,8 @@ test("observability endpoints expose the expected runtime baseline", async () =>
       const metrics = await fetch(`${new URL(root.response.url).origin}/metrics`);
       const metricsBody = await metrics.text();
       assert.equal(metrics.status, 200);
-      assert.equal(metricsBody.includes("mri_standalone_api_info"), true);
+      assert.equal(metricsBody.includes("mri_second_opinion_http_requests_total"), true);
+      assert.equal(metricsBody.includes("mri_second_opinion_http_request_duration_seconds"), true);
     });
   } finally {
     rmSync(tempDir, { recursive: true, force: true });

@@ -23,6 +23,7 @@ import {
   parseReviewCaseInput,
   parseRequeueExpiredInferenceJobsInput,
 } from "./validation";
+import { createPublicApiRateLimiter, metricsMiddleware, writeMetricsResponse } from "./http-runtime";
 
 export interface CreateAppOptions {
   postgresPoolFactory?: PostgresPoolFactory;
@@ -30,6 +31,7 @@ export interface CreateAppOptions {
 
 export function createApp(config: AppConfig, options: CreateAppOptions = {}) {
   const app = express();
+  const publicApiRateLimiter = createPublicApiRateLimiter(config);
   const caseService = new MemoryCaseService({
     caseStoreFilePath: config.caseStoreFile,
     storageMode: config.caseStoreMode,
@@ -42,9 +44,11 @@ export function createApp(config: AppConfig, options: CreateAppOptions = {}) {
 
   app.disable("x-powered-by");
   app.use(requestContextMiddleware);
+  app.use(metricsMiddleware);
   app.use(requestLoggingMiddleware);
   app.use("/api/internal", createInternalAuthMiddleware(config));
-  app.use(express.json());
+  app.use("/api", publicApiRateLimiter);
+  app.use(express.json({ limit: config.jsonBodyLimit ?? "1mb" }));
   app.use("/workbench", express.static(workbenchRoot, { index: false }));
 
   function handleError(res: express.Response, error: unknown) {
@@ -121,11 +125,7 @@ export function createApp(config: AppConfig, options: CreateAppOptions = {}) {
   });
 
   app.get("/metrics", (_req, res) => {
-    res.type("text/plain").send([
-      "# MRI Standalone API baseline metrics placeholder",
-      "# No Prometheus metrics are exported yet.",
-      'mri_standalone_api_info{service="mri-second-opinion",mode="wave1-api"} 1',
-    ].join("\n"));
+    void writeMetricsResponse(res);
   });
 
   app.post("/api/cases", async (req, res) => {
@@ -278,6 +278,20 @@ export function createApp(config: AppConfig, options: CreateAppOptions = {}) {
   });
 
   app.use((error: unknown, _req: express.Request, res: express.Response, _next: express.NextFunction) => {
+    if (
+      typeof error === "object" &&
+      error !== null &&
+      (("type" in error && error.type === "entity.too.large") ||
+        ("status" in error && error.status === 413) ||
+        ("statusCode" in error && error.statusCode === 413))
+    ) {
+      handleError(
+        res,
+        new WorkflowError(413, `Request body exceeded configured limit of ${config.jsonBodyLimit ?? "1mb"}`, "PAYLOAD_TOO_LARGE"),
+      );
+      return;
+    }
+
     if (error instanceof SyntaxError) {
       handleError(res, new WorkflowError(400, "Malformed JSON body", "INVALID_INPUT"));
       return;

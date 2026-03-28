@@ -12,6 +12,8 @@ The repository must not be described as public-launch-ready until every required
 
 Use `releases/public-github-and-mvp-path.md` to distinguish safe public publication from actual MVP closure.
 
+Use `academic/action-plan.md` for all post-launch execution waves. Later waves do not strengthen the current launch verdict automatically; they need their own code, docs, and evidence closure.
+
 ## Gate 1. Repository Independence
 
 - [x] standalone install works from clean checkout

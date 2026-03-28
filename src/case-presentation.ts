@@ -22,7 +22,7 @@ export function presentCaseListItem(caseRecord: CaseRecord) {
 }
 
 export function presentCaseDetail(caseRecord: CaseRecord) {
-  const reportArtifacts = caseRecord.report?.derivedArtifacts ?? [];
+  const reportArtifacts = caseRecord.artifactManifest;
 
   return {
     ...presentCaseListItem(caseRecord),
@@ -45,6 +45,7 @@ export function presentCaseDetail(caseRecord: CaseRecord) {
           artifactCount: reportArtifacts.length,
         }
       : null,
+    artifactManifest: reportArtifacts,
     review: caseRecord.review,
     evidenceCards: caseRecord.evidenceCards,
     history: caseRecord.history,

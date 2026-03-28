@@ -1,4 +1,29 @@
 services:
+  app:
+    build:
+      context: .
+    environment:
+      NODE_ENV: ${NODE_ENV:-development}
+      PORT: ${PORT:-4010}
+      MRI_CASE_STORE_MODE: ${MRI_CASE_STORE_MODE:-sqlite}
+      MRI_CASE_STORE_FILE: /data/cases.sqlite
+    ports:
+      - "${PORT:-4010}:${PORT:-4010}"
+    healthcheck:
+      test:
+        - CMD
+        - node
+        - /app/scripts/container-healthcheck.mjs
+      interval: 10s
+      timeout: 5s
+      retries: 12
+      start_period: 15s
+    init: true
+    restart: unless-stopped
+    stop_grace_period: 15s
+    volumes:
+      - app-data:/data
+
   postgres:
     image: postgres:17-alpine
     environment:
@@ -29,5 +54,6 @@ services:
       - redis-data:/data
 
 volumes:
+  app-data:
   postgres-data:
   redis-data:
