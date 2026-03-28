@@ -223,6 +223,17 @@ const measurementSchema = z.object({
   unit: optionalTrimmedString,
 });
 
+const base64ContentSchema = requiredTrimmedString("artifactPayloads[].contentBase64").refine(
+  (value) => /^(?:[A-Za-z0-9+/]{4})*(?:[A-Za-z0-9+/]{2}==|[A-Za-z0-9+/]{3}=)?$/u.test(value),
+  "artifactPayloads[].contentBase64 must be base64 encoded",
+);
+
+const artifactPayloadSchema = z.object({
+  artifactRef: requiredTrimmedString("artifactPayloads[].artifactRef"),
+  contentType: requiredTrimmedString("artifactPayloads[].contentType"),
+  contentBase64: base64ContentSchema,
+});
+
 const inferenceCallbackSchema = z.object({
   caseId: requiredTrimmedString("caseId"),
   qcDisposition: z.enum(["pass", "warn", "reject"], {
@@ -234,9 +245,41 @@ const inferenceCallbackSchema = z.object({
     invalid_type_error: "measurements must be an array",
   }),
   artifacts: stringArrayField("artifacts"),
+  artifactPayloads: z
+    .preprocess(
+      (value) => (typeof value === "undefined" ? undefined : value),
+      z.array(artifactPayloadSchema, {
+        invalid_type_error: "artifactPayloads must be an array",
+      }).optional(),
+    ),
   issues: optionalStringArrayField("issues"),
   generatedSummary: optionalTrimmedString,
   qcSummary: qcSummarySchema,
+}).superRefine((value, ctx) => {
+  const artifactRefs = new Set(value.artifacts);
+  const artifactPayloadRefs = new Set<string>();
+
+  for (const artifactPayload of value.artifactPayloads ?? []) {
+    if (!artifactRefs.has(artifactPayload.artifactRef)) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: "artifactPayloads entries must reference values present in artifacts",
+        path: ["artifactPayloads"],
+      });
+      return;
+    }
+
+    if (artifactPayloadRefs.has(artifactPayload.artifactRef)) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: "artifactPayloads must not contain duplicate artifactRef values",
+        path: ["artifactPayloads"],
+      });
+      return;
+    }
+
+    artifactPayloadRefs.add(artifactPayload.artifactRef);
+  }
 });
 
 const claimJobInputSchema = z.object({
@@ -289,6 +332,13 @@ export function parseInferenceCallbackInput(body: unknown): {
   input: InferenceCallbackInput;
 } {
   const parsed = parseWithSchema(body, inferenceCallbackSchema);
+  const artifactPayloads = parsed.artifactPayloads as
+    | Array<{
+        artifactRef: string;
+        contentType: string;
+        contentBase64: string;
+      }>
+    | undefined;
   return {
     caseId: parsed.caseId,
     input: {
@@ -300,6 +350,11 @@ export function parseInferenceCallbackInput(body: unknown): {
         unit: measurement.unit as string | undefined,
       })),
       artifacts: parsed.artifacts,
+      artifactPayloads: artifactPayloads?.map((artifactPayload) => ({
+        artifactRef: artifactPayload.artifactRef,
+        contentType: artifactPayload.contentType,
+        contentBase64: artifactPayload.contentBase64,
+      })),
       issues: parsed.issues as string[] | undefined,
       generatedSummary: parsed.generatedSummary as string | undefined,
       qcSummary: parsed.qcSummary as QcSummaryInput | undefined,

@@ -1,5 +1,6 @@
 import {
   createPlannedArtifactPersistenceTargets,
+  type DerivedArtifactDescriptor,
 } from "./case-artifacts";
 import type { CaseRecord, DeliveryJobRecord, InferenceJobRecord, ReportPayload } from "./cases";
 import { getWorkflowPackageManifest } from "./workflow-packages";
@@ -7,6 +8,17 @@ import { getWorkflowPackageManifest } from "./workflow-packages";
 type OperationsSummary = Awaited<
   ReturnType<import("./cases").MemoryCaseService["getOperationsSummary"]>
 >;
+
+function presentArtifactDescriptor(artifact: DerivedArtifactDescriptor) {
+  if (!artifact.retrievalUrl) {
+    return artifact;
+  }
+
+  return {
+    ...artifact,
+    storageUri: artifact.retrievalUrl,
+  };
+}
 
 export function presentCaseListItem(caseRecord: CaseRecord) {
   return {
@@ -26,7 +38,7 @@ export function presentCaseListItem(caseRecord: CaseRecord) {
 }
 
 export function presentCaseDetail(caseRecord: CaseRecord) {
-  const reportArtifacts = caseRecord.artifactManifest;
+  const reportArtifacts = caseRecord.artifactManifest.map((artifact) => presentArtifactDescriptor(artifact));
   const selectedPackage = caseRecord.structuralExecution?.packageId ?? caseRecord.planEnvelope.packageResolution.selectedPackage;
 
   return {
@@ -74,7 +86,7 @@ export function presentReport(report: ReportPayload) {
     uncertaintySummary: report.uncertaintySummary,
     issues: report.issues,
     artifactRefs: report.artifacts,
-    artifacts: report.derivedArtifacts ?? [],
+    artifacts: (report.derivedArtifacts ?? []).map((artifact) => presentArtifactDescriptor(artifact)),
     provenance: report.provenance,
     reviewStatus: report.reviewStatus,
     disclaimerProfile: report.disclaimerProfile,

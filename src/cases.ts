@@ -1,4 +1,4 @@
-import { randomUUID } from "node:crypto";
+import { createHash, randomUUID } from "node:crypto";
 import {
   ALLOWED_TRANSITIONS,
   createStructuralExecutionEnvelope,
@@ -24,6 +24,12 @@ import {
   type StudyContextRecord,
 } from "./case-imaging";
 import type { DerivedArtifactDescriptor } from "./case-artifacts";
+import {
+  getDefaultArtifactStoreRoot,
+  persistArtifactPayloads,
+  readPersistedArtifact,
+  type ArtifactPayloadInput,
+} from "./case-artifact-storage";
 
 export const CASE_STATUSES = [
   "INGESTING",
@@ -95,6 +101,7 @@ export interface InferenceCallbackInput {
   findings: string[];
   measurements: Array<{ label: string; value: number; unit?: string }>;
   artifacts: string[];
+  artifactPayloads?: ArtifactPayloadInput[];
   issues?: string[];
   generatedSummary?: string;
   qcSummary?: QcSummaryInput;
@@ -320,6 +327,7 @@ export interface MemoryCaseServiceOptions {
   caseStoreSchema?: string;
   postgresPoolFactory?: PostgresPoolFactory;
   repository?: CaseRepository;
+  artifactStoreRoot?: string;
 }
 
 export interface PersistedCaseSnapshot {
@@ -429,6 +437,11 @@ function createInferenceFingerprint(input: InferenceCallbackInput) {
     findings: input.findings,
     measurements: normalizeMeasurementSet(input.measurements),
     artifacts: input.artifacts,
+    artifactPayloads: (input.artifactPayloads ?? []).map((artifactPayload) => ({
+      artifactRef: artifactPayload.artifactRef,
+      contentType: artifactPayload.contentType,
+      contentDigest: createHash("sha256").update(artifactPayload.contentBase64).digest("hex"),
+    })),
     issues: input.issues ?? [],
     generatedSummary: input.generatedSummary ?? null,
   });
@@ -440,8 +453,13 @@ function isConcurrentStoreModificationError(error: unknown) {
 
 export class MemoryCaseService {
   private readonly repository: CaseRepository;
+  private readonly artifactStoreRoot: string;
 
   constructor(private readonly options: MemoryCaseServiceOptions = {}) {
+    this.artifactStoreRoot =
+      options.artifactStoreRoot ??
+      getDefaultArtifactStoreRoot(options.caseStoreFilePath ?? options.snapshotFilePath);
+
     if (options.repository) {
       this.repository = options.repository;
       return;
@@ -610,7 +628,17 @@ export class MemoryCaseService {
         issues: normalizedInput.issues,
         qcSummary: normalizedInput.qcSummary,
       });
-      record.artifactManifest = createArtifactManifest(record, normalizedInput, completedAt);
+      const persistedArtifactPayloads = persistArtifactPayloads({
+        artifactStoreRoot: this.artifactStoreRoot,
+        caseId: record.caseId,
+        artifactPayloads: normalizedInput.artifactPayloads ?? [],
+      });
+      record.artifactManifest = createArtifactManifest(
+        record,
+        normalizedInput,
+        completedAt,
+        persistedArtifactPayloads,
+      );
       if (record.structuralExecution) {
         record.structuralExecution.artifactIds = record.artifactManifest.map((artifact) => artifact.artifactId);
       }
@@ -1051,6 +1079,26 @@ export class MemoryCaseService {
     ) as ReportPayload;
   }
 
+  async getArtifact(caseId: string, artifactId: string) {
+    const record = await this.requireCase(caseId);
+    const artifact = record.artifactManifest.find((entry) => entry.artifactId === artifactId);
+
+    if (!artifact) {
+      throw new WorkflowError(404, "Artifact is not available for this case", "ARTIFACT_NOT_FOUND");
+    }
+
+    const persistedArtifact = readPersistedArtifact(artifact.storageUri);
+
+    if (!persistedArtifact) {
+      throw new WorkflowError(404, "Artifact content is not available for this case", "ARTIFACT_NOT_AVAILABLE");
+    }
+
+    return {
+      artifact: cloneCase(artifact),
+      content: persistedArtifact.content,
+    };
+  }
+
   async getOperationsSummary() {
     const byStatus = Object.fromEntries(CASE_STATUSES.map((status) => [status, 0])) as Record<CaseStatus, number>;
     const caseRecords = await this.repository.values();
@@ -1127,6 +1175,30 @@ export class MemoryCaseService {
       throw new WorkflowError(400, "findings, measurements, and artifacts are required arrays", "INVALID_INPUT");
     }
 
+    const artifacts = input.artifacts.map((value) => String(value));
+    const artifactPayloads = Array.isArray(input.artifactPayloads)
+      ? input.artifactPayloads.map((artifactPayload) => ({
+          artifactRef: assertNonEmptyString(artifactPayload.artifactRef, "artifactPayload.artifactRef"),
+          contentType: assertNonEmptyString(artifactPayload.contentType, "artifactPayload.contentType"),
+          contentBase64: assertNonEmptyString(artifactPayload.contentBase64, "artifactPayload.contentBase64"),
+        }))
+      : [];
+    const artifactRefs = new Set(artifacts);
+
+    if (new Set(artifactPayloads.map((artifactPayload) => artifactPayload.artifactRef)).size !== artifactPayloads.length) {
+      throw new WorkflowError(400, "artifactPayloads must not contain duplicate artifactRef values", "INVALID_INPUT");
+    }
+
+    for (const artifactPayload of artifactPayloads) {
+      if (!artifactRefs.has(artifactPayload.artifactRef)) {
+        throw new WorkflowError(
+          400,
+          "artifactPayloads entries must reference values present in artifacts",
+          "INVALID_INPUT",
+        );
+      }
+    }
+
     return {
       qcDisposition: input.qcDisposition,
       findings: input.findings.map((value) => String(value)),
@@ -1135,7 +1207,8 @@ export class MemoryCaseService {
         value: measurement.value,
         unit: measurement.unit,
       })),
-      artifacts: input.artifacts.map((value) => String(value)),
+      artifacts,
+      artifactPayloads: artifactPayloads.length > 0 ? artifactPayloads : undefined,
       issues: Array.isArray(input.issues) ? input.issues.map((value) => String(value)) : [],
       generatedSummary: input.generatedSummary,
       qcSummary: input.qcSummary,

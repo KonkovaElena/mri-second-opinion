@@ -91,6 +91,7 @@ export function createApp(config: AppConfig, options: CreateAppOptions = {}) {
           "POST /api/cases/:caseId/review",
           "POST /api/cases/:caseId/finalize",
           "GET /api/cases/:caseId/report",
+          "GET /api/cases/:caseId/artifacts/:artifactId",
           "GET /api/operations/summary",
           "POST /api/delivery/:caseId/retry",
         ],
@@ -185,6 +186,17 @@ export function createApp(config: AppConfig, options: CreateAppOptions = {}) {
   app.get("/api/cases/:caseId/report", async (req, res) => {
     try {
       res.json({ report: presentReport(await caseService.getReport(req.params.caseId)) });
+    } catch (error) {
+      handleError(res, error);
+    }
+  });
+
+  app.get("/api/cases/:caseId/artifacts/:artifactId", async (req, res) => {
+    try {
+      const artifact = await caseService.getArtifact(req.params.caseId, req.params.artifactId);
+      res.setHeader("content-type", artifact.artifact.mimeType);
+      res.setHeader("content-length", String(artifact.content.byteLength));
+      res.send(artifact.content);
     } catch (error) {
       handleError(res, error);
     }

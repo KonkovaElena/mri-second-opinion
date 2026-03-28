@@ -150,6 +150,12 @@ export function normalizeStoredCaseRecord(parsed: CaseRecord): CaseRecord {
   );
   const normalizedArtifactManifest = artifactManifest.map((artifact) => ({
     ...artifact,
+    retrievalUrl:
+      typeof artifact.retrievalUrl === "string"
+        ? artifact.retrievalUrl
+        : artifact.storageUri.startsWith("file://")
+          ? `/api/cases/${parsed.caseId}/artifacts/${artifact.artifactId}`
+          : null,
     producingPackageId: artifact.producingPackageId ?? selectedPackageManifest?.packageId ?? null,
     producingPackageVersion: artifact.producingPackageVersion ?? selectedPackageManifest?.packageVersion ?? null,
     workflowFamily: artifact.workflowFamily ?? (selectedPackageManifest?.workflowFamily ?? "brain-structural"),

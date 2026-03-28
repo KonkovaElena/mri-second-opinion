@@ -9,6 +9,7 @@ import type {
   ReportPayload,
   StructuralExecutionEnvelope,
 } from "./cases";
+import type { ArtifactStorageOverride } from "./case-artifacts";
 import type { StudyContextRecord } from "./case-imaging";
 import { createDerivedArtifactDescriptors } from "./case-artifacts";
 import { missingRequiredSequences, nowIso } from "./case-common";
@@ -298,6 +299,7 @@ export function createArtifactManifest(
   caseRecord: CaseRecord,
   input: InferenceCallbackInput,
   generatedAt = nowIso(),
+  artifactStorageOverrides?: ArtifactStorageOverride[],
 ) {
   const packageManifest = getWorkflowPackageManifest(caseRecord.planEnvelope.packageResolution.selectedPackage);
 
@@ -308,6 +310,7 @@ export function createArtifactManifest(
     studyContext: caseRecord.studyContext,
     generatedAt,
     packageManifest,
+    artifactStorageOverrides,
   });
 }
 

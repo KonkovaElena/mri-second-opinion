@@ -450,6 +450,7 @@ test("public case lifecycle reaches delivery failure and retry path", async () =
       assert.equal(report.body.report.artifacts[1].artifactType, "qc-summary");
       assert.equal(report.body.report.artifacts[0].viewerReady, true);
       assert.equal(report.body.report.artifacts[0].viewerDescriptor.viewerMode, "dicom-overlay");
+      assert.equal(report.body.report.artifacts[0].retrievalUrl, null);
 
       const retry = await jsonRequest(`/api/delivery/${caseId}/retry`, {
         method: "POST",
@@ -479,6 +480,7 @@ test("public case lifecycle reaches delivery failure and retry path", async () =
       assert.equal(detail.body.case.artifactManifest.length, 2);
       assert.equal(detail.body.case.artifactManifest[0].archiveLocator.studyInstanceUid, "2.25.12345");
       assert.equal(detail.body.case.artifactManifest[1].artifactType, "qc-summary");
+      assert.equal(detail.body.case.artifactManifest[0].retrievalUrl, null);
       assert.equal(detail.body.case.qcSummary.summary, "Motion degraded but interpretable.");
       assert.equal(detail.body.case.qcSummary.checks[0].status, "warn");
       assert.equal(detail.body.case.qcSummary.metrics[0].name, "snr");
@@ -595,6 +597,161 @@ test("case detail exposes persisted execution contracts after restart", async ()
     });
   } finally {
     rmSync(tempDir, { recursive: true, force: true });
+  }
+});
+
+test("artifact payloads are persisted and retrievable across sqlite restarts", async () => {
+  const { tempDir, caseStoreFile } = createTestStoreFile();
+
+  try {
+    let caseId = "";
+
+    await withServer(caseStoreFile, async ({ jsonRequest }) => {
+      const created = await jsonRequest("/api/cases", {
+        method: "POST",
+        body: JSON.stringify({
+          patientAlias: "synthetic-patient-artifact-persist-001",
+          studyUid: "1.2.840.artifact.persist.1",
+          sequenceInventory: ["T1w", "FLAIR"],
+          studyContext: {
+            studyInstanceUid: "2.25.artifact.persist.1",
+            accessionNumber: "ACC-ART-001",
+            studyDate: "2026-03-28",
+            sourceArchive: "pacs-demo",
+            dicomWebBaseUrl: "https://dicom.example.test/studies/2.25.artifact.persist.1",
+            metadataSummary: ["Artifact payload persistence demo"],
+            series: [
+              {
+                seriesInstanceUid: "2.25.artifact.persist.1.1",
+                seriesDescription: "Sag T1 MPRAGE",
+                modality: "MR",
+                sequenceLabel: "T1w",
+                instanceCount: 176,
+              },
+            ],
+          },
+        }),
+      });
+
+      assert.equal(created.response.status, 201);
+      caseId = created.body.case.caseId as string;
+
+      const inferred = await jsonRequest("/api/internal/inference-callback", {
+        method: "POST",
+        body: JSON.stringify({
+          caseId,
+          qcDisposition: "pass",
+          findings: ["Persisted artifact payload verification."],
+          measurements: [{ label: "brain_volume_ml", value: 1108 }],
+          artifacts: ["artifact://overlay-preview", "artifact://qc-summary"],
+          artifactPayloads: [
+            {
+              artifactRef: "artifact://overlay-preview",
+              contentType: "image/png",
+              contentBase64: Buffer.from("PNG-DEMO-ARTIFACT", "utf-8").toString("base64"),
+            },
+            {
+              artifactRef: "artifact://qc-summary",
+              contentType: "application/json",
+              contentBase64: Buffer.from(JSON.stringify({ summary: "qc-ok", checks: 1 }), "utf-8").toString("base64"),
+            },
+          ],
+          generatedSummary: "Artifact payload draft generated.",
+        }),
+      });
+
+      assert.equal(inferred.response.status, 200);
+      assert.equal(inferred.body.case.status, "AWAITING_REVIEW");
+    });
+
+    await withServer(caseStoreFile, async ({ baseUrl, jsonRequest }) => {
+      const detail = await jsonRequest(`/api/cases/${caseId}`);
+
+      assert.equal(detail.response.status, 200);
+      const overlayArtifact = detail.body.case.artifactManifest.find(
+        (artifact: { artifactType: string }) => artifact.artifactType === "overlay-preview",
+      );
+      const qcArtifact = detail.body.case.artifactManifest.find(
+        (artifact: { artifactType: string }) => artifact.artifactType === "qc-summary",
+      );
+
+      assert.equal(typeof overlayArtifact.retrievalUrl, "string");
+      assert.equal(overlayArtifact.storageUri, overlayArtifact.retrievalUrl);
+      assert.equal(typeof qcArtifact.retrievalUrl, "string");
+      assert.equal(qcArtifact.storageUri, qcArtifact.retrievalUrl);
+
+      const overlayResponse = await fetch(`${baseUrl}${overlayArtifact.retrievalUrl}`);
+      assert.equal(overlayResponse.status, 200);
+      assert.equal(overlayResponse.headers.get("content-type"), "image/png");
+      assert.equal(Buffer.from(await overlayResponse.arrayBuffer()).toString("utf-8"), "PNG-DEMO-ARTIFACT");
+
+      const qcResponse = await fetch(`${baseUrl}${qcArtifact.retrievalUrl}`);
+      assert.equal(qcResponse.status, 200);
+      assert.equal(qcResponse.headers.get("content-type"), "application/json");
+      assert.deepEqual(JSON.parse(await qcResponse.text()), { summary: "qc-ok", checks: 1 });
+    });
+  } finally {
+    rmSync(tempDir, { recursive: true, force: true });
+  }
+});
+
+test("postgres-backed cases retain artifact retrieval metadata after restart", async () => {
+  const store = createPostgresTestStore();
+
+  try {
+    let caseId = "";
+
+    await withPostgresServer(store, async ({ jsonRequest }) => {
+      const created = await jsonRequest("/api/cases", {
+        method: "POST",
+        body: JSON.stringify({
+          patientAlias: "synthetic-patient-artifact-postgres-001",
+          studyUid: "1.2.840.artifact.postgres.1",
+          sequenceInventory: ["T1w", "FLAIR"],
+        }),
+      });
+
+      assert.equal(created.response.status, 201);
+      caseId = created.body.case.caseId as string;
+
+      const inferred = await jsonRequest("/api/internal/inference-callback", {
+        method: "POST",
+        body: JSON.stringify({
+          caseId,
+          qcDisposition: "pass",
+          findings: ["Postgres artifact metadata verification."],
+          measurements: [{ label: "brain_volume_ml", value: 1099 }],
+          artifacts: ["artifact://qc-summary"],
+          artifactPayloads: [
+            {
+              artifactRef: "artifact://qc-summary",
+              contentType: "application/json",
+              contentBase64: Buffer.from(JSON.stringify({ source: "postgres" }), "utf-8").toString("base64"),
+            },
+          ],
+          generatedSummary: "Postgres artifact draft generated.",
+        }),
+      });
+
+      assert.equal(inferred.response.status, 200);
+      assert.equal(inferred.body.case.status, "AWAITING_REVIEW");
+    });
+
+    await withPostgresServer(store, async ({ baseUrl, jsonRequest }) => {
+      const detail = await jsonRequest(`/api/cases/${caseId}`);
+      assert.equal(detail.response.status, 200);
+
+      const artifact = detail.body.case.artifactManifest[0];
+      assert.equal(typeof artifact.retrievalUrl, "string");
+      assert.equal(artifact.storageUri, artifact.retrievalUrl);
+
+      const artifactResponse = await fetch(`${baseUrl}${artifact.retrievalUrl}`);
+      assert.equal(artifactResponse.status, 200);
+      assert.equal(artifactResponse.headers.get("content-type"), "application/json");
+      assert.deepEqual(JSON.parse(await artifactResponse.text()), { source: "postgres" });
+    });
+  } finally {
+    rmSync(store.tempDir, { recursive: true, force: true });
   }
 });
 
