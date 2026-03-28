@@ -109,11 +109,11 @@ In practical terms, that means:
 |---|---|---|
 | Control plane | standalone TypeScript API | typed workflow core with stronger orchestration seams |
 | Workflow durability | SQLite-backed default store plus a locally verified PostgreSQL path | release-linked PostgreSQL operations and broader durable workflow truth |
-| Async execution | local durable delivery-job queue plus callback completion baseline | broader queue-backed execution and retry dispatch |
+| Async execution | local durable inference and delivery queues, bounded dispatch leases, and persisted execution-contract truth on case detail and report surfaces | broader queue-backed execution and retry dispatch |
 | Imaging boundary | documented only | Orthanc plus DICOMWeb |
 | Compute plane | callback contract only | Python MRI QC and inference workers |
 | Review surface | built-in synthetic-demo workbench on top of the current API | OHIF-backed clinician review workspace |
-| Artifact layer | report artifacts plus typed derived descriptors with archive-link metadata | object-store-backed derived artifacts and export payloads |
+| Artifact layer | typed derived descriptors with archive-link metadata plus package-provenance artifact manifests | object-store-backed derived artifacts and export payloads |
 
 ## What Works Today
 
@@ -132,10 +132,12 @@ Implemented and verified in this repository today:
 9. report payloads that preserve legacy artifact refs alongside typed derived artifact descriptors with conservative viewer-ready semantics
 10. built-in `GET /workbench` review surface for queue visibility, case detail, review, finalize, report preview, operations summary, and delivery retry over the live API
 11. explicit worker-facing delivery queue claim path backed by durable records and restart survival proof
-12. explicit worker-facing inference queue list, claim, and expired-claim requeue paths backed by durable records and restart survival proof
-13. internal separation between orchestration, planning, and snapshot-repository seams while preserving the HTTP contract
-14. Wave 1 public-edge hardening with request-size limits, public API rate limiting, Node HTTP timeout guards, and graceful shutdown hooks
-15. root container packaging plus a compose app-service bring-up path for the current standalone runtime baseline
+12. explicit worker-facing inference queue list, claim, expired-claim requeue, dispatch claim, and dispatch heartbeat paths backed by durable records and restart survival proof
+13. HMAC-signed protection for `/api/internal/dispatch/*` when `MRI_HMAC_SECRET` is configured, layered on top of namespace bearer-token protection
+14. persisted workflow package manifest, structural execution envelope, and package-provenance artifact manifest surfaces on case detail and report responses
+15. internal separation between orchestration, planning, and snapshot-repository seams while preserving the HTTP contract
+16. Wave 1 public-edge hardening with request-size limits, public API rate limiting, Node HTTP timeout guards, and graceful shutdown hooks
+17. root container packaging plus a compose app-service bring-up path for the current standalone runtime baseline
 
 ## What Does Not Exist Yet
 
@@ -210,7 +212,9 @@ If `MRI_INTERNAL_API_TOKEN` is set, every `api/internal/*` route requires `Autho
 
 This is the current namespace-level protection seam for worker-facing HTTP routes.
 
-HMAC request signing and replay resistance remain future hardening work.
+If `MRI_HMAC_SECRET` is set, `/api/internal/dispatch/*` additionally requires `X-MRI-Timestamp`, `X-MRI-Nonce`, and `X-MRI-Signature` headers.
+
+That HMAC layer is currently scoped to the bounded dispatch claim and heartbeat seam rather than to the entire internal namespace.
 
 The root route also exposes the live route inventory and points readers to scope, launch-readiness, and verdict docs.
 

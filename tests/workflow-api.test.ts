@@ -491,6 +491,113 @@ test("public case lifecycle reaches delivery failure and retry path", async () =
   }
 });
 
+test("case detail exposes persisted execution contracts after restart", async () => {
+  const { tempDir, caseStoreFile } = createTestStoreFile();
+
+  try {
+    let caseId = "";
+    let claimedAt: string | null = null;
+
+    await withServer(caseStoreFile, async ({ jsonRequest }) => {
+      const created = await jsonRequest("/api/cases", {
+        method: "POST",
+        body: JSON.stringify({
+          patientAlias: "synthetic-patient-execution-contract-001",
+          studyUid: "1.2.840.execution.contract.1",
+          sequenceInventory: ["T1w", "FLAIR"],
+          studyContext: {
+            studyInstanceUid: "2.25.execution.contract.1",
+            accessionNumber: "ACC-EXEC-001",
+            studyDate: "2026-03-28",
+            sourceArchive: "pacs-demo",
+            dicomWebBaseUrl: "https://dicom.example.test/studies/2.25.execution.contract.1",
+            metadataSummary: ["Execution contract demo study"],
+            series: [
+              {
+                seriesInstanceUid: "2.25.execution.contract.1.1",
+                seriesDescription: "Sag T1 MPRAGE",
+                modality: "MR",
+                sequenceLabel: "T1w",
+                instanceCount: 176,
+              },
+            ],
+          },
+        }),
+      });
+
+      assert.equal(created.response.status, 201);
+      caseId = created.body.case.caseId as string;
+
+      const claim = await jsonRequest("/api/internal/inference-jobs/claim-next", {
+        method: "POST",
+        body: JSON.stringify({ workerId: "execution-contract-worker" }),
+      });
+
+      assert.equal(claim.response.status, 200);
+      assert.equal(claim.body.job.caseId, caseId);
+      claimedAt = claim.body.job.claimedAt as string;
+
+      const inferred = await jsonRequest("/api/internal/inference-callback", {
+        method: "POST",
+        body: JSON.stringify({
+          caseId,
+          qcDisposition: "pass",
+          findings: ["Execution contract API verification."],
+          measurements: [{ label: "brain_volume_ml", value: 1114 }],
+          artifacts: ["artifact://overlay-preview", "artifact://qc-summary"],
+          generatedSummary: "Execution contract API draft.",
+          qcSummary: {
+            summary: "API execution contract QC summary.",
+            checks: [
+              {
+                checkId: "motion",
+                status: "pass",
+                detail: "No meaningful motion artifact.",
+              },
+            ],
+            metrics: [
+              {
+                name: "snr",
+                value: 22.1,
+                unit: "ratio",
+              },
+            ],
+          },
+        }),
+      });
+
+      assert.equal(inferred.response.status, 200);
+      assert.equal(inferred.body.case.status, "AWAITING_REVIEW");
+    });
+
+    await withServer(caseStoreFile, async ({ jsonRequest }) => {
+      const detail = await jsonRequest(`/api/cases/${caseId}`);
+
+      assert.equal(detail.response.status, 200);
+      assert.equal(detail.body.case.packageManifest.packageId, "brain-structural-fastsurfer");
+      assert.equal(detail.body.case.packageManifest.packageVersion, "0.1.0");
+      assert.equal(detail.body.case.packageManifest.outputContracts.artifacts.length, 4);
+      assert.equal(detail.body.case.structuralExecution.packageId, "brain-structural-fastsurfer");
+      assert.equal(detail.body.case.structuralExecution.executionStatus, "completed");
+      assert.equal(detail.body.case.structuralExecution.dispatchedAt, claimedAt);
+      assert.equal(detail.body.case.structuralExecution.resourceClass, "light-gpu");
+      assert.equal(detail.body.case.structuralExecution.artifactIds.length, 2);
+      assert.equal(detail.body.case.artifactManifest[0].producingPackageId, "brain-structural-fastsurfer");
+      assert.equal(detail.body.case.artifactManifest[0].producingPackageVersion, "0.1.0");
+      assert.equal(detail.body.case.artifactManifest[0].workflowFamily, "brain-structural");
+      assert.deepEqual(detail.body.case.artifactManifest[0].exportCompatibilityTags, ["internal-json", "rendered-report"]);
+
+      const report = await jsonRequest(`/api/cases/${caseId}/report`);
+
+      assert.equal(report.response.status, 200);
+      assert.equal(report.body.report.provenance.workflowVersion, "brain-structural-fastsurfer@0.1.0");
+      assert.equal(report.body.report.artifacts[0].producingPackageId, "brain-structural-fastsurfer");
+    });
+  } finally {
+    rmSync(tempDir, { recursive: true, force: true });
+  }
+});
+
 test("internal ingest rejects a case when T1w is missing", async () => {
   const { tempDir, caseStoreFile } = createTestStoreFile();
 

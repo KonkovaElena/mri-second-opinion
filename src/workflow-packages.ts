@@ -74,3 +74,17 @@ export function getWorkflowPackageManifest(packageId: string | null | undefined)
     operatorWarnings: [...manifest.operatorWarnings],
   };
 }
+
+export function formatWorkflowPackageVersion(
+  manifest:
+    | Pick<WorkflowPackageManifest, "packageId" | "packageVersion">
+    | { packageId: string; packageVersion: string }
+    | null
+    | undefined,
+) {
+  if (!manifest) {
+    return null;
+  }
+
+  return `${manifest.packageId}@${manifest.packageVersion}`;
+}

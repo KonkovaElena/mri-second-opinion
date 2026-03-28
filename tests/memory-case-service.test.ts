@@ -193,6 +193,81 @@ test("inference queue survives snapshot-mode restart and can be claimed", async 
   }
 });
 
+test("structural execution contract and artifact provenance survive snapshot restart", async () => {
+  const { tempDir, caseStoreFile } = createStorePath();
+  const services: MemoryCaseService[] = [];
+
+  try {
+    const first = new MemoryCaseService({
+      snapshotFilePath: caseStoreFile,
+      storageMode: "snapshot",
+    });
+    services.push(first);
+
+    const created = await first.createCase({
+      patientAlias: "snapshot-execution-contract",
+      studyUid: "1.2.3.snapshot.execution.contract",
+      sequenceInventory: ["T1w", "FLAIR"],
+      studyContext: {
+        studyInstanceUid: "2.25.snapshot.execution.contract",
+        sourceArchive: "orthanc-demo",
+        dicomWebBaseUrl: "https://dicom.example.test/studies/2.25.snapshot.execution.contract",
+        series: [
+          {
+            seriesInstanceUid: "2.25.snapshot.execution.contract.1",
+            sequenceLabel: "T1w",
+          },
+        ],
+      },
+    });
+
+    const claimed = await first.claimNextInferenceJob("snapshot-contract-worker");
+    assert.notEqual(claimed, null);
+
+    await first.completeInference(created.caseId, {
+      qcDisposition: "pass",
+      findings: ["Execution contract persistence verification."],
+      measurements: [{ label: "brain_volume_ml", value: 1112 }],
+      artifacts: ["artifact://overlay-preview", "artifact://qc-summary"],
+      generatedSummary: "Execution contract draft.",
+    });
+
+    const second = new MemoryCaseService({
+      snapshotFilePath: caseStoreFile,
+      storageMode: "snapshot",
+    });
+    services.push(second);
+
+    const reloaded = await second.getCase(created.caseId);
+
+    assert.notEqual(reloaded.structuralExecution, null);
+    assert.equal(reloaded.structuralExecution?.packageId, "brain-structural-fastsurfer");
+    assert.equal(reloaded.structuralExecution?.packageVersion, "0.1.0");
+    assert.equal(reloaded.structuralExecution?.manifestSchemaVersion, "0.1.0");
+    assert.equal(reloaded.structuralExecution?.executionStatus, "completed");
+    assert.equal(reloaded.structuralExecution?.resourceClass, "light-gpu");
+    assert.equal(reloaded.structuralExecution?.callbackSource, "internal-inference");
+    assert.equal(reloaded.structuralExecution?.dispatchedAt, claimed?.claimedAt ?? null);
+    assert.equal(reloaded.structuralExecution?.artifactIds.length, 2);
+    assert.deepEqual(
+      reloaded.structuralExecution?.artifactIds,
+      reloaded.artifactManifest.map((artifact) => artifact.artifactId),
+    );
+
+    assert.equal(reloaded.artifactManifest.length, 2);
+    assert.equal(reloaded.artifactManifest[0].producingPackageId, "brain-structural-fastsurfer");
+    assert.equal(reloaded.artifactManifest[0].producingPackageVersion, "0.1.0");
+    assert.equal(reloaded.artifactManifest[0].workflowFamily, "brain-structural");
+    assert.deepEqual(reloaded.artifactManifest[0].exportCompatibilityTags, ["internal-json", "rendered-report"]);
+    assert.equal(reloaded.report?.provenance.workflowVersion, "brain-structural-fastsurfer@0.1.0");
+  } finally {
+    for (const service of services) {
+      await service.close();
+    }
+    rmSync(tempDir, { recursive: true, force: true });
+  }
+});
+
 test("expired claimed inference jobs are requeued in snapshot mode", async () => {
   const { tempDir, caseStoreFile } = createStorePath();
   const services: MemoryCaseService[] = [];
@@ -543,8 +618,10 @@ test("legacy sqlite report payloads backfill derivedArtifacts on restart", async
         .get(created.caseId) as { payload_json: string };
       const payload = JSON.parse(row.payload_json) as {
         report: Record<string, unknown>;
+        structuralExecution?: Record<string, unknown>;
       };
       delete payload.report.derivedArtifacts;
+      delete payload.structuralExecution;
       database
         .prepare("UPDATE case_records SET payload_json = ? WHERE case_id = ?")
         .run(JSON.stringify(payload), created.caseId);
@@ -559,9 +636,13 @@ test("legacy sqlite report payloads backfill derivedArtifacts on restart", async
     services.push(second);
 
     const report = await second.getReport(created.caseId);
+    const reloaded = await second.getCase(created.caseId);
     assert.equal(report.derivedArtifacts.length, 2);
     assert.equal(report.derivedArtifacts[0].artifactType, "overlay-preview");
     assert.equal(report.derivedArtifacts[0].viewerReady, true);
+    assert.notEqual(reloaded.structuralExecution, null);
+    assert.equal(reloaded.structuralExecution?.packageId, "brain-structural-fastsurfer");
+    assert.equal(reloaded.structuralExecution?.executionStatus, "completed");
   } finally {
     for (const service of services) {
       await service.close();

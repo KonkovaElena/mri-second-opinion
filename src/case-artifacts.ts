@@ -1,4 +1,5 @@
 import type { StudyContextRecord } from "./case-imaging";
+import type { WorkflowPackageManifest } from "./workflow-packages";
 
 export type DerivedArtifactType =
   | "qc-summary"
@@ -28,6 +29,10 @@ export interface DerivedArtifactDescriptor {
   label: string;
   storageUri: string;
   mimeType: string;
+  producingPackageId: string | null;
+  producingPackageVersion: string | null;
+  workflowFamily: "brain-structural";
+  exportCompatibilityTags: string[];
   archiveLocator: ArchiveLocator;
   viewerReady: boolean;
   viewerDescriptor: ViewerDescriptor | null;
@@ -182,6 +187,7 @@ export function createDerivedArtifactDescriptors(input: {
   artifactRefs: string[];
   studyContext: StudyContextRecord;
   generatedAt: string;
+  packageManifest?: WorkflowPackageManifest | null;
 }): DerivedArtifactDescriptor[] {
   const archiveLocator = createArchiveLocator(input.studyContext);
 
@@ -198,6 +204,10 @@ export function createDerivedArtifactDescriptors(input: {
       label: labelForArtifactType(artifactType),
       storageUri: reference,
       mimeType: mimeTypeForArtifactType(artifactType),
+      producingPackageId: input.packageManifest?.packageId ?? null,
+      producingPackageVersion: input.packageManifest?.packageVersion ?? null,
+      workflowFamily: input.packageManifest?.workflowFamily ?? "brain-structural",
+      exportCompatibilityTags: [...(input.packageManifest?.outputContracts.exportCompatibility ?? [])],
       archiveLocator,
       viewerReady: viewerDescriptor !== null,
       viewerDescriptor,

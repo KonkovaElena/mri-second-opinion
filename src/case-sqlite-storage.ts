@@ -2,7 +2,9 @@ import { mkdirSync } from "node:fs";
 import { dirname } from "node:path";
 import { DatabaseSync } from "node:sqlite";
 import type { CaseRecord, DeliveryJobRecord, InferenceJobRecord } from "./cases";
+import { backfillStructuralExecutionEnvelope } from "./case-planning";
 import { createDerivedArtifactDescriptors } from "./case-artifacts";
+import { formatWorkflowPackageVersion, getWorkflowPackageManifest } from "./workflow-packages";
 
 export interface LoadedSqliteCaseRecord {
   caseRecord: CaseRecord;
@@ -111,6 +113,12 @@ export function openCaseDatabase(databaseFilePath: string) {
 
 export function parseStoredCaseRecord(payloadJson: string): LoadedSqliteCaseRecord {
   const parsed = JSON.parse(payloadJson) as CaseRecord;
+  return {
+    caseRecord: normalizeStoredCaseRecord(parsed),
+  };
+}
+
+export function normalizeStoredCaseRecord(parsed: CaseRecord): CaseRecord {
   const studyContext = {
     ...parsed.studyContext,
     studyInstanceUid:
@@ -134,23 +142,58 @@ export function parseStoredCaseRecord(payloadJson: string): LoadedSqliteCaseReco
           artifactRefs: parsed.report.artifacts ?? [],
           studyContext,
           generatedAt: parsed.report.provenance.generatedAt,
+          packageManifest: getWorkflowPackageManifest(parsed.planEnvelope.packageResolution.selectedPackage),
         })
       : []);
+  const selectedPackageManifest = getWorkflowPackageManifest(
+    parsed.structuralExecution?.packageId ?? parsed.planEnvelope.packageResolution.selectedPackage,
+  );
+  const normalizedArtifactManifest = artifactManifest.map((artifact) => ({
+    ...artifact,
+    producingPackageId: artifact.producingPackageId ?? selectedPackageManifest?.packageId ?? null,
+    producingPackageVersion: artifact.producingPackageVersion ?? selectedPackageManifest?.packageVersion ?? null,
+    workflowFamily: artifact.workflowFamily ?? (selectedPackageManifest?.workflowFamily ?? "brain-structural"),
+    exportCompatibilityTags: Array.isArray(artifact.exportCompatibilityTags)
+      ? [...artifact.exportCompatibilityTags]
+      : [...(selectedPackageManifest?.outputContracts.exportCompatibility ?? [])],
+  }));
   const report = parsed.report
     ? {
         ...parsed.report,
         derivedArtifacts: undefined,
+        provenance: {
+          ...parsed.report.provenance,
+          workflowVersion:
+            parsed.report.provenance.workflowVersion ??
+            formatWorkflowPackageVersion(parsed.structuralExecution ?? selectedPackageManifest) ??
+            "brain-structural-fastsurfer@0.1.0",
+        },
       }
     : null;
+  const structuralExecution = parsed.structuralExecution
+    ? {
+        ...parsed.structuralExecution,
+        artifactIds: Array.isArray(parsed.structuralExecution.artifactIds)
+          ? [...parsed.structuralExecution.artifactIds]
+          : normalizedArtifactManifest.map((artifact) => artifact.artifactId),
+      }
+    : backfillStructuralExecutionEnvelope({
+        caseRecord: {
+          ...parsed,
+          studyContext,
+          artifactManifest: normalizedArtifactManifest,
+          report,
+        },
+        artifactIds: normalizedArtifactManifest.map((artifact) => artifact.artifactId),
+      });
 
   return {
-    caseRecord: {
-      ...parsed,
-      studyContext,
-      artifactManifest,
-      report,
-      lastInferenceFingerprint: parsed.lastInferenceFingerprint ?? null,
-    },
+    ...parsed,
+    studyContext,
+    structuralExecution,
+    artifactManifest: normalizedArtifactManifest,
+    report,
+    lastInferenceFingerprint: parsed.lastInferenceFingerprint ?? null,
   };
 }
 

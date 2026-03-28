@@ -11,6 +11,7 @@ import {
 import { dirname } from "node:path";
 import { randomUUID } from "node:crypto";
 import type { CaseRecord, DeliveryJobRecord, InferenceJobRecord, PersistedCaseSnapshot } from "./cases";
+import { normalizeStoredCaseRecord } from "./case-sqlite-storage";
 
 function cloneCase<T>(value: T): T {
   return JSON.parse(JSON.stringify(value)) as T;
@@ -43,10 +44,7 @@ export function loadPersistedCaseSnapshot(snapshotFilePath?: string) {
 
   return {
     revision: parsed.revision,
-    cases: parsed.cases.map((caseRecord) => ({
-      ...caseRecord,
-      lastInferenceFingerprint: caseRecord.lastInferenceFingerprint ?? null,
-    })),
+    cases: parsed.cases.map((caseRecord) => normalizeStoredCaseRecord(caseRecord)),
     deliveryJobs: Array.isArray(parsed.deliveryJobs)
       ? parsed.deliveryJobs.map((deliveryJob) => ({
           ...deliveryJob,

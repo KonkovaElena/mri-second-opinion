@@ -1,6 +1,7 @@
 import { randomUUID } from "node:crypto";
 import {
   ALLOWED_TRANSITIONS,
+  createStructuralExecutionEnvelope,
   createArtifactManifest,
   createDraftReport,
   createEvidenceCards,
@@ -192,6 +193,23 @@ export interface WorkflowBranch {
   requiredOutputs: string[];
 }
 
+export type StructuralExecutionStatus = "completed" | "qc-rejected";
+
+export interface StructuralExecutionEnvelope {
+  executionSchemaVersion: "0.1.0";
+  packageId: string;
+  packageVersion: string;
+  manifestSchemaVersion: string;
+  workflowFamily: WorkflowFamily;
+  branchId: string;
+  executionStatus: StructuralExecutionStatus;
+  dispatchedAt: string | null;
+  completedAt: string;
+  resourceClass: string;
+  callbackSource: "internal-inference";
+  artifactIds: string[];
+}
+
 export interface PlanEnvelope {
   planSchemaVersion: string;
   caseRef: {
@@ -282,6 +300,7 @@ export interface CaseRecord {
   operationLog: OperationLogEntry[];
   planEnvelope: PlanEnvelope;
   evidenceCards: EvidenceCard[];
+  structuralExecution: StructuralExecutionEnvelope | null;
   artifactManifest: DerivedArtifactDescriptor[];
   report: ReportPayload | null;
   lastInferenceFingerprint: string | null;
@@ -519,6 +538,8 @@ export class MemoryCaseService {
     const record = await this.requireCase(caseId);
     const normalizedInput = this.normalizeInferenceInput(input);
     const fingerprint = createInferenceFingerprint(normalizedInput);
+    const activeInferenceJob = await this.findLatestActiveInferenceJob(record.caseId);
+    const completedAt = nowIso();
 
     return this.persistExistingCase(record, async () => {
       if (record.status !== "SUBMITTED") {
@@ -546,6 +567,13 @@ export class MemoryCaseService {
       }
 
       if (normalizedInput.qcDisposition === "reject") {
+        record.structuralExecution = createStructuralExecutionEnvelope({
+          caseRecord: record,
+          inferenceJob: activeInferenceJob,
+          executionStatus: "qc-rejected",
+          completedAt,
+          artifactIds: [],
+        });
         record.qcSummary = createQcSummaryRecord({
           disposition: normalizedInput.qcDisposition,
           checkedAt: nowIso(),
@@ -564,21 +592,31 @@ export class MemoryCaseService {
           outcome: "blocked",
           detail: "Inference callback marked the study as QC rejected.",
         });
-        this.completeInferenceJob(await this.findLatestActiveInferenceJob(record.caseId), record.caseId);
+        this.completeInferenceJob(activeInferenceJob, record.caseId);
         record.evidenceCards = createEvidenceCards(record);
         return cloneCase(record);
       }
 
+      record.structuralExecution = createStructuralExecutionEnvelope({
+        caseRecord: record,
+        inferenceJob: activeInferenceJob,
+        executionStatus: "completed",
+        completedAt,
+        artifactIds: [],
+      });
       record.qcSummary = createQcSummaryRecord({
         disposition: normalizedInput.qcDisposition,
         checkedAt: nowIso(),
         issues: normalizedInput.issues,
         qcSummary: normalizedInput.qcSummary,
       });
-      record.artifactManifest = createArtifactManifest(record, normalizedInput);
+      record.artifactManifest = createArtifactManifest(record, normalizedInput, completedAt);
+      if (record.structuralExecution) {
+        record.structuralExecution.artifactIds = record.artifactManifest.map((artifact) => artifact.artifactId);
+      }
       record.planEnvelope.studyContext.qcDisposition = record.qcSummary.disposition;
       record.lastInferenceFingerprint = fingerprint;
-      record.report = createDraftReport(record, normalizedInput);
+      record.report = createDraftReport(record, normalizedInput, completedAt);
       record.planEnvelope.branches = record.planEnvelope.branches.map((branch) => ({
         ...branch,
         status: branch.status === "blocked" ? branch.status : "succeeded",
@@ -592,7 +630,7 @@ export class MemoryCaseService {
         outcome: "completed",
         detail: `Draft report prepared with QC ${normalizedInput.qcDisposition}.`,
       });
-      this.completeInferenceJob(await this.findLatestActiveInferenceJob(record.caseId), record.caseId);
+      this.completeInferenceJob(activeInferenceJob, record.caseId);
       record.evidenceCards = createEvidenceCards(record);
 
       return cloneCase(record);
@@ -1151,6 +1189,7 @@ export class MemoryCaseService {
         isEligible,
       }),
       evidenceCards: [],
+      structuralExecution: null,
       artifactManifest: [],
       report: null,
       lastInferenceFingerprint: null,

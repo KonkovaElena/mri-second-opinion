@@ -27,9 +27,12 @@ export function presentCaseListItem(caseRecord: CaseRecord) {
 
 export function presentCaseDetail(caseRecord: CaseRecord) {
   const reportArtifacts = caseRecord.artifactManifest;
+  const selectedPackage = caseRecord.structuralExecution?.packageId ?? caseRecord.planEnvelope.packageResolution.selectedPackage;
 
   return {
     ...presentCaseListItem(caseRecord),
+    packageManifest: getWorkflowPackageManifest(selectedPackage),
+    structuralExecution: caseRecord.structuralExecution,
     studyContext: caseRecord.studyContext,
     qcSummary: caseRecord.qcSummary,
     planSummary: {

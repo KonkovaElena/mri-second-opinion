@@ -3,13 +3,16 @@ import type {
   CaseStatus,
   EvidenceCard,
   InferenceCallbackInput,
+  InferenceJobRecord,
   PlanEnvelope,
   PolicyGateRecord,
   ReportPayload,
+  StructuralExecutionEnvelope,
 } from "./cases";
 import type { StudyContextRecord } from "./case-imaging";
 import { createDerivedArtifactDescriptors } from "./case-artifacts";
 import { missingRequiredSequences, nowIso } from "./case-common";
+import { formatWorkflowPackageVersion, getWorkflowPackageManifest } from "./workflow-packages";
 
 export const ALLOWED_TRANSITIONS: Readonly<Record<CaseStatus, readonly CaseStatus[]>> = {
   INGESTING: ["SUBMITTED", "QC_REJECTED"],
@@ -136,7 +139,10 @@ export function createPlanEnvelope(input: {
 export function createEvidenceCards(caseRecord: CaseRecord): EvidenceCard[] {
   const cards: EvidenceCard[] = [];
   const missingRequired = missingRequiredSequences(caseRecord.sequenceInventory);
-  const selectedPackage = caseRecord.planEnvelope.packageResolution.selectedPackage;
+  const selectedPackage = caseRecord.structuralExecution?.packageId ?? caseRecord.planEnvelope.packageResolution.selectedPackage;
+  const executionPackageRef = caseRecord.structuralExecution
+    ? formatWorkflowPackageVersion(caseRecord.structuralExecution)
+    : null;
 
   cards.push({
     cardType: "routing",
@@ -146,9 +152,15 @@ export function createEvidenceCards(caseRecord: CaseRecord): EvidenceCard[] {
     severity: selectedPackage ? "info" : "blocked",
     status: selectedPackage ? "good" : "blocked",
     summary: selectedPackage
-      ? `Selected package ${selectedPackage}.`
+      ? executionPackageRef
+        ? `Selected package ${executionPackageRef} with persisted execution state ${caseRecord.structuralExecution?.executionStatus}.`
+        : `Selected package ${selectedPackage}.`
       : "No eligible package selected for this case.",
-    supportingRefs: [selectedPackage ?? "blocked:brain-structural-fastsurfer"],
+    supportingRefs: selectedPackage
+      ? executionPackageRef
+        ? [executionPackageRef, ...caseRecord.structuralExecution!.artifactIds]
+        : [selectedPackage]
+      : ["blocked:brain-structural-fastsurfer"],
     recommendedAction: selectedPackage ? null : "Confirm T1w availability or reject intake.",
   });
 
@@ -236,8 +248,58 @@ export function createEvidenceCards(caseRecord: CaseRecord): EvidenceCard[] {
   return cards;
 }
 
-export function createArtifactManifest(caseRecord: CaseRecord, input: InferenceCallbackInput) {
-  const generatedAt = nowIso();
+export function createStructuralExecutionEnvelope(input: {
+  caseRecord: CaseRecord;
+  inferenceJob: InferenceJobRecord | null;
+  executionStatus: StructuralExecutionEnvelope["executionStatus"];
+  completedAt?: string;
+  artifactIds: string[];
+}): StructuralExecutionEnvelope | null {
+  const packageManifest = getWorkflowPackageManifest(input.caseRecord.planEnvelope.packageResolution.selectedPackage);
+
+  if (!packageManifest) {
+    return null;
+  }
+
+  return {
+    executionSchemaVersion: "0.1.0",
+    packageId: packageManifest.packageId,
+    packageVersion: packageManifest.packageVersion,
+    manifestSchemaVersion: packageManifest.manifestSchemaVersion,
+    workflowFamily: packageManifest.workflowFamily,
+    branchId: "structural",
+    executionStatus: input.executionStatus,
+    dispatchedAt: input.inferenceJob?.claimedAt ?? null,
+    completedAt: input.completedAt ?? nowIso(),
+    resourceClass: input.caseRecord.planEnvelope.dispatchProfile.resourceClass,
+    callbackSource: "internal-inference",
+    artifactIds: [...input.artifactIds],
+  };
+}
+
+export function backfillStructuralExecutionEnvelope(input: {
+  caseRecord: CaseRecord;
+  artifactIds: string[];
+}): StructuralExecutionEnvelope | null {
+  if (!input.caseRecord.report) {
+    return null;
+  }
+
+  return createStructuralExecutionEnvelope({
+    caseRecord: input.caseRecord,
+    inferenceJob: null,
+    executionStatus: input.caseRecord.status === "QC_REJECTED" ? "qc-rejected" : "completed",
+    completedAt: input.caseRecord.report.provenance.generatedAt,
+    artifactIds: input.artifactIds,
+  });
+}
+
+export function createArtifactManifest(
+  caseRecord: CaseRecord,
+  input: InferenceCallbackInput,
+  generatedAt = nowIso(),
+) {
+  const packageManifest = getWorkflowPackageManifest(caseRecord.planEnvelope.packageResolution.selectedPackage);
 
   return createDerivedArtifactDescriptors({
     caseId: caseRecord.caseId,
@@ -245,11 +307,20 @@ export function createArtifactManifest(caseRecord: CaseRecord, input: InferenceC
     artifactRefs: input.artifacts,
     studyContext: caseRecord.studyContext,
     generatedAt,
+    packageManifest,
   });
 }
 
-export function createDraftReport(caseRecord: CaseRecord, input: InferenceCallbackInput): ReportPayload {
-  const generatedAt = nowIso();
+export function createDraftReport(
+  caseRecord: CaseRecord,
+  input: InferenceCallbackInput,
+  generatedAt = nowIso(),
+): ReportPayload {
+  const packageManifest = getWorkflowPackageManifest(caseRecord.planEnvelope.packageResolution.selectedPackage);
+  const workflowVersion =
+    formatWorkflowPackageVersion(caseRecord.structuralExecution) ??
+    formatWorkflowPackageVersion(packageManifest) ??
+    "brain-structural-fastsurfer@0.1.0";
 
   return {
     reportSchemaVersion: "0.1.0",
@@ -270,7 +341,7 @@ export function createDraftReport(caseRecord: CaseRecord, input: InferenceCallba
     issues: input.issues ?? [],
     artifacts: input.artifacts,
     provenance: {
-      workflowVersion: "brain-structural-fastsurfer@0.1.0",
+      workflowVersion,
       plannerVersion: caseRecord.planEnvelope.provenance.plannerVersion,
       generatedAt,
     },

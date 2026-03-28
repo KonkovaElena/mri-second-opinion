@@ -87,8 +87,9 @@ Close one real processing branch for the neuro-first slice.
 Current execution note 2026-03-28:
 
 1. Wave 2A boundary truth is already in place and publicly evidenced
-2. the next smallest honest WP-3 step is Wave 2B contract layering on inference-job claim responses
-3. that contract should expose package identity, dispatch profile, and planned artifact persistence targets before a real worker or object-store runtime is introduced
+2. Wave 2B contract layering on inference-job claim responses and HMAC-protected dispatch lease closure are already in place
+3. the current smallest honest WP-3 step is persisted execution-contract truth on case detail and report surfaces
+4. that step should keep package identity, execution state, and artifact inventory durable before any real worker or object-store runtime is introduced
 
 Primary outputs:
 
