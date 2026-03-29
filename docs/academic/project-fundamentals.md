@@ -354,7 +354,7 @@ SUBMITTED ──────→ PLANNING
 | Критерий | Оценка | Комментарий |
 |---|---|---|
 | Доменная модель | 10/10 | 9-state FSM, формально верифицирована |
-| Безопасность | 9/10 | HMAC-SHA256, timing-safe auth, replay protection |
+| Безопасность | 8/10 | HMAC-SHA256 (dispatch routes), timing-safe bearer auth; nonce replay store implemented but not yet enforced |
 | Валидация входных данных | 10/10 | Полная Zod-схема для всех endpoints |
 | Качество кода | 9.9/10 | Clean separation, модульность, TypeScript strict |
 | Тестирование | 9.5/10 | 1 875 строк тестов, restart-safety проверена |

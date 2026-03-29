@@ -133,7 +133,7 @@ Implemented and verified in this repository today:
 10. built-in `GET /workbench` review surface for queue visibility, case detail, review, finalize, report preview, operations summary, and delivery retry over the live API
 11. explicit worker-facing delivery queue claim path backed by durable records and restart survival proof
 12. explicit worker-facing inference queue list, claim, expired-claim requeue, dispatch claim, and dispatch heartbeat paths backed by durable records and restart survival proof
-13. HMAC-signed protection for `/api/internal/dispatch/*` when `MRI_HMAC_SECRET` is configured, layered on top of namespace bearer-token protection
+13. HMAC-signed protection for `/api/internal/dispatch/*` when `MRI_INTERNAL_HMAC_SECRET` is configured, layered on top of namespace bearer-token protection
 14. persisted workflow package manifest, structural execution envelope, package-provenance artifact manifest surfaces, and public artifact retrieval URLs backed by local file persistence on case detail and report responses
 15. internal separation between orchestration, planning, and snapshot-repository seams while preserving the HTTP contract
 16. Wave 1 public-edge hardening with request-size limits, public API rate limiting, Node HTTP timeout guards, and graceful shutdown hooks
@@ -212,7 +212,7 @@ If `MRI_INTERNAL_API_TOKEN` is set, every `api/internal/*` route requires `Autho
 
 This is the current namespace-level protection seam for worker-facing HTTP routes.
 
-If `MRI_HMAC_SECRET` is set, `/api/internal/dispatch/*` additionally requires `X-MRI-Timestamp`, `X-MRI-Nonce`, and `X-MRI-Signature` headers.
+If `MRI_INTERNAL_HMAC_SECRET` is set, `/api/internal/dispatch/*` additionally requires `X-MRI-Timestamp`, `X-MRI-Nonce`, and `X-MRI-Signature` headers.
 
 That HMAC layer is currently scoped to the bounded dispatch claim and heartbeat seam rather than to the entire internal namespace.
 

@@ -1,5 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
+import { spawn, spawnSync } from "node:child_process";
 import { createServer, type Server } from "node:http";
 import type { AddressInfo } from "node:net";
 import { mkdtempSync, rmSync } from "node:fs";
@@ -14,6 +15,7 @@ import {
   HMAC_HEADER_TIMESTAMP,
   canonicalizeRequest,
   computeSignature,
+  serializeSignedJsonPayload,
 } from "../src/hmac-auth";
 
 function createTestStoreFile() {
@@ -200,6 +202,107 @@ async function withPostgresServer<T>(
 const DEFAULT_INTERNAL_API_TOKEN = "dispatch-internal-token-0001";
 const DEFAULT_HMAC_SECRET = "dispatch-hmac-secret-0123456789abcdef";
 
+type PythonLaunch = {
+  command: string;
+  args: string[];
+};
+
+let cachedPythonLaunch: PythonLaunch | null = null;
+
+function resolvePythonLaunch(): PythonLaunch {
+  if (cachedPythonLaunch) {
+    return cachedPythonLaunch;
+  }
+
+  const configured = process.env.MRI_WORKER_PYTHON?.trim();
+  const candidates: PythonLaunch[] = [];
+
+  if (configured) {
+    candidates.push({ command: configured, args: [] });
+  }
+
+  if (process.platform === "win32") {
+    candidates.push({ command: "py", args: ["-3"] });
+  }
+
+  candidates.push({ command: "python3", args: [] });
+  candidates.push({ command: "python", args: [] });
+
+  for (const candidate of candidates) {
+    const probe = spawnSync(candidate.command, [...candidate.args, "--version"], {
+      encoding: "utf-8",
+    });
+
+    if (probe.status === 0) {
+      cachedPythonLaunch = candidate;
+      return candidate;
+    }
+  }
+
+  throw new Error("Unable to locate a Python 3 executable for the MRI worker test.");
+}
+
+async function runPythonWorker(
+  baseUrl: string,
+  envOverrides: Record<string, string> = {},
+): Promise<{ exitCode: number; stdout: string; stderr: string }> {
+  const python = resolvePythonLaunch();
+
+  return await new Promise((resolve, reject) => {
+    const child = spawn(python.command, [...python.args, join(process.cwd(), "worker", "main.py")], {
+      cwd: process.cwd(),
+      env: {
+        ...process.env,
+        MRI_API_BASE_URL: baseUrl,
+        MRI_INTERNAL_HMAC_SECRET: DEFAULT_HMAC_SECRET,
+        MRI_WORKER_ID: "python-worker-test",
+        MRI_WORKER_STAGE: "inference",
+        ...envOverrides,
+      },
+      stdio: ["ignore", "pipe", "pipe"],
+    });
+
+    let stdout = "";
+    let stderr = "";
+
+    child.stdout.setEncoding("utf-8");
+    child.stderr.setEncoding("utf-8");
+    child.stdout.on("data", (chunk) => {
+      stdout += chunk;
+    });
+    child.stderr.on("data", (chunk) => {
+      stderr += chunk;
+    });
+    child.on("error", reject);
+    child.on("close", (exitCode) => {
+      resolve({
+        exitCode: exitCode ?? -1,
+        stdout,
+        stderr,
+      });
+    });
+  });
+}
+
+function serializePayloadWithPython(payload: unknown): string {
+  const python = resolvePythonLaunch();
+  const script = [
+    "import json, sys",
+    "payload = json.loads(sys.stdin.read())",
+    "sys.stdout.write(json.dumps(payload, separators=(',', ':')))",
+  ].join("; ");
+  const result = spawnSync(python.command, [...python.args, "-c", script], {
+    input: JSON.stringify(payload),
+    encoding: "utf-8",
+  });
+
+  if (result.status !== 0) {
+    throw new Error(`Python JSON serialization probe failed: ${result.stderr}`);
+  }
+
+  return result.stdout;
+}
+
 function createSignedDispatchRequest(
   path: string,
   options: {
@@ -213,7 +316,7 @@ function createSignedDispatchRequest(
 ): RequestInit {
   const method = options.method ?? "POST";
   const payload = typeof options.body === "undefined" ? {} : options.body;
-  const rawBody = Buffer.from(JSON.stringify(payload), "utf-8");
+  const rawBody = serializeSignedJsonPayload(payload);
   const timestamp = options.timestamp ?? new Date().toISOString();
   const nonce = options.nonce ?? "dispatch-nonce-001";
   const hmacSecret = options.hmacSecret ?? DEFAULT_HMAC_SECRET;
@@ -251,6 +354,7 @@ async function createReviewedCase(
     studyUid?: string;
     studyInstanceUid?: string;
     accessionNumber?: string;
+    internalApiToken?: string;
   } = {},
 ) {
   const created = await jsonRequest("/api/cases", {
@@ -292,6 +396,12 @@ async function createReviewedCase(
 
   const inferred = await jsonRequest("/api/internal/inference-callback", {
     method: "POST",
+    headers:
+      overrides.internalApiToken === undefined
+        ? undefined
+        : {
+            authorization: `Bearer ${overrides.internalApiToken}`,
+          },
     body: JSON.stringify({
       caseId,
       qcDisposition: "warn",
@@ -338,6 +448,30 @@ async function createReviewedCase(
 
   return { caseId };
 }
+
+test("signed JSON serialization matches the python worker contract", () => {
+  const payload = {
+    workerId: "contract-worker-001",
+    stage: "inference",
+    leaseSeconds: 90,
+    studyContext: {
+      series: ["T1w", "FLAIR"],
+      measurements: {
+        sliceThickness: 1.5,
+        contrast: false,
+      },
+    },
+  };
+
+  const tsBody = serializeSignedJsonPayload(payload).toString("utf-8");
+  const pythonBody = serializePayloadWithPython(payload);
+
+  assert.equal(tsBody, pythonBody);
+  assert.equal(
+    tsBody,
+    "{\"workerId\":\"contract-worker-001\",\"stage\":\"inference\",\"leaseSeconds\":90,\"studyContext\":{\"series\":[\"T1w\",\"FLAIR\"],\"measurements\":{\"sliceThickness\":1.5,\"contrast\":false}}}",
+  );
+});
 
 test("public case lifecycle reaches delivery failure and retry path", async () => {
   const { tempDir, caseStoreFile } = createTestStoreFile();
@@ -948,6 +1082,54 @@ test("dispatch routes require HMAC headers when a secret is configured", async (
   }
 });
 
+test("dispatch routes reject replayed nonce", async () => {
+  const { tempDir, caseStoreFile } = createTestStoreFile();
+
+  try {
+    await withServer(
+      caseStoreFile,
+      async ({ baseUrl }) => {
+        // Create a case so dispatch/claim has work to do
+        const created = await fetch(`${baseUrl}/api/cases`, {
+          method: "POST",
+          headers: { "content-type": "application/json" },
+          body: JSON.stringify({
+            patientAlias: "synthetic-patient-replay-001",
+            studyUid: "1.2.840.replay.1",
+            sequenceInventory: ["T1w", "FLAIR"],
+          }),
+        });
+        assert.equal(created.status, 201);
+
+        const fixedNonce = "replay-nonce-unique-001";
+        const claimPath = "/api/internal/dispatch/claim";
+
+        // First request with this nonce should succeed (200 or empty dispatch)
+        const first = await signedJsonRequest(baseUrl, claimPath, {
+          body: { workerId: "replay-worker-001" },
+          nonce: fixedNonce,
+        });
+        assert.notEqual(first.response.status, 401, "First request should not be rejected");
+
+        // Replay the same nonce — must be rejected
+        const replay = await signedJsonRequest(baseUrl, claimPath, {
+          body: { workerId: "replay-worker-001" },
+          nonce: fixedNonce,
+        });
+        assert.equal(replay.response.status, 401, "Replayed nonce must be rejected");
+        assert.equal(replay.body.code, "HMAC_VERIFICATION_FAILED");
+        assert.match(replay.body.error, /Nonce already consumed/);
+      },
+      {
+        internalApiToken: DEFAULT_INTERNAL_API_TOKEN,
+        hmacSecret: DEFAULT_HMAC_SECRET,
+      },
+    );
+  } finally {
+    rmSync(tempDir, { recursive: true, force: true });
+  }
+});
+
 test("review workbench shell is served with real static assets", async () => {
   const { tempDir, caseStoreFile } = createTestStoreFile();
 
@@ -1211,6 +1393,9 @@ test("inference jobs are persisted, restart-safe, and worker-claimable over HTTP
       assert.equal(claim.body.execution.claim.jobId, claim.body.job.jobId);
       assert.equal(claim.body.execution.claim.caseId, caseId);
       assert.equal(claim.body.execution.claim.workerId, "inference-worker-1");
+      assert.equal(claim.body.execution.caseContext.studyUid, "1.2.840.0.queue.inference");
+      assert.deepEqual(claim.body.execution.caseContext.sequenceInventory, ["T1w", "FLAIR"]);
+      assert.equal(claim.body.execution.studyContext.studyInstanceUid, "1.2.840.0.queue.inference");
       assert.equal(claim.body.execution.dispatchProfile.resourceClass, "light-gpu");
       assert.equal(claim.body.execution.dispatchProfile.retryTier, "standard");
       assert.equal(claim.body.execution.packageManifest.packageId, "brain-structural-fastsurfer");
@@ -1253,6 +1438,224 @@ test("inference jobs are persisted, restart-safe, and worker-claimable over HTTP
   }
 });
 
+test("dispatch routes work with both bearer token and HMAC configured (dual auth)", async () => {
+  const { tempDir, caseStoreFile } = createTestStoreFile();
+
+  try {
+    await withServer(
+      caseStoreFile,
+      async ({ baseUrl, jsonRequest }) => {
+        // Create a case so dispatch/claim returns data
+        const created = await jsonRequest("/api/cases", {
+          method: "POST",
+          body: JSON.stringify({
+            patientAlias: "synthetic-patient-dual-auth-001",
+            studyUid: "1.2.840.dual.auth.1",
+            sequenceInventory: ["T1w", "FLAIR"],
+          }),
+        });
+        assert.equal(created.response.status, 201);
+
+        // Signed request with both Bearer and HMAC should succeed
+        const claim = await signedJsonRequest(baseUrl, "/api/internal/dispatch/claim", {
+          body: { workerId: "dual-auth-worker-001" },
+        });
+        assert.equal(claim.response.status, 200, "Dual-auth claim must succeed");
+        assert.notEqual(claim.body.dispatch, null, "Should return a dispatch assignment");
+
+        // Heartbeat with both auth layers should also succeed
+        const heartbeat = await signedJsonRequest(baseUrl, "/api/internal/dispatch/heartbeat", {
+          body: { leaseId: claim.body.dispatch.leaseId },
+          nonce: "dual-auth-heartbeat-nonce-001",
+        });
+        assert.equal(heartbeat.response.status, 200, "Dual-auth heartbeat must succeed");
+
+        // Bearer-only (no HMAC) on dispatch route should be rejected
+        const bearerOnly = await jsonRequest("/api/internal/dispatch/claim", {
+          method: "POST",
+          headers: {
+            authorization: `Bearer ${DEFAULT_INTERNAL_API_TOKEN}`,
+          },
+          body: JSON.stringify({ workerId: "bearer-only-worker-001" }),
+        });
+        assert.equal(bearerOnly.response.status, 401, "Bearer-only must be rejected on dispatch routes");
+
+        // Non-dispatch internal route should work with bearer alone
+        const jobs = await jsonRequest("/api/internal/inference-jobs", {
+          method: "GET",
+          headers: {
+            authorization: `Bearer ${DEFAULT_INTERNAL_API_TOKEN}`,
+          },
+        });
+        assert.equal(jobs.response.status, 200, "Bearer-only must work on non-dispatch internal routes");
+      },
+      {
+        internalApiToken: DEFAULT_INTERNAL_API_TOKEN,
+        hmacSecret: DEFAULT_HMAC_SECRET,
+      },
+    );
+  } finally {
+    rmSync(tempDir, { recursive: true, force: true });
+  }
+});
+
+test("python worker derives metadata-backed outputs from the dispatch execution contract under dual auth", async () => {
+  const { tempDir, caseStoreFile } = createTestStoreFile();
+
+  try {
+    await withServer(
+      caseStoreFile,
+      async ({ baseUrl, jsonRequest }) => {
+        const created = await jsonRequest("/api/cases", {
+          method: "POST",
+          body: JSON.stringify({
+            patientAlias: "synthetic-python-worker-001",
+            studyUid: "1.2.840.python.worker.1",
+            sequenceInventory: ["T1w", "FLAIR"],
+            indication: "memory complaints",
+            studyContext: {
+              studyInstanceUid: "2.25.python.worker.study.001",
+              accessionNumber: "PY-WORKER-001",
+              studyDate: "2026-03-29",
+              sourceArchive: "demo-orthanc",
+              dicomWebBaseUrl: "https://demo.example.test/dicom/studies/2.25.python.worker.study.001",
+              metadataSummary: ["Synthetic worker study", "Two MR series available"],
+              series: [
+                {
+                  seriesInstanceUid: "2.25.python.worker.study.001.1",
+                  seriesDescription: "Sag T1",
+                  modality: "MR",
+                  sequenceLabel: "T1w",
+                  instanceCount: 176,
+                },
+                {
+                  seriesInstanceUid: "2.25.python.worker.study.001.2",
+                  seriesDescription: "Ax FLAIR",
+                  modality: "MR",
+                  sequenceLabel: "FLAIR",
+                  instanceCount: 34,
+                },
+              ],
+            },
+          }),
+        });
+
+        assert.equal(created.response.status, 201);
+        const caseId = created.body.case.caseId as string;
+
+        const worker = await runPythonWorker(baseUrl, {
+          MRI_WORKER_ID: "python-worker-contract-001",
+          MRI_INTERNAL_API_TOKEN: DEFAULT_INTERNAL_API_TOKEN,
+        });
+
+        assert.equal(worker.exitCode, 0, `${worker.stderr}\n${worker.stdout}`);
+        assert.match(worker.stdout, /"leaseId"/);
+        assert.match(worker.stdout, /"caseId"/);
+
+        const detail = await jsonRequest(`/api/cases/${caseId}`);
+        assert.equal(detail.response.status, 200);
+        assert.equal(detail.body.case.status, "AWAITING_REVIEW");
+        assert.equal(detail.body.case.qcSummary.disposition, "pass");
+        assert.equal(detail.body.case.artifactManifest.length, 4);
+        assert.match(detail.body.case.reportSummary.processingSummary, /Metadata-derived draft/);
+
+        const report = await jsonRequest(`/api/cases/${caseId}/report`);
+        assert.equal(report.response.status, 200);
+        assert.match(report.body.report.processingSummary, /2\.25\.python\.worker\.study\.001/);
+        assert.match(report.body.report.findings[0], /Metadata-derived structural triage/);
+        assert.match(report.body.report.findings[1], /T1w, FLAIR/);
+        assert.match(report.body.report.issues[0], /no voxel-level inference executed/i);
+        assert.equal(report.body.report.artifacts.length, 4);
+
+        const qcArtifact = detail.body.case.artifactManifest.find(
+          (artifact: { artifactType: string }) => artifact.artifactType === "qc-summary",
+        );
+        assert.notEqual(qcArtifact, undefined);
+        assert.match(qcArtifact.storageUri, new RegExp(`/api/cases/${caseId}/artifacts/`));
+
+        const qcResponse = await fetch(`${baseUrl}${qcArtifact.storageUri}`);
+        assert.equal(qcResponse.status, 200);
+        assert.match(qcResponse.headers.get("content-type") ?? "", /application\/json/);
+        const qcBody = await qcResponse.json();
+        assert.equal(qcBody.caseId, caseId);
+        assert.equal(qcBody.workerId, "python-worker-contract-001");
+        assert.equal(qcBody.studyInstanceUid, "2.25.python.worker.study.001");
+        assert.match(qcBody.summary, /Metadata-derived draft/);
+      },
+      {
+        internalApiToken: DEFAULT_INTERNAL_API_TOKEN,
+        hmacSecret: DEFAULT_HMAC_SECRET,
+      },
+    );
+  } finally {
+    rmSync(tempDir, { recursive: true, force: true });
+  }
+});
+
+test("python worker marks delivery jobs complete when stage=delivery", async () => {
+  const { tempDir, caseStoreFile } = createTestStoreFile();
+
+  try {
+    await withServer(
+      caseStoreFile,
+      async ({ baseUrl, jsonRequest }) => {
+        const prepared = await createReviewedCase(jsonRequest, {
+          patientAlias: "synthetic-python-delivery-001",
+          studyUid: "1.2.840.python.delivery.1",
+          studyInstanceUid: "2.25.python.delivery.study.001",
+          accessionNumber: "PY-DELIVERY-001",
+          internalApiToken: DEFAULT_INTERNAL_API_TOKEN,
+        });
+
+        const finalized = await jsonRequest(`/api/cases/${prepared.caseId}/finalize`, {
+          method: "POST",
+          body: JSON.stringify({
+            finalSummary: "Clinician-reviewed summary locked and queued for delivery.",
+          }),
+        });
+
+        assert.equal(finalized.response.status, 200);
+        assert.equal(finalized.body.case.status, "DELIVERY_PENDING");
+
+        const worker = await runPythonWorker(baseUrl, {
+          MRI_WORKER_ID: "python-worker-delivery-001",
+          MRI_WORKER_STAGE: "delivery",
+          MRI_INTERNAL_API_TOKEN: DEFAULT_INTERNAL_API_TOKEN,
+        });
+
+        assert.equal(worker.exitCode, 0, `${worker.stderr}\n${worker.stdout}`);
+
+        const detail = await jsonRequest(`/api/cases/${prepared.caseId}`);
+        assert.equal(detail.response.status, 200);
+        assert.equal(detail.body.case.status, "DELIVERED");
+        assert.equal(
+          detail.body.case.operationLog.some((entry: { operationType: string }) => entry.operationType === "delivery-succeeded"),
+          true,
+        );
+
+        const jobs = await jsonRequest("/api/internal/delivery-jobs", {
+          method: "GET",
+          headers: {
+            authorization: `Bearer ${DEFAULT_INTERNAL_API_TOKEN}`,
+          },
+        });
+
+        assert.equal(jobs.response.status, 200);
+        const deliveryJob = jobs.body.jobs.find((job: { caseId: string }) => job.caseId === prepared.caseId);
+        assert.notEqual(deliveryJob, undefined);
+        assert.equal(deliveryJob.status, "delivered");
+        assert.equal(deliveryJob.workerId, "python-worker-delivery-001");
+      },
+      {
+        internalApiToken: DEFAULT_INTERNAL_API_TOKEN,
+        hmacSecret: DEFAULT_HMAC_SECRET,
+      },
+    );
+  } finally {
+    rmSync(tempDir, { recursive: true, force: true });
+  }
+});
+
 test("dispatch claim leases survive sqlite restart and can be renewed over HTTP", async () => {
   const { tempDir, caseStoreFile } = createTestStoreFile();
 
@@ -1288,6 +1691,24 @@ test("dispatch claim leases survive sqlite restart and can be renewed over HTTP"
         assert.equal(claim.body.dispatch.caseId, caseId);
         assert.equal(claim.body.dispatch.jobId, claim.body.execution.claim.jobId);
         assert.equal(claim.body.execution.claim.workerId, "dispatch-worker-sqlite-001");
+        assert.equal(claim.body.execution.workflowFamily, "brain-structural");
+        assert.equal(claim.body.execution.selectedPackage, "brain-structural-fastsurfer");
+        assert.equal(claim.body.execution.caseContext.studyUid, "1.2.840.dispatch.sqlite.1");
+        assert.equal(claim.body.execution.dispatchProfile.resourceClass, "light-gpu");
+        assert.equal(claim.body.execution.dispatchProfile.retryTier, "standard");
+        assert.equal(claim.body.execution.packageManifest.packageId, "brain-structural-fastsurfer");
+        assert.deepEqual(claim.body.execution.requiredArtifacts, [
+          "qc-summary",
+          "metrics-json",
+          "overlay-preview",
+          "report-preview",
+        ]);
+        assert.equal(claim.body.execution.persistenceTargets.length, 4);
+        assert.equal(claim.body.execution.persistenceTargets[0].artifactType, "qc-summary");
+        assert.equal(
+          claim.body.execution.persistenceTargets[0].plannedStorageUri,
+          `object-store://case-artifacts/${caseId}/qc-summary.json`,
+        );
         assert.equal(typeof claim.body.dispatch.leaseId, "string");
         assert.equal(typeof claim.body.dispatch.leaseExpiresAt, "string");
 
@@ -1562,6 +1983,24 @@ test("dispatch claim leases survive postgres restart and can be renewed over HTT
         assert.equal(claim.body.dispatch.caseId, caseId);
         assert.equal(claim.body.dispatch.jobId, claim.body.execution.claim.jobId);
         assert.equal(claim.body.execution.claim.workerId, "dispatch-worker-postgres-001");
+        assert.equal(claim.body.execution.workflowFamily, "brain-structural");
+        assert.equal(claim.body.execution.selectedPackage, "brain-structural-fastsurfer");
+        assert.equal(claim.body.execution.caseContext.studyUid, "1.2.840.dispatch.postgres.1");
+        assert.equal(claim.body.execution.dispatchProfile.resourceClass, "light-gpu");
+        assert.equal(claim.body.execution.dispatchProfile.retryTier, "standard");
+        assert.equal(claim.body.execution.packageManifest.packageId, "brain-structural-fastsurfer");
+        assert.deepEqual(claim.body.execution.requiredArtifacts, [
+          "qc-summary",
+          "metrics-json",
+          "overlay-preview",
+          "report-preview",
+        ]);
+        assert.equal(claim.body.execution.persistenceTargets.length, 4);
+        assert.equal(claim.body.execution.persistenceTargets[0].artifactType, "qc-summary");
+        assert.equal(
+          claim.body.execution.persistenceTargets[0].plannedStorageUri,
+          `object-store://case-artifacts/${caseId}/qc-summary.json`,
+        );
         assert.equal(typeof claim.body.dispatch.leaseId, "string");
         assert.equal(typeof claim.body.dispatch.leaseExpiresAt, "string");
 

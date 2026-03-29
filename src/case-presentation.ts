@@ -131,6 +131,7 @@ export function presentInferenceExecutionContract(input: {
   inferenceJob: InferenceJobRecord;
 }) {
   const selectedPackage = input.caseRecord.planEnvelope.packageResolution.selectedPackage;
+  const studyContext = input.caseRecord.studyContext;
 
   return {
     claim: {
@@ -143,6 +144,18 @@ export function presentInferenceExecutionContract(input: {
     },
     workflowFamily: input.caseRecord.workflowFamily,
     selectedPackage,
+    caseContext: {
+      studyUid: input.caseRecord.studyUid,
+      indication: input.caseRecord.indication,
+      sequenceInventory: [...input.caseRecord.sequenceInventory],
+    },
+    studyContext: {
+      ...studyContext,
+      metadataSummary: [...studyContext.metadataSummary],
+      series: studyContext.series.map((series) => ({
+        ...series,
+      })),
+    },
     dispatchProfile: {
       ...input.caseRecord.planEnvelope.dispatchProfile,
     },

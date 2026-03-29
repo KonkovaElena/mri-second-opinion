@@ -28,7 +28,7 @@ The current repository is best understood as:
 1. publicly hosted on GitHub with a conservative publication posture
 2. local workflow baseline and closure evidence exist for the standalone API path
 3. Track A repository-content work is complete, with remaining GitHub-UI follow-up tracked separately
-4. Wave 1.5 same-head hosted evidence closure is still open even though the current pushed head `f6021ecdb45f4ecf5aece2c52cc0e6f462361d49` already has hosted `ci` proof and the publication verdict remains `PUBLIC_GITHUB_READY`
+4. Wave 1.5 same-head hosted evidence closure is still open because the current `main` head `b295a2a98362168df11b7e36600733893f22e154` has not yet been captured by both hosted `ci` and `docs-governance`, even though the earlier runtime-bearing head `f6021ecdb45f4ecf5aece2c52cc0e6f462361d49` already has hosted `ci` proof and the publication verdict remains `PUBLIC_GITHUB_READY`
 5. workflow MVP is not yet closed
 6. repository verdict is `PUBLIC_GITHUB_READY`
 
@@ -120,7 +120,7 @@ After repository publication is safe, use this order for follow-up work.
 
 After Wave 1.5, the project should not branch into multiple major implementation waves at once.
 
-Use `../academic/action-plan.md` as the authority for the remaining order. The current pushed head already closes Wave 2A locally through file-backed artifact persistence and public artifact retrieval, so the next runtime wave after Wave 1.5 is:
+Use `../academic/action-plan.md` as the authority for the remaining order. The current `main` history already includes the Wave 2A local closure from `f6021ecdb45f4ecf5aece2c52cc0e6f462361d49` together with the later reconciliation head `b295a2a98362168df11b7e36600733893f22e154`, so the next runtime wave after Wave 1.5 remains:
 
 1. real compute path
 2. archive and viewer truth

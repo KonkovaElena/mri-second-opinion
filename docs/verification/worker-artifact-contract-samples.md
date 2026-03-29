@@ -1,6 +1,6 @@
 # Worker Artifact Contract Samples
 
-Date: 2026-03-27
+Date: 2026-03-29
 
 ## Purpose
 
@@ -8,7 +8,9 @@ This note captures the current sample contract surfaces for the wave 1 worker-fa
 
 It is evidence of the implemented local contract shape.
 
-It is not proof of a real Python or external worker runtime.
+It is evidence of a bounded Python worker runtime with stage-specific transport: inference derives outputs from case and study metadata, and delivery claims finalized jobs on the existing internal delivery rail.
+
+It is not proof of DICOM-derived or voxel-level compute.
 
 ## Evidence Basis
 
@@ -17,8 +19,83 @@ These samples are aligned to the deterministic synthetic flows exercised by:
 1. `tests/workflow-api.test.ts`
 2. `tests/memory-case-service.test.ts`
 3. `tests/postgres-case-service.test.ts`
+4. `tests/execution-contract.test.ts`
 
-## 1. Sample plan envelope excerpt
+## 1. Sample inference execution contract excerpt
+
+This excerpt shows the worker-facing execution contract returned by the inference claim surfaces (`/api/internal/inference-jobs/claim-next` and `/api/internal/dispatch/claim`).
+
+```json
+{
+  "claim": {
+    "jobId": "<job-id>",
+    "caseId": "<case-id>",
+    "workerId": "python-worker-demo",
+    "claimedAt": "<iso-timestamp>",
+    "attemptCount": 1,
+    "status": "claimed"
+  },
+  "workflowFamily": "brain-structural",
+  "selectedPackage": "brain-structural-fastsurfer",
+  "caseContext": {
+    "studyUid": "1.2.840.0.1",
+    "indication": "memory complaints",
+    "sequenceInventory": ["T1w", "FLAIR"]
+  },
+  "studyContext": {
+    "studyInstanceUid": "1.2.840.0.1",
+    "sourceArchive": "orthanc-local",
+    "dicomWebBaseUrl": "http://localhost:8042/dicom-web",
+    "metadataSummary": ["synthetic-demo"],
+    "series": [
+      {
+        "seriesInstanceUid": "1.2.840.0.1.1",
+        "seriesDescription": "3D T1w",
+        "modality": "MR",
+        "sequenceLabel": "T1w",
+        "instanceCount": 160
+      }
+    ]
+  },
+  "dispatchProfile": {
+    "resourceClass": "light-gpu",
+    "retryTier": "standard"
+  },
+  "packageManifest": {
+    "packageId": "brain-structural-fastsurfer",
+    "packageVersion": "0.1.0",
+    "workflowFamily": "brain-structural"
+  },
+  "requiredArtifacts": ["qc-summary", "metrics-json", "overlay-preview", "report-preview"],
+  "persistenceTargets": [
+    {
+      "artifactType": "qc-summary",
+      "plannedStorageUri": "object-store://case-artifacts/<case-id>/qc-summary.json"
+    }
+  ]
+}
+```
+
+## 1a. Sample delivery job claim excerpt
+
+The delivery stage does not receive an execution contract. It claims a queued job from `/api/internal/delivery-jobs/claim-next` and then posts `/api/internal/delivery-callback` against the same case id.
+
+```json
+{
+  "job": {
+    "jobId": "<job-id>",
+    "caseId": "<case-id>",
+    "status": "claimed",
+    "attemptCount": 1,
+    "workerId": "python-worker-delivery-001",
+    "claimedAt": "<iso-timestamp>",
+    "completedAt": null,
+    "lastError": null
+  }
+}
+```
+
+## 2. Sample plan envelope excerpt
 
 This excerpt shows the currently persisted routing and study-context contract for an eligible neuro structural case.
 
@@ -49,7 +126,7 @@ This excerpt shows the currently persisted routing and study-context contract fo
 }
 ```
 
-## 2. Sample study-context surface
+## 3. Sample study-context surface
 
 This shape is persisted directly on each case as `studyContext` and is exposed on case-detail reads.
 
@@ -74,7 +151,7 @@ This shape is persisted directly on each case as `studyContext` and is exposed o
 }
 ```
 
-## 3. Sample QC summary surface
+## 4. Sample QC summary surface
 
 This shape is persisted directly on each case as `qcSummary` and is exposed on case-detail reads.
 
@@ -99,7 +176,7 @@ This shape is persisted directly on each case as `qcSummary` and is exposed on c
 }
 ```
 
-## 4. Sample report payload excerpt
+## 5. Sample report payload excerpt
 
 This shape is persisted on the report surface and exposed through `GET /api/cases/:caseId/report`.
 
@@ -123,7 +200,7 @@ This shape is persisted on the report surface and exposed through `GET /api/case
 }
 ```
 
-## 5. Sample derived artifact descriptor
+## 6. Sample derived artifact descriptor
 
 This shape is exposed under `report.derivedArtifacts`.
 
@@ -152,7 +229,7 @@ This shape is exposed under `report.derivedArtifacts`.
 }
 ```
 
-## 6. Sample evidence card excerpt
+## 7. Sample evidence card excerpt
 
 This card shape is exposed on case-detail reads as part of `evidenceCards`.
 
@@ -176,14 +253,17 @@ These samples prove the current repository has a durable local contract surface 
 
 1. study context
 2. QC result summary
-3. report payload and structured findings
-4. typed derived artifacts with conservative viewer semantics
-5. evidence-card visibility on case-detail reads
+3. shared worker-facing execution contract fields across both inference claim surfaces
+4. report payload and structured findings
+5. typed derived artifacts with conservative viewer semantics
+6. evidence-card visibility on case-detail reads
+7. a bounded Python worker with stage-specific transport: inference derives draft outputs from metadata carried in the execution contract, while delivery uses the internal delivery claim/callback rail
+8. local file-backed persistence of worker-produced artifact payloads
 
 These samples do not prove:
 
 1. DICOM to NIfTI conversion
 2. real HD-BET, FastSurfer, or SynthSeg execution
 3. object-store durability for artifacts
-4. Python worker orchestration
+4. production-grade Python worker orchestration at scale
 5. runtime profiling on named hardware

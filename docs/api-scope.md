@@ -44,7 +44,7 @@ Route descriptions and public nouns should follow `docs/public-vocabulary.md`.
 9. public read endpoints use stable presenter envelopes for case list, case detail, report, and operations summary instead of returning raw internal models directly
 10. `GET /workbench` is a built-in operator surface for the current standalone API baseline; it is synthetic-demo-friendly, uses the live API plus existing internal callback seams, and does not claim an OHIF deployment or a production imaging workstation
 11. internal inference-job, delivery-job, and dispatch claim or heartbeat rails are implementation proof for the local queue baselines, not a claim of distributed workers, external brokers, or hosted execution closure
-12. if `MRI_HMAC_SECRET` is configured, `/api/internal/dispatch/*` requires HMAC request-signing headers in addition to the optional namespace bearer token
+12. if `MRI_INTERNAL_HMAC_SECRET` is configured, `/api/internal/dispatch/*` requires HMAC request-signing headers in addition to the optional namespace bearer token
 13. case detail and report surfaces expose persisted package-manifest, structural-execution, typed artifact-manifest truth, and public retrieval URLs for locally persisted artifacts rather than reconstructing worker state only from report wording
 
 For non-HTTP repository surfaces, see `docs/scope-inventory.md`.

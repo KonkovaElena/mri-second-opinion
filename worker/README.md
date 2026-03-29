@@ -4,23 +4,23 @@ This directory contains the bounded Python worker scaffold for PR-14.
 
 It is not a production inference runtime.
 
-It proves one truthful external worker loop against the current standalone API:
+It now proves two truthful bounded worker loops against the current standalone API:
 
-1. signed dispatch claim
-2. signed lease heartbeat
-3. signed callback with artifact storage references
+1. inference: signed dispatch claim, signed lease heartbeat, and a metadata-derived callback with bounded artifact payloads
+2. delivery: internal delivery-job claim and delivery callback on the existing `/api/internal/delivery-*` rail
 
 ## Environment
 
 Set these variables before running the scaffold:
 
 1. `MRI_API_BASE_URL` — standalone API base URL, for example `http://127.0.0.1:4010`
-2. `MRI_INTERNAL_HMAC_SECRET` — same HMAC secret configured on the API
+2. `MRI_INTERNAL_HMAC_SECRET` — same HMAC secret configured on the API; required for `MRI_WORKER_STAGE=inference`
 3. `MRI_WORKER_ID` — worker identity, default `python-worker-demo`
 4. `MRI_WORKER_STAGE` — `inference` or `delivery`, default `inference`
 5. `MRI_LEASE_SECONDS` — initial claim lease length, default `90`
 6. `MRI_HEARTBEAT_LEASE_SECONDS` — renewed lease length, default `180`
-7. `MRI_CORRELATION_ID` — optional fixed correlation id reused across claim, heartbeat, and callback; defaults to a generated UUID
+7. `MRI_INTERNAL_API_TOKEN` — optional bearer token reused on `/api/internal/*` routes when the standalone API enables internal auth
+8. `MRI_CORRELATION_ID` — optional fixed correlation id reused across claim, heartbeat, and callback; defaults to a generated UUID
 
 ## Usage
 
@@ -32,13 +32,11 @@ python worker/main.py
 
 For the current bounded proof path, the worker does this:
 
-1. claims one dispatch item
-2. renews the lease once
-3. if the stage is `inference`, submits a synthetic signed inference callback
-4. if the stage is `delivery`, submits a signed delivery callback with `delivered`
+1. if the stage is `inference`, it claims one signed dispatch item, renews the lease once, derives a draft from `execution.caseContext`, `execution.studyContext`, and the selected package manifest, then persists bounded local payloads for `qc-summary`, `metrics-json`, `overlay-preview`, and `report-preview`
+2. if the stage is `delivery`, it claims one queued delivery job from `/api/internal/delivery-jobs/claim-next` and posts `/api/internal/delivery-callback` with `delivered`
 
-All three signed internal requests reuse the same `X-Correlation-Id` value so the standalone operation log and stdout JSON logs can be joined into one bounded workflow transcript.
+Both stage paths reuse the same `X-Correlation-Id` value so the standalone operation log and stdout JSON logs can be joined into one bounded workflow transcript. The inference path signs dispatch requests with HMAC headers. The delivery path uses the existing internal bearer-token rail when the standalone API requires it.
 
-The callback payload uses storage-reference strings only.
+The inference callback no longer emits a fixed synthetic draft. It emits a metadata-derived draft that is still honest about its bounded scope: it uses the execution contract and series metadata only, and it does not claim voxel-level or DICOM-derived inference.
 
-The API turns those into typed artifact references inside the durable case record.
+The callback uses planned storage-reference strings from the execution contract and attaches local artifact payloads. The API persists those payloads into the bounded local artifact store and turns them into typed artifact references inside the durable case record.

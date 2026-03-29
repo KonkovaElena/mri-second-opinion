@@ -2,6 +2,7 @@ import { createHmac, createHash, timingSafeEqual } from "node:crypto";
 import type express from "express";
 import { WorkflowError } from "./cases";
 import type { AppConfig } from "./config";
+import type { ReplayStore } from "./replay-store";
 
 /**
  * Canonical header names for HMAC signed requests.
@@ -31,6 +32,15 @@ export function canonicalizeRequest(
  */
 export function computeSignature(secret: string, canonicalString: string): string {
   return createHmac("sha256", secret).update(canonicalString).digest("hex");
+}
+
+/**
+ * Signed JSON contract: UTF-8 encoded compact JSON with no extra whitespace.
+ * Python workers must mirror this with json.dumps(payload, separators=(",", ":")).
+ */
+export function serializeSignedJsonPayload(payload: unknown): Buffer {
+  const normalizedPayload = typeof payload === "undefined" ? {} : payload;
+  return Buffer.from(JSON.stringify(normalizedPayload), "utf-8");
 }
 
 /**
@@ -112,11 +122,12 @@ export function verifySignedRequest(opts: {
  * Express middleware that verifies HMAC-signed requests.
  *
  * Requires the raw body to be available — call express.json() BEFORE this
- * middleware and ensure req.body is parsed, but we reconstruct raw bytes
- * from the parsed body for canonical signing.
+ * middleware and ensure req.body is parsed, then rebuild the compact signed
+ * JSON representation before canonical verification.
  */
 export function createHmacAuthMiddleware(
   config: Pick<AppConfig, "hmacSecret" | "clockSkewToleranceMs">,
+  replayStore?: ReplayStore,
 ): express.RequestHandler {
   return (req, _res, next) => {
     const hmacSecret = config.hmacSecret;
@@ -126,7 +137,7 @@ export function createHmacAuthMiddleware(
       return;
     }
 
-    const rawBody = Buffer.from(JSON.stringify(req.body ?? {}), "utf-8");
+    const rawBody = serializeSignedJsonPayload(req.body);
     const result = verifySignedRequest({
       method: req.method,
       path: req.originalUrl,
@@ -139,6 +150,21 @@ export function createHmacAuthMiddleware(
     if (!result.ok) {
       const statusCode = result.code === "MISSING_SIGNATURE_HEADERS" ? 401 : 403;
       next(new WorkflowError(statusCode, result.message ?? "HMAC verification failed", "HMAC_VERIFICATION_FAILED"));
+      return;
+    }
+
+    if (replayStore) {
+      const nonce = req.headers[HMAC_HEADER_NONCE] as string;
+      const timestamp = req.headers[HMAC_HEADER_TIMESTAMP] as string;
+      const requestTimeMs = new Date(timestamp).getTime();
+
+      replayStore.checkAndRecord(nonce, requestTimeMs).then((isReplay) => {
+        if (isReplay) {
+          next(new WorkflowError(401, "Nonce already consumed", "HMAC_VERIFICATION_FAILED"));
+          return;
+        }
+        next();
+      }).catch(next);
       return;
     }
 

@@ -15,6 +15,7 @@ import {
 import { buildHealthSnapshot, buildReadinessSnapshot } from "./health";
 import { createInternalAuthMiddleware } from "./internal-auth";
 import { createHmacAuthMiddleware } from "./hmac-auth";
+import { MemoryReplayStore } from "./replay-store";
 import { getRequestId, requestContextMiddleware, requestLoggingMiddleware } from "./request-context";
 import {
   parseClaimJobInput,
@@ -305,7 +306,12 @@ export function createApp(config: AppConfig, options: CreateAppOptions = {}) {
 
   // --- Dispatch routes (HMAC-authenticated for external workers) ---
 
-  const hmacAuth = createHmacAuthMiddleware(config);
+  const replayStore = new MemoryReplayStore({
+    ttlMs: config.replayStoreTtlMs,
+    maxEntries: config.replayStoreMaxEntries,
+  });
+
+  const hmacAuth = createHmacAuthMiddleware(config, replayStore);
 
   app.post("/api/internal/dispatch/claim", hmacAuth, async (req, res) => {
     try {

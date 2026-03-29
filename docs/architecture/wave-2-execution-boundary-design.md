@@ -10,7 +10,7 @@ Its purpose is to convert the current truthful control-plane baseline into a min
 
 ## Status 2026-03-29
 
-The full local execution-truth slice of Wave 2A is now closed on the current pushed head.
+The full local execution-truth slice of Wave 2A is now closed in the current `main` history.
 
 Authority-doc reconciliation and same-head hosted Wave 1.5 closure still remain open.
 
@@ -21,7 +21,7 @@ The repository now proves:
 3. restart-safe inference and delivery queue state
 4. hosted `ci` and `docs-governance` proof for the latest fully hosted-validated head `1e340b978bfa35a2ed339adcdb0d2add56cc08c3`
 5. HMAC-authenticated `/api/internal/dispatch/claim` and `/api/internal/dispatch/heartbeat` routes that return or renew a bounded execution lease
-6. local file-backed artifact persistence plus public artifact retrieval on the current pushed head `f6021ecdb45f4ecf5aece2c52cc0e6f462361d49`
+6. local file-backed artifact persistence plus public artifact retrieval on the earlier runtime-bearing head `f6021ecdb45f4ecf5aece2c52cc0e6f462361d49`, which remains part of the current `main` history
 
 The next runtime wave after the current docs and evidence reconciliation is Wave 2B real Python compute path. Wave 2A no longer needs another artifact or retrieval implementation slice.
 

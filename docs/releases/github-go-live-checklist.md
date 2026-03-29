@@ -61,7 +61,7 @@ Current hosted proof recorded:
 9. `docs-governance` success on `1e340b978bfa35a2ed339adcdb0d2add56cc08c3`: `https://github.com/KonkovaElena/mri-second-opinion/actions/runs/23684738468`
 10. `ci` success on `f6021ecdb45f4ecf5aece2c52cc0e6f462361d49`: `https://github.com/KonkovaElena/mri-second-opinion/actions/runs/23693425627`
 
-The current pushed head is `f6021ecdb45f4ecf5aece2c52cc0e6f462361d49`; the latest head with both hosted `ci` and `docs-governance` proof is `1e340b978bfa35a2ed339adcdb0d2add56cc08c3`, and `f6021ecdb45f4ecf5aece2c52cc0e6f462361d49` only has hosted `ci` so far because the commit touched code and test paths rather than docs-governance surfaces. Wave 1.5 therefore remains open until the next docs-reconciliation head carries both hosted workflows even though the publication verdict stays conservative and unchanged.
+The current local and remote `main` head is `b295a2a98362168df11b7e36600733893f22e154`; the latest head with both hosted `ci` and `docs-governance` proof is `1e340b978bfa35a2ed339adcdb0d2add56cc08c3`, and the earlier runtime-bearing head `f6021ecdb45f4ecf5aece2c52cc0e6f462361d49` only has hosted `ci` recorded so far. Wave 1.5 therefore remains open until `b295a2a98362168df11b7e36600733893f22e154` or a newer docs-reconciliation head carries both hosted workflows even though the publication verdict stays conservative and unchanged.
 
 ## Phase 4. Publication safety review
 
