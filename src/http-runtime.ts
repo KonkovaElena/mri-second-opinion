@@ -157,7 +157,6 @@ export async function shutdownHttpServer(
     clearTimeout(forceCloseTimer);
   }
 
-  server.closeIdleConnections?.();
   await closeResources();
 
   return {

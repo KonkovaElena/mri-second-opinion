@@ -56,6 +56,15 @@ export function createApp(config: AppConfig, options: CreateAppOptions = {}) {
   app.locals.caseService = caseService;
 
   app.disable("x-powered-by");
+
+  app.use((_req, res, next) => {
+    res.setHeader("X-Content-Type-Options", "nosniff");
+    res.setHeader("X-Frame-Options", "DENY");
+    res.setHeader("Referrer-Policy", "strict-origin-when-cross-origin");
+    res.setHeader("X-Permitted-Cross-Domain-Policies", "none");
+    next();
+  });
+
   app.use(requestContextMiddleware);
   app.use(metricsMiddleware);
   app.use(requestLoggingMiddleware);
@@ -212,7 +221,11 @@ export function createApp(config: AppConfig, options: CreateAppOptions = {}) {
   });
 
   app.get("/metrics", (_req, res) => {
-    void writeMetricsResponse(res);
+    writeMetricsResponse(res).catch(() => {
+      if (!res.headersSent) {
+        res.status(500).json({ error: "Failed to collect metrics" });
+      }
+    });
   });
 
   app.post("/api/cases", async (req, res) => {

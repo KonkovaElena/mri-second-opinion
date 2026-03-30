@@ -113,6 +113,7 @@ export function createArchiveLookupClient(config: ArchiveLookupConfig): ArchiveL
           headers: {
             accept: "application/json",
           },
+          signal: AbortSignal.timeout(10_000),
         });
 
         if (!response.ok) {

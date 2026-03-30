@@ -3205,6 +3205,60 @@ test("duplicate inference callback is treated as a safe replay", async () => {
   }
 });
 
+test("inference replay with reordered arrays is treated as safe replay, not conflict", async () => {
+  const { tempDir, caseStoreFile } = createTestStoreFile();
+
+  try {
+    await withServer(caseStoreFile, async ({ jsonRequest }) => {
+      const created = await jsonRequest("/api/cases", {
+        method: "POST",
+        body: JSON.stringify({
+          patientAlias: "synthetic-patient-replay-order",
+          studyUid: "1.2.840.0.replay-order",
+          sequenceInventory: ["T1w", "FLAIR"],
+        }),
+      });
+
+      const caseId = created.body.case.caseId as string;
+
+      const first = await jsonRequest("/api/internal/inference-callback", {
+        method: "POST",
+        body: JSON.stringify({
+          caseId,
+          qcDisposition: "pass",
+          findings: ["Finding A", "Finding B"],
+          measurements: [
+            { label: "brain_parenchyma_ml", value: 1123 },
+            { label: "hippocampus_ml", value: 4.2 },
+          ],
+          artifacts: ["artifact://preview", "artifact://qc"],
+        }),
+      });
+      assert.equal(first.response.status, 200);
+
+      // Resubmit with arrays in different order — same data
+      const reordered = await jsonRequest("/api/internal/inference-callback", {
+        method: "POST",
+        body: JSON.stringify({
+          caseId,
+          qcDisposition: "pass",
+          findings: ["Finding B", "Finding A"],
+          measurements: [
+            { label: "hippocampus_ml", value: 4.2 },
+            { label: "brain_parenchyma_ml", value: 1123 },
+          ],
+          artifacts: ["artifact://qc", "artifact://preview"],
+        }),
+      });
+
+      assert.equal(reordered.response.status, 200, "reordered replay must be accepted, not 409");
+      assert.equal(reordered.body.case.status, "AWAITING_REVIEW");
+    });
+  } finally {
+    rmSync(tempDir, { recursive: true, force: true });
+  }
+});
+
 test("conflicting inference callback is rejected instead of being silently ignored", async () => {
   const { tempDir, caseStoreFile } = createTestStoreFile();
 

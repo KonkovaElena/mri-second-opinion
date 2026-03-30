@@ -458,18 +458,25 @@ function normalizeMeasurementSet(
 }
 
 function createInferenceFingerprint(input: InferenceCallbackInput) {
+  const sortedFindings = [...input.findings].sort();
+  const sortedArtifacts = [...input.artifacts].sort();
+  const sortedMeasurements = normalizeMeasurementSet(input.measurements)
+    .sort((a, b) => a.label.localeCompare(b.label) || a.value - b.value);
+  const sortedPayloads = (input.artifactPayloads ?? []).map((artifactPayload) => ({
+    artifactRef: artifactPayload.artifactRef,
+    contentType: artifactPayload.contentType,
+    contentDigest: createHash("sha256").update(artifactPayload.contentBase64).digest("hex"),
+  })).sort((a, b) => a.artifactRef.localeCompare(b.artifactRef));
+  const sortedIssues = [...(input.issues ?? [])].sort();
+
   return JSON.stringify({
     qcDisposition: input.qcDisposition,
-    findings: input.findings,
-    measurements: normalizeMeasurementSet(input.measurements),
-    artifacts: input.artifacts,
+    findings: sortedFindings,
+    measurements: sortedMeasurements,
+    artifacts: sortedArtifacts,
     executionContext: input.executionContext ?? null,
-    artifactPayloads: (input.artifactPayloads ?? []).map((artifactPayload) => ({
-      artifactRef: artifactPayload.artifactRef,
-      contentType: artifactPayload.contentType,
-      contentDigest: createHash("sha256").update(artifactPayload.contentBase64).digest("hex"),
-    })),
-    issues: input.issues ?? [],
+    artifactPayloads: sortedPayloads,
+    issues: sortedIssues,
     generatedSummary: input.generatedSummary ?? null,
   });
 }
