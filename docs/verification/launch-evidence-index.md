@@ -9,13 +9,14 @@ Every claim about launch readiness should link back to one or more artifacts lis
 - Current verdict: `PUBLIC_GITHUB_READY`
 - Last reviewed: 2026-03-30
 - Latest hosted-validated head: `04cb0a57d1e64f8a5cf03a22b4a5c60d37dffc3a`
+- Current local validation snapshot above that hosted head: `npm run build` is clean and `npm test` reports 136 total tests, 135 pass, 0 fail, and 1 skipped after semantic payload-size validation, archive-lookup graceful degradation, and PostgreSQL payload round-trip hardening landed
 - Previous hosted-validated head: `1e340b978bfa35a2ed339adcdb0d2add56cc08c3`
 - Wave 1.5 evidence status: closed on `04cb0a57d1e64f8a5cf03a22b4a5c60d37dffc3a`; GitHub-hosted `ci` and `docs-governance` both succeeded on the same runtime-and-doc reconciliation head after the worker execution-contract alignment landed. Later docs-only evidence refreshes do not reopen Wave 1.5 unless they change platform-sensitive runtime paths or GitHub workflow surfaces.
 - Wave 2B evidence status: locally closed on the bounded compute seam recorded in `docs/verification/wave-2b-bounded-compute-audit-2026-03-29.md`; the remaining compute gaps are DICOM-derived or package-grade execution and distributed worker infrastructure, not the absence of a real worker boundary.
 - Wave 3A evidence status: locally closed on the bounded archive lookup and clinician-facing viewer path recorded in `docs/verification/archive-viewer-seam-audit-2026-03-27.md` v2.0.0 and `docs/verification/workbench-frontend-audit-2026-03-27.md` v2.0.0; 95 tests pass, 0 fail.
 - Wave 3B evidence status: locally closed; 4 new artifact/report closure tests confirm report-preview retrieval, provenance chain integrity, archive truth preservation through review/finalize/report surfaces, and lossless report artifact delivery; 99 tests pass, 0 fail. No new production code changes needed — existing Waves 2A/3A implementation already satisfies all 3 exit gates.
-- Wave 4 evidence status: locally closed; DICOM SR and FHIR R4 DiagnosticReport export seams implemented and tested end-to-end; regulatory governance pack (PCCP, IEC 62304, ISO 14971, data governance, vulnerability SOP) created with honest-claim discipline; 102 tests pass, 0 fail.
-- Wave 5 evidence status: locally closed; clinical evidence program complete — reader-study protocol, subgroup analysis plan, PMS activation criteria, and release-linked validation packet created; no new code changes, 102 tests unchanged.
+- Wave 4 evidence status: locally closed; DICOM SR and FHIR R4 DiagnosticReport export seams implemented and tested end-to-end; regulatory governance pack (PCCP, IEC 62304, ISO 14971, data governance, vulnerability SOP) created with honest-claim discipline, and the current cumulative local validation snapshot is recorded in `docs/verification/release-validation-packet.md`.
+- Wave 5 evidence status: locally closed; clinical evidence program complete — reader-study protocol, subgroup analysis plan, PMS activation criteria, and release-linked validation packet created. The current local validation packet now records 136 total tests, 135 pass, 0 fail, and 1 skipped without changing the conservative publication verdict.
 - Public repository: `https://github.com/KonkovaElena/mri-second-opinion`
 - Auditor handoff: `docs/verification/ai-auditor-handoff-2026-03-25.md` (historical snapshot dated 2026-03-25; current verdict advanced later)
 - Repository-status retrospective: `docs/verification/publication-retrospective-audit-2026-03-27.md`
@@ -174,6 +175,8 @@ Record:
   - `docs/public-vocabulary.md`
   - `docs/status-model.md`
   - `tests/workflow-api.test.ts`
+  - `tests/validation-limits.test.ts`
+  - `tests/archive-error-types.test.ts`
   - `docs/verification/runtime-baseline-verification.md`
   - `docs/verification/demo-flow-audit-2026-03-27.md`
   - `docs/verification/presentation-surface-audit-2026-03-27.md`
@@ -197,6 +200,8 @@ Record:
   - `tests/workflow-api.test.ts`
   - `tests/postgres-bootstrap.test.ts`
   - `tests/postgres-case-service.test.ts`
+  - `tests/postgres-payload-roundtrip.test.ts`
+  - `tests/archive-error-types.test.ts`
   - `docs/verification/durable-delivery-queue-audit-2026-03-27.md`
   - `docs/verification/inference-queue-lease-audit-2026-03-27.md`
   - `docs/verification/postgres-bootstrap-audit-2026-03-27.md`

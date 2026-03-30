@@ -15,7 +15,7 @@ It satisfies Wave 5 exit gate 3: evidence ledger links runtime version, docs ver
 | Repository | mri-second-opinion |
 | Repository base head | `3d0df4f74010e6acc27164e2c0a581b145a11572` |
 | Latest hosted-validated head | `04cb0a57d1e64f8a5cf03a22b4a5c60d37dffc3a` |
-| Local validation scope | finalized-only export gating, release-doc reconciliation, and audit remediation (order-safe fingerprint, security headers, archive timeout, metrics error handling) on the working tree above the base head |
+| Local validation scope | finalized-only export gating, release-doc reconciliation, audit remediation, and later validation plus persistence hardening (semantic payload-size limits, archive lookup graceful degradation, PostgreSQL payload round-trip preservation) on the working tree above the base head |
 | Node.js target | 22+ |
 | TypeScript target | ES2022 |
 | Test runner | `npm test` (`node --import tsx --test tests/**/*.test.ts`) |
@@ -24,11 +24,11 @@ It satisfies Wave 5 exit gate 3: evidence ledger links runtime version, docs ver
 
 | Metric | Value |
 |--------|-------|
-| Total tests | 115 |
-| Passing | 114 |
+| Total tests | 136 |
+| Passing | 135 |
 | Failing | 0 |
 | Skipped | 1 |
-| Duration | ~3.0 s |
+| Duration | ~3.4 s |
 | Runner | `npm test` (`node --import tsx --test tests/**/*.test.ts`) |
 
 ### Test Coverage By Wave
@@ -44,6 +44,7 @@ It satisfies Wave 5 exit gate 3: evidence ledger links runtime version, docs ver
 | Wave 4 | DICOM SR, FHIR R4, finalized-only export gating | ~104 |
 | Post-Wave reconciliation | additional runtime, PostgreSQL, and workflow regression coverage | 114 |
 | Audit remediation | order-safe fingerprint, security headers, archive timeout, metrics error handling | 115 |
+| Post-publication hardening | semantic payload-size validation, archive-lookup degradation, and PostgreSQL round-trip preservation | 136 |
 
 ## TypeScript Compilation
 
@@ -105,7 +106,7 @@ Status: clean (`npm run build` -> `tsc -p tsconfig.json`)
 
 | Validation dimension | Artifact | Status |
 |---------------------|----------|--------|
-| Functional correctness | 115 tests, 114 pass, 0 fail, 1 skipped | Complete |
+| Functional correctness | 136 tests, 135 pass, 0 fail, 1 skipped | Complete |
 | Type safety | `npm run build` clean | Complete |
 | Interoperability | DICOM SR + FHIR R4 exports validated | Complete |
 | Regulatory readiness | 5-document governance pack | Complete |
@@ -120,14 +121,14 @@ Status: clean (`npm run build` -> `tsc -p tsconfig.json`)
 1. Reader study not yet executed — protocol exists, no data collected
 2. Subgroup analysis not yet executed — plan operationalizes framework, no results available
 3. PMS program not yet active — activation criteria defined, none met yet
-4. Hosted GitHub Actions evidence is not yet refreshed for the current local validation snapshot; the latest paired hosted-validated head remains `04cb0a57d1e64f8a5cf03a22b4a5c60d37dffc3a` in `docs/verification/launch-evidence-index.md`
+4. Hosted GitHub Actions evidence is not yet refreshed for the current local validation snapshot that includes the later validation and persistence hardening; the latest paired hosted-validated head remains `04cb0a57d1e64f8a5cf03a22b4a5c60d37dffc3a` in `docs/verification/launch-evidence-index.md`
 5. No automated SBOM generation in release workflow
 6. Skip count is 1 (one test intentionally skipped)
 
 ## Interpretation
 
-This validation packet establishes that the repository has a current local validation snapshot with clean build output, validated interoperability exports, and a documented regulatory and clinical evaluation path.
+This validation packet establishes that the repository has a current local validation snapshot with clean build output, validated interoperability exports, a strengthened validation and persistence regression net, and a documented regulatory and clinical evaluation path.
 
-The gaps are execution gaps, not specification gaps: the protocols and plans exist, the studies have not been run yet. Hosted workflow truth also still points to the last paired `ci` and `docs-governance` success on `04cb0a57d1e64f8a5cf03a22b4a5c60d37dffc3a`; the current local working tree has not been re-hosted yet.
+The gaps are execution gaps, not specification gaps: the protocols and plans exist, the studies have not been run yet. Hosted workflow truth also still points to the last paired `ci` and `docs-governance` success on `04cb0a57d1e64f8a5cf03a22b4a5c60d37dffc3a`; the current local validation snapshot above that hosted head has not been re-hosted yet.
 
 This is the expected state for a pre-evaluation RUO system. The next milestone is reader study execution, which will populate the subgroup analysis and provide the first real clinical performance data.

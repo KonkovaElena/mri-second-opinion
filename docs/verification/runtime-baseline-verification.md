@@ -1,10 +1,10 @@
 # Runtime Baseline Verification
 
-Date: 2026-03-27
+Date: 2026-03-30
 
 ## Scope
 
-This note records the current standalone runtime baseline after the stash-pop merge was reconciled and the final docs-governance drift was corrected on the pushed public head.
+This note records the current standalone runtime baseline after the publication reconciliation waves, export closure, and the latest validation plus persistence hardening pass were verified locally.
 
 It is the current-state runtime note for the standalone repository path.
 
@@ -23,9 +23,14 @@ It is not a target-architecture document and it intentionally excludes supersede
 9. `src/case-sqlite-storage.ts`
 10. `src/case-postgres-repository.ts`
 11. `src/postgres-bootstrap.ts`
-12. `public/workbench/index.html`
-13. `.github/workflows/ci.yml`
-14. `.github/workflows/docs-governance.yml`
+12. `src/archive-lookup.ts`
+13. `src/validation.ts`
+14. `public/workbench/index.html`
+15. `.github/workflows/ci.yml`
+16. `.github/workflows/docs-governance.yml`
+17. `tests/validation-limits.test.ts`
+18. `tests/archive-error-types.test.ts`
+19. `tests/postgres-payload-roundtrip.test.ts`
 
 ## Verified Behaviors
 
@@ -39,7 +44,9 @@ Confirmed locally from the standalone repository root.
 
 Confirmed locally.
 
-The reconciled standalone suite passes via `npx tsx --test tests/*.test.ts` with `53` passing tests and `0` failures.
+The current standalone suite passes via `npm test` (`node --import tsx --test tests/**/*.test.ts`) with `136` total tests, `135` passing, `0` failures, and `1` skipped.
+
+The latest hardening pass extends the baseline with semantic payload-size validation, archive lookup graceful-degradation coverage, and PostgreSQL payload round-trip preservation for Unicode content, multiline review comments, floating-point measurements, and large sequence inventories.
 
 The strongest current verification anchors are:
 
@@ -47,6 +54,9 @@ The strongest current verification anchors are:
 2. `tests/memory-case-service.test.ts`
 3. `tests/postgres-bootstrap.test.ts`
 4. `tests/postgres-case-service.test.ts`
+5. `tests/validation-limits.test.ts`
+6. `tests/archive-error-types.test.ts`
+7. `tests/postgres-payload-roundtrip.test.ts`
 
 ## 3. Runtime startup and baseline endpoints
 
@@ -75,8 +85,11 @@ The current merged runtime exposes and validates these public endpoints:
 4. `POST /api/cases/:caseId/review`
 5. `POST /api/cases/:caseId/finalize`
 6. `GET /api/cases/:caseId/report`
-7. `GET /api/operations/summary`
-8. `POST /api/delivery/:caseId/retry`
+7. `GET /api/cases/:caseId/exports/dicom-sr`
+8. `GET /api/cases/:caseId/exports/fhir-diagnostic-report`
+9. `GET /api/cases/:caseId/artifacts/:artifactId`
+10. `GET /api/operations/summary`
+11. `POST /api/delivery/:caseId/retry`
 
 The current merged runtime also exposes these internal bounded-slice endpoints:
 
@@ -88,8 +101,11 @@ The current merged runtime also exposes these internal bounded-slice endpoints:
 6. `GET /api/internal/delivery-jobs`
 7. `POST /api/internal/delivery-jobs/claim-next`
 8. `POST /api/internal/delivery-callback`
+9. `POST /api/internal/dispatch/claim`
+10. `POST /api/internal/dispatch/heartbeat`
+11. `POST /api/internal/dispatch/fail`
 
-The route-level tests cover create, review, finalize, delivery retry, inference completion, delivery completion, ingest idempotency, malformed JSON normalization, durable job claims, and expired inference-job requeue behavior.
+The route-level tests cover create, review, finalize, report retrieval, finalized-only export guards, artifact retrieval, delivery retry, inference completion, delivery completion, ingest idempotency, malformed JSON normalization, semantic request-size enforcement, archive-lookup degradation paths, HMAC-guarded dispatch claim or heartbeat rails, dispatch failure classification, durable job claims, and expired inference-job requeue behavior.
 
 ## 5. Restart-safe local persistence
 
@@ -126,21 +142,35 @@ The current repository now has local clean-database PostgreSQL proof through:
 
 This closes the local migration and bootstrap proof for the current baseline.
 
-## 7. PostgreSQL service-path proof
+## 7. PostgreSQL service-path and payload-preservation proof
 
 Confirmed locally.
 
-`tests/postgres-case-service.test.ts` exercises the merged PostgreSQL repository path through the current `MemoryCaseService` model and verifies:
+`tests/postgres-case-service.test.ts` and `tests/postgres-payload-roundtrip.test.ts` exercise the merged PostgreSQL repository path through the current `MemoryCaseService` model and verify:
 
 1. delivery-queue restart survival
 2. inference-job persistence through claim and callback completion
 3. expired claimed inference jobs can be requeued
+4. Unicode and mixed-script strings survive create, inference, and review persistence
+5. multiline review comments, floating-point measurements, and large sequence inventories round-trip without loss
 
 This is local service-path evidence only.
 
 It is not yet hosted or release-linked PostgreSQL operations evidence.
 
-## 8. Built-in workbench and read-side presentation
+## 8. Request validation and archive-enrichment hardening
+
+Confirmed locally.
+
+`tests/validation-limits.test.ts` and `tests/archive-error-types.test.ts` verify that the current public and internal intake paths reject oversized semantic payloads, preserve explicit validation boundaries, and degrade gracefully when the bounded archive lookup seam returns not-found, server-error, or network-failure states.
+
+The verified hardening scope includes:
+
+1. boundary enforcement for patient identifiers, study UIDs, free-text fields, sequence inventories, findings, summaries, and artifact payloads
+2. archive enrichment when bounded lookup returns valid study metadata
+3. case creation without false-negative failures when bounded archive lookup returns `404`, `500`, or network-level errors
+
+## 9. Built-in workbench and read-side presentation
 
 Confirmed locally.
 
@@ -157,7 +187,7 @@ The workbench is wired to live endpoints for:
 
 The read-side presentation layer now exposes explicit case, report, inference-job, delivery-job, and operations-summary envelopes through `src/case-presentation.ts`.
 
-## 9. Derived artifact and viewer-seam truth
+## 10. Derived artifact and viewer-seam truth
 
 Confirmed locally.
 
@@ -173,19 +203,16 @@ Those descriptors now carry:
 
 `viewerReady` is intentionally conservative and only becomes true when trustworthy archive-binding metadata exists.
 
-## 10. Reconciliation note
+## 11. Reconciliation note
 
 This file intentionally supersedes older current-state claims that no longer match the merged runtime.
 
 Specifically, this note does not claim current proof for:
 
-1. `POST /api/internal/dispatch/claim`
-2. `POST /api/internal/dispatch/heartbeat`
-3. `GET /operator`
-4. `src/artifact-store.ts`
-5. `tests/postgres-integration.test.ts`
-6. an active Redis-backed dispatch substrate
-7. ~~nonce replay enforcement~~ — now wired: `MemoryReplayStore` is active in `src/app.ts` dispatch middleware since audit remediation wave
+1. `GET /operator`
+2. `src/artifact-store.ts`
+3. `tests/postgres-integration.test.ts`
+4. an active Redis-backed dispatch substrate
 
 Those references belonged to earlier intermediate publication states and should not be reused as current runtime truth.
 

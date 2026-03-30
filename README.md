@@ -15,9 +15,18 @@ Use these entrypoints before reading deeper evidence packs.
 1. verdict authority: `docs/releases/v1-go-no-go.md`
 2. launch gates: `docs/launch-readiness-checklist.md`
 3. evidence ledger: `docs/verification/launch-evidence-index.md`
-4. publication vs MVP routing: `docs/releases/public-github-and-mvp-path.md`
-5. current wave sequencing: `docs/roadmap-and-validation.md`
-6. retrospective lessons: `docs/verification/publication-retrospective-audit-2026-03-27.md`
+4. local validation packet: `docs/verification/release-validation-packet.md`
+5. publication vs MVP routing: `docs/releases/public-github-and-mvp-path.md`
+6. current wave sequencing: `docs/roadmap-and-validation.md`
+7. retrospective lessons: `docs/verification/publication-retrospective-audit-2026-03-27.md`
+
+## Latest Local Validation Snapshot
+
+The latest local hardening pass keeps the conservative `PUBLIC_GITHUB_READY` verdict unchanged while strengthening the verified baseline above the latest hosted-validated head.
+
+1. `npm run build` completes cleanly on the current publication branch
+2. `npm test` is green with `136` total tests, `135` passing, `0` failing, and `1` skipped
+3. the new regression coverage hardens semantic payload-size validation, archive lookup graceful degradation, and PostgreSQL payload round-trip preservation for Unicode content, multiline review comments, floating-point measurements, and large sequence inventories
 
 ## Phase 1 Governance Pack
 

@@ -49,7 +49,7 @@ The repository has locally closed all five wave gates:
 1. Reader-study protocol written: retrospective multi-reader blinded study design with ICC and Bland-Altman primary endpoints, applicable to neuro-first T1-weighted 3D MRI workflow
 2. Subgroup analysis plan operationalized: primary strata from bias-analysis-framework.md (scanner vendor, field strength, QC class, age band), secondary strata (sex, protocol completeness, site), degradation thresholds defined
 3. PMS activation criteria documented: 6 prerequisites for upgrading the PMS transition plan from document to operational program, pre-activation evidence milestones tracked
-4. Release-linked validation packet created: evidence ledger linking base head `3d0df4f74010e6acc27164e2c0a581b145a11572`, latest hosted-validated head `04cb0a57d1e64f8a5cf03a22b4a5c60d37dffc3a`, 114 tests (113 pass, 0 fail, 1 skipped), build proof, export validation, regulatory pack, all documentation versions, and known gaps
+4. Release-linked validation packet created: evidence ledger linking base head `3d0df4f74010e6acc27164e2c0a581b145a11572`, latest hosted-validated head `04cb0a57d1e64f8a5cf03a22b4a5c60d37dffc3a`, the current local validation snapshot with 136 tests (135 pass, 0 fail, 1 skipped), build proof, export validation, regulatory pack, all documentation versions, and known gaps
 5. All exit gates met: reader-study SOP applicable to neuro-first slice, subgroup reporting references real validation strata, evidence ledger links runtime/docs/validation
 
 ### Wave 4 closure outcomes
@@ -62,7 +62,7 @@ The repository has locally closed all five wave gates:
 
 ### Recorded proof
 
-1. local validation snapshot — `npm run build` plus `npm test` pass with 115 total tests, 114 pass, 0 fail, and 1 skipped after finalized-only export regression coverage and audit remediation (order-safe fingerprint, security headers, archive timeout, metrics error handling) landed
+1. local validation snapshot — `npm run build` plus `npm test` pass with 136 total tests, 135 pass, 0 fail, and 1 skipped after finalized-only export regression coverage, audit remediation (order-safe fingerprint, security headers, archive timeout, metrics error handling), and later validation plus persistence hardening (semantic payload-size limits, archive-lookup graceful degradation, PostgreSQL payload round-trip preservation) landed
 2. 5 regulatory governance documents with honest-claim discipline (Wave 4)
 3. 4 clinical evidence documents with explicit execution-pending gaps (Wave 5)
 4. `docs/verification/release-validation-packet.md` — completeness matrix and known gaps

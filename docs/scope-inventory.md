@@ -2,7 +2,7 @@
 title: "Scope Inventory"
 status: "active"
 version: "1.0.0"
-last_updated: "2026-03-27"
+last_updated: "2026-03-30"
 tags: [scope, inventory, reference, mri]
 ---
 
@@ -27,11 +27,14 @@ Use it when checking whether a route, document, test, or demo asset is inside th
 7. `src/case-sqlite-storage.ts`
 8. `src/case-planning.ts`
 9. `src/case-common.ts`
-10. `src/case-imaging.ts`
-11. `src/case-artifacts.ts`
-12. `src/case-presentation.ts`
-13. `src/case-postgres-repository.ts`
-14. `src/postgres-bootstrap.ts`
+10. `src/case-exports.ts`
+11. `src/case-imaging.ts`
+12. `src/case-artifacts.ts`
+13. `src/case-presentation.ts`
+14. `src/archive-lookup.ts`
+15. `src/validation.ts`
+16. `src/case-postgres-repository.ts`
+17. `src/postgres-bootstrap.ts`
 
 ### Built-in frontend runtime
 
@@ -47,13 +50,16 @@ Use it when checking whether a route, document, test, or demo asset is inside th
 4. `POST /api/cases/:caseId/review`
 5. `POST /api/cases/:caseId/finalize`
 6. `GET /api/cases/:caseId/report`
-7. `GET /api/operations/summary`
-8. `POST /api/delivery/:caseId/retry`
-9. `GET /workbench`
-10. `GET /`
-11. `GET /healthz`
-12. `GET /readyz`
-13. `GET /metrics`
+7. `GET /api/cases/:caseId/exports/dicom-sr`
+8. `GET /api/cases/:caseId/exports/fhir-diagnostic-report`
+9. `GET /api/cases/:caseId/artifacts/:artifactId`
+10. `GET /api/operations/summary`
+11. `POST /api/delivery/:caseId/retry`
+12. `GET /workbench`
+13. `GET /`
+14. `GET /healthz`
+15. `GET /readyz`
+16. `GET /metrics`
 
 ### Internal integration rails
 
@@ -65,6 +71,9 @@ Use it when checking whether a route, document, test, or demo asset is inside th
 6. `GET /api/internal/delivery-jobs`
 7. `POST /api/internal/delivery-jobs/claim-next`
 8. `POST /api/internal/delivery-callback`
+9. `POST /api/internal/dispatch/claim`
+10. `POST /api/internal/dispatch/heartbeat`
+11. `POST /api/internal/dispatch/fail`
 
 ## Active Documentation Surfaces
 
@@ -103,7 +112,8 @@ Use it when checking whether a route, document, test, or demo asset is inside th
 9. `docs/verification/durable-delivery-queue-audit-2026-03-27.md`
 10. `docs/verification/inference-queue-lease-audit-2026-03-27.md`
 11. `docs/verification/postgres-bootstrap-audit-2026-03-27.md`
-12. `docs/releases/v1-go-no-go.md`
+12. `docs/verification/release-validation-packet.md`
+13. `docs/releases/v1-go-no-go.md`
 
 ### Demo-facing materials
 
@@ -121,8 +131,11 @@ Use it when checking whether a route, document, test, or demo asset is inside th
 2. `tests/memory-case-service.test.ts`
 3. `tests/postgres-case-service.test.ts`
 4. `tests/postgres-bootstrap.test.ts`
-5. `.github/workflows/ci.yml`
-6. `.github/workflows/docs-governance.yml`
+5. `tests/validation-limits.test.ts`
+6. `tests/archive-error-types.test.ts`
+7. `tests/postgres-payload-roundtrip.test.ts`
+8. `.github/workflows/ci.yml`
+9. `.github/workflows/docs-governance.yml`
 
 ## Current Demo Asset Reality
 
