@@ -274,7 +274,7 @@ export function createApp(config: AppConfig, options: CreateAppOptions = {}) {
 
   app.get("/api/cases/:caseId/exports/dicom-sr", async (req, res) => {
     try {
-      const report = await caseService.getReport(req.params.caseId);
+      const report = await caseService.getFinalizedReport(req.params.caseId);
       res.json({ dicomSr: buildDicomSrExport(report) });
     } catch (error) {
       handleError(res, error);
@@ -284,7 +284,7 @@ export function createApp(config: AppConfig, options: CreateAppOptions = {}) {
   app.get("/api/cases/:caseId/exports/fhir-diagnostic-report", async (req, res) => {
     try {
       const record = await caseService.getCase(req.params.caseId);
-      const report = await caseService.getReport(req.params.caseId);
+      const report = await caseService.getFinalizedReport(req.params.caseId);
       res.json({ diagnosticReport: buildFhirDiagnosticReport(report, record.patientAlias) });
     } catch (error) {
       handleError(res, error);

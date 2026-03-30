@@ -1,5 +1,6 @@
 import { Pool } from "pg";
 import type { CaseRecord, DeliveryJobRecord, InferenceJobRecord } from "./cases";
+import { getRetryBackoffSeconds } from "./case-common";
 import {
   buildPostgresBootstrapStatements,
   type PostgresBootstrapConfig,
@@ -29,6 +30,41 @@ export interface PostgresCaseRepositoryOptions extends PostgresBootstrapConfig {
   poolFactory?: PostgresPoolFactory;
 }
 
+interface StoredInferenceJobRow {
+  job_id: string;
+  case_id: string;
+  status: string;
+  attempt_count: number;
+  enqueued_at: string;
+  available_at: string;
+  updated_at: string;
+  worker_id: string | null;
+  claimed_at: string | null;
+  completed_at: string | null;
+  last_error: string | null;
+  lease_id: string | null;
+  lease_expires_at: string | null;
+  failure_class: string | null;
+}
+
+export interface PostgresRenewInferenceLeaseResult {
+  status: "updated" | "expired" | "missing";
+  job: InferenceJobRecord | null;
+}
+
+export interface PostgresFailInferenceJobInput {
+  caseId: string;
+  leaseId: string;
+  failureClass: Exclude<InferenceJobRecord["failureClass"], null>;
+  errorMessage: string;
+}
+
+export interface PostgresFailInferenceJobResult {
+  status: "updated" | "missing";
+  job: InferenceJobRecord | null;
+  requeued: boolean;
+}
+
 function cloneCase<T>(value: T): T {
   return JSON.parse(JSON.stringify(value)) as T;
 }
@@ -54,11 +90,18 @@ export class PostgresCaseRepository {
   private readonly dirtyDeliveryJobIds = new Set<string>();
   private readonly dirtyInferenceJobIds = new Set<string>();
   private readonly pool: PostgresPoolLike;
+  private readonly ownsPool: boolean;
   private initialized = false;
   private storeRevision = 0;
 
   constructor(private readonly options: PostgresCaseRepositoryOptions) {
-    this.pool = options.poolFactory?.() ?? createDefaultPool(options.connectionString);
+    if (options.poolFactory) {
+      this.pool = options.poolFactory();
+      this.ownsPool = false;
+    } else {
+      this.pool = createDefaultPool(options.connectionString);
+      this.ownsPool = true;
+    }
   }
 
   async list() {
@@ -427,8 +470,214 @@ export class PostgresCaseRepository {
     }
   }
 
+  async renewInferenceLease(
+    leaseId: string,
+    extensionMs: number,
+  ): Promise<PostgresRenewInferenceLeaseResult> {
+    await this.ensureLoaded();
+
+    const revisionTable = qualifyTable(this.options.schema, "store_metadata");
+    const inferenceTable = qualifyTable(this.options.schema, "inference_jobs");
+    const client = await this.pool.connect();
+
+    try {
+      await client.query("BEGIN");
+
+      const revisionRow = await client.query<{ value: string | number }>(
+        `SELECT value FROM ${revisionTable} WHERE key = 'revision' FOR UPDATE`,
+      );
+      const currentRevision = Number(revisionRow.rows[0]?.value ?? 0);
+
+      const rowResult = await client.query<StoredInferenceJobRow>(
+        `SELECT job_id, case_id, status, attempt_count, enqueued_at, available_at, updated_at, worker_id, claimed_at, completed_at, last_error, lease_id, lease_expires_at, failure_class
+         FROM ${inferenceTable}
+         WHERE lease_id = $1 AND status = 'claimed'
+         LIMIT 1
+         FOR UPDATE`,
+        [leaseId],
+      );
+      const row = rowResult.rows[0];
+
+      if (!row) {
+        await client.query("ROLLBACK");
+        this.storeRevision = currentRevision;
+        return { status: "missing", job: null };
+      }
+
+      const { inferenceJob } = parseStoredInferenceJobRecord(row);
+
+      if (inferenceJob.leaseExpiresAt && Date.parse(inferenceJob.leaseExpiresAt) < Date.now()) {
+        await client.query("ROLLBACK");
+        this.storeRevision = currentRevision;
+        this.applyPersistedInferenceJob(inferenceJob);
+        return { status: "expired", job: cloneCase(inferenceJob) };
+      }
+
+      const updatedAt = new Date().toISOString();
+      const leaseExpiresAt = new Date(Date.now() + extensionMs).toISOString();
+      const updatedJob: InferenceJobRecord = {
+        ...inferenceJob,
+        updatedAt,
+        leaseExpiresAt,
+      };
+
+      await client.query(
+        `UPDATE ${inferenceTable}
+         SET updated_at = $1,
+             lease_expires_at = $2
+         WHERE job_id = $3`,
+        [updatedJob.updatedAt, updatedJob.leaseExpiresAt, updatedJob.jobId],
+      );
+
+      const nextRevision = currentRevision + 1;
+      await client.query(
+        `UPDATE ${revisionTable} SET value = $1 WHERE key = 'revision'`,
+        [String(nextRevision)],
+      );
+
+      await client.query("COMMIT");
+
+      this.storeRevision = nextRevision;
+      this.applyPersistedInferenceJob(updatedJob);
+      return { status: "updated", job: cloneCase(updatedJob) };
+    } catch (error) {
+      try {
+        await client.query("ROLLBACK");
+      } catch {
+        // Ignore rollback failures and surface the original error.
+      }
+
+      throw error;
+    } finally {
+      client.release();
+    }
+  }
+
+  async failClaimedInferenceJob(
+    input: PostgresFailInferenceJobInput,
+  ): Promise<PostgresFailInferenceJobResult> {
+    await this.ensureLoaded();
+
+    const revisionTable = qualifyTable(this.options.schema, "store_metadata");
+    const inferenceTable = qualifyTable(this.options.schema, "inference_jobs");
+    const client = await this.pool.connect();
+
+    try {
+      await client.query("BEGIN");
+
+      const revisionRow = await client.query<{ value: string | number }>(
+        `SELECT value FROM ${revisionTable} WHERE key = 'revision' FOR UPDATE`,
+      );
+      const currentRevision = Number(revisionRow.rows[0]?.value ?? 0);
+
+      const rowResult = await client.query<StoredInferenceJobRow>(
+        `SELECT job_id, case_id, status, attempt_count, enqueued_at, available_at, updated_at, worker_id, claimed_at, completed_at, last_error, lease_id, lease_expires_at, failure_class
+         FROM ${inferenceTable}
+         WHERE case_id = $1 AND lease_id = $2 AND status = 'claimed'
+         LIMIT 1
+         FOR UPDATE`,
+        [input.caseId, input.leaseId],
+      );
+      const row = rowResult.rows[0];
+
+      if (!row) {
+        await client.query("ROLLBACK");
+        this.storeRevision = currentRevision;
+        return { status: "missing", job: null, requeued: false };
+      }
+
+      const { inferenceJob } = parseStoredInferenceJobRecord(row);
+      const updatedAt = new Date().toISOString();
+      const updatedJob: InferenceJobRecord =
+        input.failureClass === "transient"
+          ? {
+              ...inferenceJob,
+              status: "queued",
+              availableAt: new Date(
+                Date.now() + getRetryBackoffSeconds("standard", inferenceJob.attemptCount) * 1000,
+              ).toISOString(),
+              updatedAt,
+              workerId: null,
+              claimedAt: null,
+              completedAt: null,
+              lastError: input.errorMessage,
+              failureClass: "transient",
+              leaseId: null,
+              leaseExpiresAt: null,
+            }
+          : {
+              ...inferenceJob,
+              status: "failed",
+              updatedAt,
+              completedAt: updatedAt,
+              lastError: input.errorMessage,
+              failureClass: "terminal",
+              leaseId: null,
+              leaseExpiresAt: null,
+            };
+
+      await client.query(
+        `UPDATE ${inferenceTable}
+         SET status = $1,
+             attempt_count = $2,
+             available_at = $3,
+             updated_at = $4,
+             worker_id = $5,
+             claimed_at = $6,
+             completed_at = $7,
+             last_error = $8,
+             lease_id = $9,
+             lease_expires_at = $10,
+             failure_class = $11
+         WHERE job_id = $12`,
+        [
+          updatedJob.status,
+          updatedJob.attemptCount,
+          updatedJob.availableAt,
+          updatedJob.updatedAt,
+          updatedJob.workerId,
+          updatedJob.claimedAt,
+          updatedJob.completedAt,
+          updatedJob.lastError,
+          updatedJob.leaseId,
+          updatedJob.leaseExpiresAt,
+          updatedJob.failureClass,
+          updatedJob.jobId,
+        ],
+      );
+
+      const nextRevision = currentRevision + 1;
+      await client.query(
+        `UPDATE ${revisionTable} SET value = $1 WHERE key = 'revision'`,
+        [String(nextRevision)],
+      );
+
+      await client.query("COMMIT");
+
+      this.storeRevision = nextRevision;
+      this.applyPersistedInferenceJob(updatedJob);
+      return {
+        status: "updated",
+        job: cloneCase(updatedJob),
+        requeued: input.failureClass === "transient",
+      };
+    } catch (error) {
+      try {
+        await client.query("ROLLBACK");
+      } catch {
+        // Ignore rollback failures and surface the original error.
+      }
+
+      throw error;
+    } finally {
+      client.release();
+    }
+  }
+
   async close() {
-    await this.pool.end();
+    if (this.ownsPool) {
+      await this.pool.end();
+    }
   }
 
   private async ensureLoaded() {
@@ -474,5 +723,10 @@ export class PostgresCaseRepository {
     } finally {
       client.release();
     }
+  }
+
+  private applyPersistedInferenceJob(inferenceJob: InferenceJobRecord) {
+    this.inferenceJobs.set(inferenceJob.jobId, cloneCase(inferenceJob));
+    this.dirtyInferenceJobIds.delete(inferenceJob.jobId);
   }
 }

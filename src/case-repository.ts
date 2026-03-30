@@ -5,7 +5,10 @@ import {
 } from "./case-storage";
 import {
   PostgresCaseRepository,
+  type PostgresFailInferenceJobInput,
+  type PostgresFailInferenceJobResult,
   type PostgresPoolFactory,
+  type PostgresRenewInferenceLeaseResult,
 } from "./case-postgres-repository";
 import {
   openCaseDatabase,
@@ -31,6 +34,8 @@ export interface CaseRepository {
   listInferenceJobs(): Promise<InferenceJobRecord[]>;
   setInferenceJob(inferenceJob: InferenceJobRecord): void;
   replaceInferenceJobs(inferenceJobs: Iterable<InferenceJobRecord>): void;
+  renewInferenceLease?(leaseId: string, extensionMs: number): Promise<PostgresRenewInferenceLeaseResult>;
+  failClaimedInferenceJob?(input: PostgresFailInferenceJobInput): Promise<PostgresFailInferenceJobResult>;
   reload(): Promise<void>;
   save(): Promise<void>;
   close(): Promise<void>;

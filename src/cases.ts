@@ -889,6 +889,22 @@ export class MemoryCaseService {
   }
 
   async renewLease(leaseId: string, extensionMs = 5 * 60 * 1000) {
+    const renewInferenceLease = this.repository.renewInferenceLease?.bind(this.repository);
+
+    if (renewInferenceLease) {
+      const result = await renewInferenceLease(leaseId, extensionMs);
+
+      if (result.status === "missing") {
+        throw new WorkflowError(404, "No active lease found for the given leaseId", "LEASE_NOT_FOUND");
+      }
+
+      if (result.status === "expired") {
+        throw new WorkflowError(409, "Lease has already expired", "LEASE_EXPIRED");
+      }
+
+      return result.job!;
+    }
+
     const inferenceJobs = await this.repository.listInferenceJobs();
     const job = inferenceJobs.find((j) => j.leaseId === leaseId && j.status === "claimed");
 
@@ -920,6 +936,30 @@ export class MemoryCaseService {
     errorCode: string;
     detail?: string;
   }) {
+    const errorMessage = input.detail
+      ? `${input.errorCode}: ${input.detail}`
+      : input.errorCode;
+    const failClaimedInferenceJob = this.repository.failClaimedInferenceJob?.bind(this.repository);
+
+    if (failClaimedInferenceJob) {
+      const result = await failClaimedInferenceJob({
+        caseId: input.caseId,
+        leaseId: input.leaseId,
+        failureClass: input.failureClass,
+        errorMessage,
+      });
+
+      if (result.status === "missing") {
+        throw new WorkflowError(404, "No active claimed job found for the given caseId/leaseId", "JOB_NOT_FOUND");
+      }
+
+      return {
+        failureClass: input.failureClass,
+        requeued: result.requeued,
+        jobId: result.job!.jobId,
+      };
+    }
+
     const inferenceJobs = await this.repository.listInferenceJobs();
     const job = inferenceJobs.find(
       (j) => j.leaseId === input.leaseId && j.caseId === input.caseId && j.status === "claimed",
@@ -930,9 +970,6 @@ export class MemoryCaseService {
     }
 
     const now = nowIso();
-    const errorMessage = input.detail
-      ? `${input.errorCode}: ${input.detail}`
-      : input.errorCode;
 
     if (input.failureClass === "transient") {
       const backoffSeconds = getRetryBackoffSeconds("standard", job.attemptCount);
@@ -1158,6 +1195,25 @@ export class MemoryCaseService {
 
     if (!record.report) {
       throw new WorkflowError(404, "Report is not available for this case", "REPORT_NOT_READY");
+    }
+
+    return JSON.parse(
+      JSON.stringify({
+        ...record.report,
+        derivedArtifacts: record.artifactManifest,
+      }),
+    ) as ReportPayload;
+  }
+
+  async getFinalizedReport(caseId: string) {
+    const record = await this.requireCase(caseId);
+
+    if (!record.report) {
+      throw new WorkflowError(404, "Finalized report is not available for this case", "REPORT_NOT_READY");
+    }
+
+    if (record.report.reviewStatus !== "finalized") {
+      throw new WorkflowError(404, "Finalized report is not available for this case", "REPORT_NOT_FINALIZED");
     }
 
     return JSON.parse(

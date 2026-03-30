@@ -123,7 +123,7 @@ Implemented and verified in this repository today:
 
 1. standalone `npm ci`, `npm run build`, and `npm test`
 2. service startup from built output
-3. public workflow endpoints for case create, case list, case detail, review, finalize, report retrieval, artifact retrieval, delivery retry, and operations summary
+3. public workflow endpoints for case create, case list, case detail, review, finalize, report retrieval, finalized-only DICOM SR and FHIR export retrieval, artifact retrieval, delivery retry, and operations summary
 4. internal ingest, inference queue, delivery queue, inference callback, and delivery callback endpoints
 5. locked workflow-state vocabulary for the current MRI review path
 6. restart-safe local persistence for case state, explicit inference and delivery jobs, delivery state, retry history, and operation transcript on the default SQLite path, plus a locally verified PostgreSQL service path
@@ -188,8 +188,11 @@ See `docs/academic/formal-system-analysis.md` for the EFSM, protocol, and proper
 4. `POST /api/cases/:caseId/review`
 5. `POST /api/cases/:caseId/finalize`
 6. `GET /api/cases/:caseId/report`
-7. `GET /api/operations/summary`
-8. `POST /api/delivery/:caseId/retry`
+7. `GET /api/cases/:caseId/exports/dicom-sr`
+8. `GET /api/cases/:caseId/exports/fhir-diagnostic-report`
+9. `GET /api/cases/:caseId/artifacts/:artifactId`
+10. `GET /api/operations/summary`
+11. `POST /api/delivery/:caseId/retry`
 
 ### Built-in operator surface
 
@@ -198,13 +201,16 @@ See `docs/academic/formal-system-analysis.md` for the EFSM, protocol, and proper
 ### Internal integration endpoints
 
 1. `POST /api/internal/ingest`
+2. `POST /api/internal/inference-callback`
 3. `GET /api/internal/inference-jobs`
 4. `POST /api/internal/inference-jobs/claim-next`
 5. `POST /api/internal/inference-jobs/requeue-expired`
-6. `POST /api/internal/inference-callback`
-7. `GET /api/internal/delivery-jobs`
-8. `POST /api/internal/delivery-jobs/claim-next`
-9. `POST /api/internal/delivery-callback`
+6. `GET /api/internal/delivery-jobs`
+7. `POST /api/internal/delivery-jobs/claim-next`
+8. `POST /api/internal/delivery-callback`
+9. `POST /api/internal/dispatch/claim`
+10. `POST /api/internal/dispatch/heartbeat`
+11. `POST /api/internal/dispatch/fail`
 
 ### Internal route auth
 
@@ -214,7 +220,7 @@ This is the current namespace-level protection seam for worker-facing HTTP route
 
 If `MRI_INTERNAL_HMAC_SECRET` is set, `/api/internal/dispatch/*` additionally requires `X-MRI-Timestamp`, `X-MRI-Nonce`, and `X-MRI-Signature` headers.
 
-That HMAC layer is currently scoped to the bounded dispatch claim and heartbeat seam rather than to the entire internal namespace.
+That HMAC layer is currently scoped to the bounded dispatch claim, heartbeat, and fail seam rather than to the entire internal namespace.
 
 The root route also exposes the live route inventory and points readers to scope, launch-readiness, and verdict docs.
 

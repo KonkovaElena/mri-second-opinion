@@ -36,7 +36,7 @@ That timeline should be treated as a sequencing aid, not a launch promise.
 
 ## Final Wave Closure: All Waves Complete
 
-The repository has closed all five wave gates:
+The repository has locally closed all five wave gates:
 
 - Wave 1 + 1.5: API and durability baseline, hosted-validated on `04cb0a57d1e64f8a5cf03a22b4a5c60d37dffc3a`
 - Wave 2A + 2B: QC, artifacts, governance pack, bounded compute seam
@@ -49,7 +49,7 @@ The repository has closed all five wave gates:
 1. Reader-study protocol written: retrospective multi-reader blinded study design with ICC and Bland-Altman primary endpoints, applicable to neuro-first T1-weighted 3D MRI workflow
 2. Subgroup analysis plan operationalized: primary strata from bias-analysis-framework.md (scanner vendor, field strength, QC class, age band), secondary strata (sex, protocol completeness, site), degradation thresholds defined
 3. PMS activation criteria documented: 6 prerequisites for upgrading the PMS transition plan from document to operational program, pre-activation evidence milestones tracked
-4. Release-linked validation packet created: evidence ledger linking current version head to 102 tests (0 fail), TypeScript clean compilation, export validation, regulatory pack, all documentation versions, and known gaps
+4. Release-linked validation packet created: evidence ledger linking base head `3d0df4f74010e6acc27164e2c0a581b145a11572`, latest hosted-validated head `04cb0a57d1e64f8a5cf03a22b4a5c60d37dffc3a`, 114 tests (113 pass, 0 fail, 1 skipped), build proof, export validation, regulatory pack, all documentation versions, and known gaps
 5. All exit gates met: reader-study SOP applicable to neuro-first slice, subgroup reporting references real validation strata, evidence ledger links runtime/docs/validation
 
 ### Wave 4 closure outcomes
@@ -62,7 +62,7 @@ The repository has closed all five wave gates:
 
 ### Recorded proof
 
-1. `tests/workflow-api.test.ts` — 102 pass / 0 fail / 1 skip (stable since Wave 4 GREEN)
+1. local validation snapshot — `npm run build` plus `npm test` pass with 114 total tests, 113 pass, 0 fail, and 1 skipped after the finalized-only export regression coverage landed
 2. 5 regulatory governance documents with honest-claim discipline (Wave 4)
 3. 4 clinical evidence documents with explicit execution-pending gaps (Wave 5)
 4. `docs/verification/release-validation-packet.md` — completeness matrix and known gaps
@@ -73,9 +73,9 @@ Use the current repository state in this order.
 
 1. keep `PUBLIC_GITHUB_READY` scoped to conservative repository publication, not MVP closure
 2. close remaining GitHub UI or operator follow-up documented in `docs/releases/pending-manual-github-actions.md`
-3. start Wave 3A archive/viewer work without widening public claims ahead of a new code + docs + evidence package
-4. resume Track B with `WP-3` treated as locally closed bounded compute evidence; the next code-bearing step is `WP-4`
-5. revisit deeper phase-1 expansion only after the bounded MVP slice and evidence ledger are current
+3. treat Wave 3A archive/viewer and Wave 3B artifact/report work as locally closed evidence unless a future runtime change explicitly reopens them
+4. treat Wave 4 export and regulatory closure as code-and-test complete on the current local baseline; the next code-bearing work is follow-on hardening or fresh hosted-evidence capture, not reopening the export gate
+5. revisit deeper phase-1 expansion only after the bounded MVP slice, evidence ledger, and follow-on hardening proofs are current
 
 ### Execution Discipline After Wave 2B
 

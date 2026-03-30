@@ -8,13 +8,15 @@
 4. `POST /api/cases/:caseId/review`
 5. `POST /api/cases/:caseId/finalize`
 6. `GET /api/cases/:caseId/report`
-7. `GET /api/cases/:caseId/artifacts/:artifactId`
-8. `GET /api/operations/summary`
-9. `POST /api/delivery/:caseId/retry`
-10. `GET /workbench`
-11. `GET /healthz`
-12. `GET /readyz`
-13. `GET /metrics`
+7. `GET /api/cases/:caseId/exports/dicom-sr`
+8. `GET /api/cases/:caseId/exports/fhir-diagnostic-report`
+9. `GET /api/cases/:caseId/artifacts/:artifactId`
+10. `GET /api/operations/summary`
+11. `POST /api/delivery/:caseId/retry`
+12. `GET /workbench`
+13. `GET /healthz`
+14. `GET /readyz`
+15. `GET /metrics`
 
 ## Internal Integration Endpoints
 
@@ -36,7 +38,7 @@ Route descriptions and public nouns should follow `docs/public-vocabulary.md`.
 1. DICOM ingress is mediated by Orthanc, not by ad hoc file-drop endpoints in the public API
 2. inference execution is delegated to the Python compute plane
 3. public API is workflow-oriented, not PACS-oriented
-4. draft content is exposed through `GET /api/cases/:caseId` after internal ingest and inference complete; wave 1 does not expose a separate public draft-generation endpoint
+4. draft content is exposed through `GET /api/cases/:caseId` after internal ingest and inference complete; wave 1 does not expose a separate public draft-generation endpoint, and structured export endpoints remain finalized-only
 5. delivery state is exposed through case detail and operations summary; wave 1 does not expose a separate public delivery-detail endpoint
 6. current durability proof includes restart-safe local SQLite-backed case storage, a local persisted delivery-job queue, a local persisted inference-job queue with stale-claim recovery, and bounded local file-backed artifact persistence; broader production-grade PostgreSQL durability remains future work
 7. report payloads may include archive-linked artifact descriptors; `viewerReady` is only true when the payload contains trustworthy archive-binding metadata for an external viewer handoff, and wave 1 still does not claim a built-in viewer engine or PACS archive implementation

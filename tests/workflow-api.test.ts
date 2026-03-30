@@ -8,6 +8,7 @@ import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { tmpdir } from "node:os";
 import { DatabaseSync } from "node:sqlite";
+import type { Pool } from "pg";
 import { newDb } from "pg-mem";
 import { createApp } from "../src/app";
 import {
@@ -42,6 +43,19 @@ function createPostgresTestStore() {
     caseStoreSchema: "mri_wave1",
     postgresPoolFactory: () => new adapter.Pool(),
   };
+}
+
+async function withPostgresAdminPool<T>(
+  store: ReturnType<typeof createPostgresTestStore>,
+  run: (pool: Pool) => Promise<T>,
+) {
+  const pool = store.postgresPoolFactory() as Pool;
+
+  try {
+    return await run(pool);
+  } finally {
+    await pool.end();
+  }
 }
 
 async function startServer(
@@ -2786,6 +2800,111 @@ test("dispatch claim leases survive postgres restart and can be renewed over HTT
   }
 });
 
+test("dispatch heartbeat returns 404 for an unknown persisted postgres lease", async () => {
+  const store = createPostgresTestStore();
+
+  try {
+    await withPostgresServer(
+      store,
+      async ({ baseUrl }) => {
+        const heartbeat = await signedJsonRequest(baseUrl, "/api/internal/dispatch/heartbeat", {
+          body: {
+            leaseId: "missing-postgres-lease-id",
+            progress: "unknown-postgres-lease",
+          },
+        });
+
+        assert.equal(heartbeat.response.status, 404);
+        assert.equal(heartbeat.body.code, "LEASE_NOT_FOUND");
+      },
+      {
+        internalApiToken: DEFAULT_INTERNAL_API_TOKEN,
+        hmacSecret: DEFAULT_HMAC_SECRET,
+      },
+    );
+  } finally {
+    rmSync(store.tempDir, { recursive: true, force: true });
+  }
+});
+
+test("dispatch heartbeat returns 409 when a persisted postgres lease is already expired", async () => {
+  const store = createPostgresTestStore();
+
+  try {
+    let caseId = "";
+    let jobId = "";
+    let leaseId = "";
+
+    await withPostgresServer(
+      store,
+      async ({ baseUrl, jsonRequest }) => {
+        const created = await jsonRequest("/api/cases", {
+          method: "POST",
+          body: JSON.stringify({
+            patientAlias: "synthetic-patient-dispatch-postgres-expired-001",
+            studyUid: "1.2.840.dispatch.postgres.expired.1",
+            sequenceInventory: ["T1w", "FLAIR"],
+          }),
+        });
+
+        assert.equal(created.response.status, 201);
+        caseId = created.body.case.caseId as string;
+
+        const claim = await signedJsonRequest(baseUrl, "/api/internal/dispatch/claim", {
+          body: {
+            workerId: "dispatch-worker-postgres-expired-001",
+          },
+        });
+
+        assert.equal(claim.response.status, 200);
+        assert.notEqual(claim.body.dispatch, null);
+        assert.equal(claim.body.dispatch.caseId, caseId);
+        assert.equal(typeof claim.body.dispatch.jobId, "string");
+        assert.equal(typeof claim.body.dispatch.leaseId, "string");
+
+        jobId = claim.body.dispatch.jobId as string;
+        leaseId = claim.body.dispatch.leaseId as string;
+      },
+      {
+        internalApiToken: DEFAULT_INTERNAL_API_TOKEN,
+        hmacSecret: DEFAULT_HMAC_SECRET,
+      },
+    );
+
+    await withPostgresAdminPool(store, async (pool) => {
+      await pool.query("UPDATE mri_wave1.inference_jobs SET lease_expires_at = $1 WHERE job_id = $2", [
+        new Date(Date.now() - 60_000).toISOString(),
+        jobId,
+      ]);
+    });
+
+    await withPostgresServer(
+      store,
+      async ({ baseUrl, jsonRequest }) => {
+        const heartbeat = await signedJsonRequest(baseUrl, "/api/internal/dispatch/heartbeat", {
+          body: {
+            leaseId,
+            progress: "expired-postgres-lease",
+          },
+        });
+
+        assert.equal(heartbeat.response.status, 409);
+        assert.equal(heartbeat.body.code, "LEASE_EXPIRED");
+
+        const detail = await jsonRequest(`/api/cases/${caseId}`);
+        assert.equal(detail.response.status, 200);
+        assert.equal(detail.body.case.caseId, caseId);
+      },
+      {
+        internalApiToken: DEFAULT_INTERNAL_API_TOKEN,
+        hmacSecret: DEFAULT_HMAC_SECRET,
+      },
+    );
+  } finally {
+    rmSync(store.tempDir, { recursive: true, force: true });
+  }
+});
+
 test("delivery callback is rejected when no active persisted job exists", async () => {
   const { tempDir, caseStoreFile } = createTestStoreFile();
 
@@ -4529,6 +4648,72 @@ test("Wave 4: export endpoints return 404 for cases without finalized reports", 
       const fhirExport = await jsonRequest(`/api/cases/${caseId}/exports/fhir-diagnostic-report`);
       assert.equal(fhirExport.response.status, 404, "FHIR export must reject case without report");
       assert.ok(fhirExport.body.code, "error response must include error code");
+    });
+  } finally {
+    rmSync(tempDir, { recursive: true, force: true });
+  }
+});
+
+test("Wave 4: export endpoints return 404 while report is still awaiting review", async () => {
+  const { tempDir, caseStoreFile } = createTestStoreFile();
+  try {
+    await withServer(caseStoreFile, async ({ jsonRequest }) => {
+      const created = await jsonRequest("/api/cases", {
+        method: "POST",
+        body: JSON.stringify({
+          patientAlias: "DRAFT-EXPORT-001",
+          studyUid: "1.2.840.113619.2.55.3.99.10",
+          sequenceInventory: ["T1w"],
+        }),
+      });
+      assert.equal(created.response.status, 201);
+      const caseId = created.body.case.caseId as string;
+
+      const inferred = await jsonRequest("/api/internal/inference-callback", {
+        method: "POST",
+        body: JSON.stringify({
+          caseId,
+          qcDisposition: "pass",
+          findings: ["Draft export should stay private until finalization."],
+          measurements: [{ label: "hippocampal_z_score", value: -0.8 }],
+          artifacts: [],
+          generatedSummary: "Draft report generated.",
+        }),
+      });
+      assert.equal(inferred.response.status, 200);
+      assert.equal(inferred.body.case.status, "AWAITING_REVIEW");
+
+      const srExport = await jsonRequest(`/api/cases/${caseId}/exports/dicom-sr`);
+      assert.equal(srExport.response.status, 404, "DICOM SR export must reject draft report");
+      assert.ok(srExport.body.code, "draft rejection must include error code");
+
+      const fhirExport = await jsonRequest(`/api/cases/${caseId}/exports/fhir-diagnostic-report`);
+      assert.equal(fhirExport.response.status, 404, "FHIR export must reject draft report");
+      assert.ok(fhirExport.body.code, "draft rejection must include error code");
+    });
+  } finally {
+    rmSync(tempDir, { recursive: true, force: true });
+  }
+});
+
+test("Wave 4: export endpoints return 404 after review until finalization locks the report", async () => {
+  const { tempDir, caseStoreFile } = createTestStoreFile();
+  try {
+    await withServer(caseStoreFile, async ({ jsonRequest }) => {
+      const prepared = await createReviewedCase(jsonRequest, {
+        patientAlias: "REVIEWED-EXPORT-001",
+        studyUid: "1.2.840.113619.2.55.3.99.11",
+        studyInstanceUid: "2.25.reviewed-export.1",
+        accessionNumber: "ACC-REVIEW-EXPORT-001",
+      });
+
+      const srExport = await jsonRequest(`/api/cases/${prepared.caseId}/exports/dicom-sr`);
+      assert.equal(srExport.response.status, 404, "DICOM SR export must reject reviewed-but-unfinalized report");
+      assert.ok(srExport.body.code, "reviewed rejection must include error code");
+
+      const fhirExport = await jsonRequest(`/api/cases/${prepared.caseId}/exports/fhir-diagnostic-report`);
+      assert.equal(fhirExport.response.status, 404, "FHIR export must reject reviewed-but-unfinalized report");
+      assert.ok(fhirExport.body.code, "reviewed rejection must include error code");
     });
   } finally {
     rmSync(tempDir, { recursive: true, force: true });
