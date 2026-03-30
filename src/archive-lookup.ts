@@ -5,9 +5,15 @@ export interface ArchiveLookupConfig {
   archiveLookupSource?: string;
 }
 
+export type ArchiveLookupResult =
+  | { status: "found"; studyContext: StudyContextInput }
+  | { status: "not-found" }
+  | { status: "not-configured" }
+  | { status: "error"; reason: "timeout" | "network" | "server-error"; httpStatus?: number };
+
 export interface ArchiveLookupClient {
   isConfigured(): boolean;
-  lookupStudy(studyUid: string): Promise<StudyContextInput | null>;
+  lookupStudy(studyUid: string): Promise<ArchiveLookupResult>;
 }
 
 function normalizeString(value: unknown) {
@@ -101,9 +107,9 @@ export function createArchiveLookupClient(config: ArchiveLookupConfig): ArchiveL
     isConfigured() {
       return Boolean(normalizedBaseUrl);
     },
-    async lookupStudy(studyUid: string) {
+    async lookupStudy(studyUid: string): Promise<ArchiveLookupResult> {
       if (!normalizedBaseUrl) {
-        return null;
+        return { status: "not-configured" };
       }
 
       const requestUrl = new URL(`studies/${encodeURIComponent(studyUid)}`, normalizedBaseUrl);
@@ -116,13 +122,24 @@ export function createArchiveLookupClient(config: ArchiveLookupConfig): ArchiveL
           signal: AbortSignal.timeout(10_000),
         });
 
-        if (!response.ok) {
-          return null;
+        if (response.status === 404) {
+          return { status: "not-found" };
         }
 
-        return parseStudyContextPayload(await response.json(), archiveLookupSource);
-      } catch {
-        return null;
+        if (!response.ok) {
+          return { status: "error", reason: "server-error", httpStatus: response.status };
+        }
+
+        const studyContext = parseStudyContextPayload(await response.json(), archiveLookupSource);
+        if (!studyContext) {
+          return { status: "not-found" };
+        }
+
+        return { status: "found", studyContext };
+      } catch (error: unknown) {
+        const reason =
+          error instanceof DOMException && error.name === "TimeoutError" ? "timeout" : "network";
+        return { status: "error", reason };
       }
     },
   };

@@ -130,15 +130,27 @@ export function createApp(config: AppConfig, options: CreateAppOptions = {}) {
       return input;
     }
 
-    const lookedUpStudyContext = await archiveLookupClient.lookupStudy(input.studyUid);
-    if (!lookedUpStudyContext) {
-      return input;
+    const result = await archiveLookupClient.lookupStudy(input.studyUid);
+
+    if (result.status === "found") {
+      return {
+        ...input,
+        studyContext: mergeStudyContext(input.studyContext, result.studyContext),
+      };
     }
 
-    return {
-      ...input,
-      studyContext: mergeStudyContext(input.studyContext, lookedUpStudyContext),
-    };
+    if (result.status === "error") {
+      console.warn(
+        JSON.stringify({
+          event: "archive_lookup_error",
+          studyUid: input.studyUid,
+          reason: result.reason,
+          ...(result.httpStatus !== undefined ? { httpStatus: result.httpStatus } : {}),
+        }),
+      );
+    }
+
+    return input;
   }
 
   function handleError(res: express.Response, error: unknown) {

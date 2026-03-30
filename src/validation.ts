@@ -9,6 +9,26 @@ import {
 } from "./cases";
 import type { QcSummaryInput, StudyContextInput } from "./case-imaging";
 
+// ---------- Semantic size limits ----------
+const MAX_ID = 128;
+const MAX_SHORT = 256;
+const MAX_REF = 512;
+const MAX_TEXT = 2_000;
+const MAX_LONG_TEXT = 10_000;
+const MAX_BASE64 = 20_000_000; // ~15 MB decoded
+
+const MAX_SEQUENCE_INVENTORY = 100;
+const MAX_FINDINGS = 200;
+const MAX_MEASUREMENTS = 500;
+const MAX_ARTIFACTS = 500;
+const MAX_ARTIFACT_PAYLOADS = 100;
+const MAX_QC_CHECKS = 200;
+const MAX_QC_METRICS = 500;
+const MAX_SERIES = 1_000;
+const MAX_METADATA_SUMMARY = 200;
+const MAX_ISSUES = 100;
+const MAX_CAPABILITIES = 50;
+
 const jsonObjectSchema = z.object({}).passthrough();
 
 function invalidInput(message: string) {
@@ -38,23 +58,25 @@ function parseWithSchema<T>(body: unknown, schema: z.ZodType<T>) {
   return result.data;
 }
 
-const requiredTrimmedString = (fieldName: string) =>
+const requiredTrimmedString = (fieldName: string, maxLength = MAX_LONG_TEXT) =>
   z
     .string({
       required_error: `${fieldName} is required`,
       invalid_type_error: `${fieldName} is required`,
     })
+    .max(maxLength, `${fieldName} must be at most ${maxLength} characters`)
     .transform((value) => value.trim())
     .refine((value) => value.length > 0, `${fieldName} is required`);
 
-const optionalTrimmedString = z.preprocess((value) => {
-  if (typeof value !== "string") {
-    return undefined;
-  }
+const optionalTrimmedString = (maxLength = MAX_LONG_TEXT) =>
+  z.preprocess((value) => {
+    if (typeof value !== "string") {
+      return undefined;
+    }
 
-  const trimmed = value.trim();
-  return trimmed.length > 0 ? trimmed : undefined;
-}, z.string().optional());
+    const trimmed = value.trim();
+    return trimmed.length > 0 ? trimmed : undefined;
+  }, z.string().max(maxLength, `value must be at most ${maxLength} characters`).optional());
 
 const optionalNumberField = (fieldName: string) =>
   z.preprocess(
@@ -66,12 +88,18 @@ const optionalNumberField = (fieldName: string) =>
       .optional(),
   );
 
-function stringArrayField(fieldName: string, options: { requireNonEmpty?: boolean } = {}) {
+function stringArrayField(
+  fieldName: string,
+  options: { requireNonEmpty?: boolean; maxItems?: number; maxItemLength?: number } = {},
+) {
+  const maxItems = options.maxItems ?? MAX_FINDINGS;
+  const maxItemLength = options.maxItemLength ?? MAX_TEXT;
   return z
-    .array(z.string(), {
+    .array(z.string().max(maxItemLength, `${fieldName} entries must be at most ${maxItemLength} characters`), {
       required_error: `${fieldName} must be an array`,
       invalid_type_error: `${fieldName} must be an array`,
     })
+    .max(maxItems, `${fieldName} must have at most ${maxItems} entries`)
     .transform((entries) => Array.from(new Set(entries.map((entry) => entry.trim()).filter((entry) => entry.length > 0))))
     .superRefine((entries, ctx) => {
       if (options.requireNonEmpty && entries.length === 0) {
@@ -83,24 +111,25 @@ function stringArrayField(fieldName: string, options: { requireNonEmpty?: boolea
     });
 }
 
-const optionalStringArrayField = (fieldName: string) =>
+const optionalStringArrayField = (fieldName: string, maxItems = MAX_FINDINGS, maxItemLength = MAX_TEXT) =>
   z.preprocess(
     (value) => (typeof value === "undefined" ? undefined : value),
     z
-      .array(z.string(), {
+      .array(z.string().max(maxItemLength, `${fieldName} entries must be at most ${maxItemLength} characters`), {
         invalid_type_error: `${fieldName} must be an array`,
       })
+      .max(maxItems, `${fieldName} must have at most ${maxItems} entries`)
       .transform((entries) => entries.map((entry) => entry.trim()).filter((entry) => entry.length > 0))
       .optional(),
   );
 
 const studySeriesSchema = z.object({
-  seriesInstanceUid: optionalTrimmedString,
-  seriesDescription: optionalTrimmedString,
-  modality: optionalTrimmedString,
-  sequenceLabel: optionalTrimmedString,
+  seriesInstanceUid: optionalTrimmedString(MAX_ID),
+  seriesDescription: optionalTrimmedString(MAX_SHORT),
+  modality: optionalTrimmedString(MAX_SHORT),
+  sequenceLabel: optionalTrimmedString(MAX_SHORT),
   instanceCount: optionalNumberField("studyContext.series[].instanceCount"),
-  volumeDownloadUrl: optionalTrimmedString,
+  volumeDownloadUrl: optionalTrimmedString(MAX_REF),
 });
 
 const studyContextSchema = z
@@ -115,6 +144,13 @@ const studyContextSchema = z
       ctx.addIssue({
         code: z.ZodIssueCode.custom,
         message: "studyContext.series must be an array",
+      });
+    }
+
+    if (Array.isArray(series) && series.length > MAX_SERIES) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: `studyContext.series must have at most ${MAX_SERIES} entries`,
       });
     }
   })
@@ -139,51 +175,55 @@ const studyContextSchema = z
       : undefined;
 
     return {
-      studyInstanceUid: optionalTrimmedString.parse(studyContext.studyInstanceUid),
-      accessionNumber: optionalTrimmedString.parse(studyContext.accessionNumber),
-      studyDate: optionalTrimmedString.parse(studyContext.studyDate),
-      sourceArchive: optionalTrimmedString.parse(studyContext.sourceArchive),
-      dicomWebBaseUrl: optionalTrimmedString.parse(studyContext.dicomWebBaseUrl),
-      metadataSummary: optionalStringArrayField("studyContext.metadataSummary").parse(studyContext.metadataSummary),
+      studyInstanceUid: optionalTrimmedString(MAX_ID).parse(studyContext.studyInstanceUid),
+      accessionNumber: optionalTrimmedString(MAX_ID).parse(studyContext.accessionNumber),
+      studyDate: optionalTrimmedString(MAX_SHORT).parse(studyContext.studyDate),
+      sourceArchive: optionalTrimmedString(MAX_SHORT).parse(studyContext.sourceArchive),
+      dicomWebBaseUrl: optionalTrimmedString(MAX_REF).parse(studyContext.dicomWebBaseUrl),
+      metadataSummary: optionalStringArrayField("studyContext.metadataSummary", MAX_METADATA_SUMMARY, MAX_TEXT).parse(studyContext.metadataSummary),
       series: parsedSeries,
     };
   });
 
 const createCaseInputSchema = z.object({
-  patientAlias: requiredTrimmedString("patientAlias"),
-  studyUid: requiredTrimmedString("studyUid"),
-  sequenceInventory: stringArrayField("sequenceInventory", { requireNonEmpty: true }),
-  indication: optionalTrimmedString,
+  patientAlias: requiredTrimmedString("patientAlias", MAX_ID),
+  studyUid: requiredTrimmedString("studyUid", MAX_ID),
+  sequenceInventory: stringArrayField("sequenceInventory", {
+    requireNonEmpty: true,
+    maxItems: MAX_SEQUENCE_INVENTORY,
+    maxItemLength: MAX_SHORT,
+  }),
+  indication: optionalTrimmedString(MAX_TEXT),
   studyContext: studyContextSchema,
 });
 
 const reviewCaseInputSchema = z.object({
-  reviewerId: requiredTrimmedString("reviewerId"),
-  reviewerRole: optionalTrimmedString,
-  comments: optionalTrimmedString,
-  finalImpression: optionalTrimmedString,
+  reviewerId: requiredTrimmedString("reviewerId", MAX_ID),
+  reviewerRole: optionalTrimmedString(MAX_ID),
+  comments: optionalTrimmedString(MAX_LONG_TEXT),
+  finalImpression: optionalTrimmedString(MAX_LONG_TEXT),
 });
 
 const finalizeCaseInputSchema = z.object({
-  finalSummary: optionalTrimmedString,
+  finalSummary: optionalTrimmedString(MAX_LONG_TEXT),
   deliveryOutcome: z.enum(["pending", "failed", "delivered"]).optional(),
 });
 
 const qcCheckSchema = z.object({
-  checkId: requiredTrimmedString("qcSummary.checks[].checkId"),
+  checkId: requiredTrimmedString("qcSummary.checks[].checkId", MAX_SHORT),
   status: z.enum(["pass", "warn", "reject"], {
     errorMap: () => ({ message: "qcSummary.checks[].status must be pass, warn, or reject" }),
   }),
-  detail: requiredTrimmedString("qcSummary.checks[].detail"),
+  detail: requiredTrimmedString("qcSummary.checks[].detail", MAX_TEXT),
 });
 
 const qcMetricSchema = z.object({
-  name: requiredTrimmedString("qcSummary.metrics[].name"),
+  name: requiredTrimmedString("qcSummary.metrics[].name", MAX_SHORT),
   value: z.number({
     required_error: "qcSummary.metrics[].value must be a number",
     invalid_type_error: "qcSummary.metrics[].value must be a number",
   }),
-  unit: optionalTrimmedString,
+  unit: optionalTrimmedString(MAX_SHORT),
 });
 
 const qcSummarySchema = z
@@ -195,13 +235,13 @@ const qcSummarySchema = z
 
     const qcSummary = value as Record<string, unknown>;
     return {
-      summary: optionalTrimmedString.parse(qcSummary.summary),
+      summary: optionalTrimmedString(MAX_LONG_TEXT).parse(qcSummary.summary),
       checks: z
         .preprocess(
           (entry) => (typeof entry === "undefined" ? undefined : entry),
           z.array(qcCheckSchema, {
             invalid_type_error: "qcSummary.checks must be an array",
-          }).optional(),
+          }).max(MAX_QC_CHECKS, `qcSummary.checks must have at most ${MAX_QC_CHECKS} entries`).optional(),
         )
         .parse(qcSummary.checks),
       metrics: z
@@ -209,29 +249,29 @@ const qcSummarySchema = z
           (entry) => (typeof entry === "undefined" ? undefined : entry),
           z.array(qcMetricSchema, {
             invalid_type_error: "qcSummary.metrics must be an array",
-          }).optional(),
+          }).max(MAX_QC_METRICS, `qcSummary.metrics must have at most ${MAX_QC_METRICS} entries`).optional(),
         )
         .parse(qcSummary.metrics),
     };
   });
 
 const measurementSchema = z.object({
-  label: requiredTrimmedString("measurement.label"),
+  label: requiredTrimmedString("measurement.label", MAX_SHORT),
   value: z.number({
     required_error: "measurement.value is required",
     invalid_type_error: "measurement.value is required",
   }),
-  unit: optionalTrimmedString,
+  unit: optionalTrimmedString(MAX_SHORT),
 });
 
-const base64ContentSchema = requiredTrimmedString("artifactPayloads[].contentBase64").refine(
+const base64ContentSchema = requiredTrimmedString("artifactPayloads[].contentBase64", MAX_BASE64).refine(
   (value) => /^(?:[A-Za-z0-9+/]{4})*(?:[A-Za-z0-9+/]{2}==|[A-Za-z0-9+/]{3}=)?$/u.test(value),
   "artifactPayloads[].contentBase64 must be base64 encoded",
 );
 
 const artifactPayloadSchema = z.object({
-  artifactRef: requiredTrimmedString("artifactPayloads[].artifactRef"),
-  contentType: requiredTrimmedString("artifactPayloads[].contentType"),
+  artifactRef: requiredTrimmedString("artifactPayloads[].artifactRef", MAX_REF),
+  contentType: requiredTrimmedString("artifactPayloads[].contentType", MAX_SHORT),
   contentBase64: base64ContentSchema,
 });
 
@@ -244,8 +284,8 @@ const executionContextSchema = z
       (value) => (value === null ? undefined : value),
       z.enum(["missing-volume-input", "volume-download-failed", "volume-parse-failed"]).optional(),
     ),
-    fallbackDetail: optionalTrimmedString,
-    sourceSeriesInstanceUid: optionalTrimmedString,
+    fallbackDetail: optionalTrimmedString(MAX_TEXT),
+    sourceSeriesInstanceUid: optionalTrimmedString(MAX_ID),
   })
   .superRefine((value, ctx) => {
     if (value.computeMode === "voxel-backed" && (value.fallbackCode || value.fallbackDetail)) {
@@ -257,30 +297,30 @@ const executionContextSchema = z
   });
 
 const inferenceCallbackSchema = z.object({
-  caseId: requiredTrimmedString("caseId"),
+  caseId: requiredTrimmedString("caseId", MAX_ID),
   qcDisposition: z.enum(["pass", "warn", "reject"], {
     errorMap: () => ({ message: "qcDisposition must be pass, warn, or reject" }),
   }),
-  findings: stringArrayField("findings"),
+  findings: stringArrayField("findings", { maxItems: MAX_FINDINGS, maxItemLength: MAX_TEXT }),
   measurements: z.array(measurementSchema, {
     required_error: "measurements must be an array",
     invalid_type_error: "measurements must be an array",
-  }),
-  artifacts: stringArrayField("artifacts"),
+  }).max(MAX_MEASUREMENTS, `measurements must have at most ${MAX_MEASUREMENTS} entries`),
+  artifacts: stringArrayField("artifacts", { maxItems: MAX_ARTIFACTS, maxItemLength: MAX_REF }),
   artifactPayloads: z
     .preprocess(
       (value) => (typeof value === "undefined" ? undefined : value),
       z.array(artifactPayloadSchema, {
         invalid_type_error: "artifactPayloads must be an array",
-      }).optional(),
+      }).max(MAX_ARTIFACT_PAYLOADS, `artifactPayloads must have at most ${MAX_ARTIFACT_PAYLOADS} entries`).optional(),
     ),
   executionContext: z
     .preprocess(
       (value) => (typeof value === "undefined" ? undefined : value),
       executionContextSchema.optional(),
     ),
-  issues: optionalStringArrayField("issues"),
-  generatedSummary: optionalTrimmedString,
+  issues: optionalStringArrayField("issues", MAX_ISSUES, MAX_TEXT),
+  generatedSummary: optionalTrimmedString(MAX_LONG_TEXT),
   qcSummary: qcSummarySchema,
 }).superRefine((value, ctx) => {
   const artifactRefs = new Set(value.artifacts);
@@ -310,7 +350,7 @@ const inferenceCallbackSchema = z.object({
 });
 
 const claimJobInputSchema = z.object({
-  workerId: optionalTrimmedString,
+  workerId: optionalTrimmedString(MAX_ID),
 });
 
 const requeueExpiredInferenceJobsSchema = z.object({
@@ -318,11 +358,11 @@ const requeueExpiredInferenceJobsSchema = z.object({
 });
 
 const deliveryCallbackSchema = z.object({
-  caseId: requiredTrimmedString("caseId"),
+  caseId: requiredTrimmedString("caseId", MAX_ID),
   deliveryStatus: z.enum(["delivered", "failed"], {
     errorMap: () => ({ message: "deliveryStatus must be delivered or failed" }),
   }),
-  detail: optionalTrimmedString,
+  detail: optionalTrimmedString(MAX_TEXT),
 });
 
 export function parseCreateCaseInput(body: unknown): CreateCaseInput {
@@ -428,24 +468,24 @@ export function parseDeliveryCallbackInput(body: unknown): {
 }
 
 const dispatchClaimSchema = z.object({
-  workerId: optionalTrimmedString,
-  capabilities: optionalStringArrayField("capabilities"),
+  workerId: optionalTrimmedString(MAX_ID),
+  capabilities: optionalStringArrayField("capabilities", MAX_CAPABILITIES, MAX_SHORT),
 });
 
 const dispatchHeartbeatSchema = z.object({
-  leaseId: requiredTrimmedString("leaseId"),
-  progress: optionalTrimmedString,
+  leaseId: requiredTrimmedString("leaseId", MAX_ID),
+  progress: optionalTrimmedString(MAX_TEXT),
 });
 
 const dispatchFailSchema = z.object({
-  caseId: requiredTrimmedString("caseId"),
-  leaseId: requiredTrimmedString("leaseId"),
+  caseId: requiredTrimmedString("caseId", MAX_ID),
+  leaseId: requiredTrimmedString("leaseId", MAX_ID),
   failureClass: z.enum(["transient", "terminal"], {
     required_error: "failureClass is required",
     invalid_type_error: "failureClass must be 'transient' or 'terminal'",
   }),
-  errorCode: requiredTrimmedString("errorCode"),
-  detail: optionalTrimmedString,
+  errorCode: requiredTrimmedString("errorCode", MAX_SHORT),
+  detail: optionalTrimmedString(MAX_TEXT),
 });
 
 export function parseDispatchClaimInput(body: unknown): {
