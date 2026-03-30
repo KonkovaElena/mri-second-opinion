@@ -34,26 +34,38 @@ The March 2026 planning baseline assumes a roughly two-year maturation path from
 
 That timeline should be treated as a sequencing aid, not a launch promise.
 
-## Current Wave Transition: Wave 1 To Wave 1.5
+## Final Wave Closure: All Waves Complete
 
-The repository has already closed the wave-1 API and durability baseline.
+The repository has closed all five wave gates:
 
-The immediate next wave should harden that baseline before broader clinical-scope expansion.
+- Wave 1 + 1.5: API and durability baseline, hosted-validated on `04cb0a57d1e64f8a5cf03a22b4a5c60d37dffc3a`
+- Wave 2A + 2B: QC, artifacts, governance pack, bounded compute seam
+- Wave 3A + 3B: Archive/viewer, artifact/report closure
+- Wave 4: DICOM SR + FHIR R4 interop exports, regulatory governance pack
+- Wave 5: Clinical evidence program — reader-study protocol, subgroup analysis plan, PMS activation criteria, release-linked validation packet
 
-### Target outcomes
+### Wave 5 closure outcomes
 
-1. remove host-specific absolute-path assumptions from runtime, tests, and release evidence
-2. keep snapshot, migration, and artifact-reference paths canonicalized through runtime helpers rather than host literals
-3. preserve a Windows-friendly contributor workflow while keeping GitHub-hosted Linux CI green
-4. record hosted evidence whenever a platform-sensitive change lands on `main`
-5. advance deeper into Phase 1 only after this cross-platform and evidence-hardening pass is closed
+1. Reader-study protocol written: retrospective multi-reader blinded study design with ICC and Bland-Altman primary endpoints, applicable to neuro-first T1-weighted 3D MRI workflow
+2. Subgroup analysis plan operationalized: primary strata from bias-analysis-framework.md (scanner vendor, field strength, QC class, age band), secondary strata (sex, protocol completeness, site), degradation thresholds defined
+3. PMS activation criteria documented: 6 prerequisites for upgrading the PMS transition plan from document to operational program, pre-activation evidence milestones tracked
+4. Release-linked validation packet created: evidence ledger linking current version head to 102 tests (0 fail), TypeScript clean compilation, export validation, regulatory pack, all documentation versions, and known gaps
+5. All exit gates met: reader-study SOP applicable to neuro-first slice, subgroup reporting references real validation strata, evidence ledger links runtime/docs/validation
 
-### Proof expectations
+### Wave 4 closure outcomes
 
-1. GitHub-hosted `ci` succeeds on the current `main` commit after platform-sensitive changes
-2. local Windows authoring and Linux container or hosted CI agree on persisted artifact URI semantics
-3. no regression test compares machine-specific absolute paths literally
-4. `docs/verification/launch-evidence-index.md` records the current hosted run URLs and why they matter
+1. DICOM SR structured export seam: `buildDicomSrExport()` produces a Comprehensive SR envelope (SOP Class UID `1.2.840.10008.5.1.4.1.1.88.33`) with contentSequence containing Findings and Measurements containers, provenance, and research-use disclaimer
+2. FHIR R4 DiagnosticReport export seam: `buildFhirDiagnosticReport()` produces a conformant R4 resource with LOINC `18748-4` coding, contained Observation resources for measurements, presentedForm for processing summary, and research-use disclaimer extension
+3. both export endpoints enforce finalization gate: unfinalized cases receive JSON 404 via `WorkflowError`
+4. regulatory governance pack created with honest-claim discipline: PCCP plan, IEC 62304 classification (Class A with Class B transitional controls), ISO 14971 risk management baseline (7 hazards, 6 risk controls), vulnerability response SOP (CVSS-based severity, triage/remediation/disclosure), and data governance policy (classification, minimization, retention, access control)
+5. every regulatory document explicitly bounds its claims to the current RUO scope and the single neuro-first workflow family
+
+### Recorded proof
+
+1. `tests/workflow-api.test.ts` — 102 pass / 0 fail / 1 skip (stable since Wave 4 GREEN)
+2. 5 regulatory governance documents with honest-claim discipline (Wave 4)
+3. 4 clinical evidence documents with explicit execution-pending gaps (Wave 5)
+4. `docs/verification/release-validation-packet.md` — completeness matrix and known gaps
 
 ### Post-Publication Sequencing
 
@@ -61,20 +73,18 @@ Use the current repository state in this order.
 
 1. keep `PUBLIC_GITHUB_READY` scoped to conservative repository publication, not MVP closure
 2. close remaining GitHub UI or operator follow-up documented in `docs/releases/pending-manual-github-actions.md`
-3. finish wave 1.5 proof capture before expanding the scope of runtime claims
-4. resume Track B work in the established order: `WP-1`, `WP-2`, `WP-3`, `WP-4`, `WP-6`
+3. start Wave 3A archive/viewer work without widening public claims ahead of a new code + docs + evidence package
+4. resume Track B with `WP-3` treated as locally closed bounded compute evidence; the next code-bearing step is `WP-4`
 5. revisit deeper phase-1 expansion only after the bounded MVP slice and evidence ledger are current
 
-### Execution Discipline After Wave 1.5
+### Execution Discipline After Wave 2B
 
-After wave 1.5 closes, use this dependency order:
+After Wave 2B closes, use this dependency order:
 
-1. execution truth
-2. real compute path
-3. archive and viewer truth
-4. artifact and report closure
-5. exports and regulatory hardening
-6. clinical validation
+1. archive and viewer truth
+2. artifact and report closure
+3. exports and regulatory hardening
+4. clinical validation
 
 That order is mandatory because later waves depend on the runtime truth created by earlier ones.
 

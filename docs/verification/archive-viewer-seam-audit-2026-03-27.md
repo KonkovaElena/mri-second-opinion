@@ -1,9 +1,9 @@
 ---
 title: "Archive Viewer Seam Audit 2026-03-27"
 status: "active"
-version: "1.0.0"
-last_updated: "2026-03-27"
-tags: [verification, archive, viewer, mri]
+version: "2.0.0"
+last_updated: "2026-03-30"
+tags: [verification, archive, viewer, mri, wave-3a]
 role: evidence
 ---
 
@@ -13,9 +13,9 @@ role: evidence
 
 Record the closure of the archive-viewer compute seam in the standalone MRI repository.
 
-This audit verifies that report artifacts are no longer limited to opaque string references.
+This audit verifies that report artifacts are no longer limited to opaque string references and that the repository now provides a bounded archive metadata lookup and an explicit clinician-facing viewer path in the built-in review workbench.
 
-It does not claim that the repository now ships an embedded viewer or a PACS implementation.
+It does not claim that the repository ships an embedded production imaging viewer or a production PACS implementation.
 
 ## Implemented Runtime Change
 
@@ -58,12 +58,44 @@ Validation completed on 2026-03-27:
 3. standalone subtree build passed via `npm run build`
 4. workspace immediate preflight passed via `workflow:catch-and-fix-now`
 
+## Wave 3A: Archive Lookup And Viewer Path Closure
+
+The following Wave 3A capabilities were implemented and verified on 2026-03-30:
+
+### Bounded archive metadata lookup
+
+A new `src/archive-lookup.ts` module provides a bounded read-only DICOMWeb/Orthanc metadata lookup client. When `MRI_ARCHIVE_LOOKUP_BASE_URL` is configured, case intake enriches missing `studyContext` fields from the archive before plan envelope and evidence-card generation. The enrichment is caller-first: caller-supplied fields take precedence and archive fields fill gaps only. When the archive is not configured or lookup fails, case creation falls back cleanly to the existing metadata-only path.
+
+### Clinician-facing viewer path
+
+The existing review workbench at `GET /workbench` now renders an explicit Viewer Path panel. When a `viewerReady` artifact has a trusted archive binding, the workbench renders navigable `viewerPath` and `archiveStudyUrl` links derived from the artifact's `viewerDescriptor` and `archiveLocator` fields. The viewer path is rendered inside the existing workbench, not in a parallel UI.
+
+### Implementation surfaces
+
+1. `src/archive-lookup.ts` — bounded archive lookup client with `createArchiveLookupClient()` and `parseStudyContextPayload()`
+2. `src/config.ts` — `archiveLookupBaseUrl` and `archiveLookupSource` optional config fields
+3. `src/app.ts` — archive lookup intake wiring via `enrichCreateCaseInput()`, `needsArchiveLookup()`, `mergeStudyContext()`
+4. `src/case-presentation.ts` — `buildViewerPath()` and `buildArchiveStudyUrl()` helpers
+5. `public/workbench/index.html` — Viewer Path panel section
+6. `public/workbench/review-workbench.js` — viewer panel rendering and artifact viewer links
+7. `tests/workflow-api.test.ts` — 3 new end-to-end tests covering archive enrichment positive path, fallback negative path, and workbench viewer path assertion
+
+### Validation
+
+1. 95 tests pass, 0 fail, 1 skipped
+2. `npm run build` clean
+3. Archive enrichment resolves real study metadata from configured DICOMWeb endpoint
+4. `viewerReady` stays honest: only true when trusted archive binding exists
+5. Workbench renders viewer and archive links only when binding is trustworthy
+
 ## Audit Decision
 
 `Add archive viewer compute seams` is complete for the standalone repository.
 
+Wave 3A archive and viewer truth closure is complete: bounded archive lookup and clinician-facing viewer path are both code-backed and test-proven.
+
 Remaining future work stays out of scope for this step:
 
-1. embedded viewer UI
-2. real PACS archive implementation
+1. production PACS auth and orchestration
+2. embedded OHIF or equivalent viewer deployment
 3. DICOM SEG or DICOM SR export generation

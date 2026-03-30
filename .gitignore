@@ -1,6 +1,10 @@
 node_modules/
 dist/
+__pycache__/
+*.pyc
 .env
 npm-debug.log*
 .mri-data/
 artifacts/
+_*.txt
+_*.diff

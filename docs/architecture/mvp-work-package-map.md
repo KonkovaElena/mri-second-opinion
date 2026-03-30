@@ -89,8 +89,8 @@ Current execution note 2026-03-29:
 1. Wave 2A boundary truth is already in place and publicly evidenced
 2. Wave 2B contract layering on inference-job claim responses and HMAC-protected dispatch lease closure are already in place
 3. local file-backed artifact persistence and public artifact retrieval are already in place on the current pushed head
-4. the current smallest honest WP-3 step is to replace the Python worker scaffold with one real neuro-first compute path while preserving the existing callback and artifact contract
-5. that step should keep the TypeScript control-plane contract stable and avoid object-store or archive claims before the worker path is real
+4. WP-3 is now locally closed on a bounded compute seam: the Python worker can preserve the callback and artifact contract while executing either a metadata-fallback path or one bounded voxel-backed pass
+5. the next smallest honest step is WP-4 archive/viewer truth while keeping the current worker callback and artifact contract stable
 
 Primary outputs:
 

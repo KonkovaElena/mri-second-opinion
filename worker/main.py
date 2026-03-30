@@ -1,8 +1,10 @@
 import hashlib
 import hmac
 import base64
+import gzip
 import json
 import os
+import struct
 import sys
 import uuid
 from datetime import datetime, timezone
@@ -162,7 +164,169 @@ def planned_artifact_uri(targets: dict[str, dict], artifact_type: str) -> str:
     return f"artifact://{artifact_type}"
 
 
-def build_inference_callback(case_id: str, worker_id: str, execution: dict) -> dict:
+def resolve_download_url(base_url: str, download_url: str) -> str:
+    parsed_url = parse.urlparse(download_url)
+    if parsed_url.scheme:
+        return download_url
+    return parse.urljoin(f"{base_url}/", download_url.lstrip("/"))
+
+
+def download_binary_payload(base_url: str, download_url: str, correlation_id: str) -> bytes:
+    resolved_url = resolve_download_url(base_url, download_url)
+    req = request.Request(
+        resolved_url,
+        headers={
+            "x-correlation-id": correlation_id,
+        },
+        method="GET",
+    )
+    opener = request.build_opener(request.ProxyHandler({})) if should_bypass_proxy(resolved_url) else request.build_opener()
+
+    with opener.open(req) as response:
+        return response.read()
+
+
+def select_volume_input(study_context: dict) -> dict | None:
+    preferred = None
+    fallback = None
+
+    for series in study_context.get("series") or []:
+        if not isinstance(series, dict):
+            continue
+
+        download_url = str(series.get("volumeDownloadUrl") or "").strip()
+        if not download_url:
+            continue
+
+        if fallback is None:
+            fallback = series
+
+        if str(series.get("sequenceLabel") or "").strip() == "T1w":
+            preferred = series
+            break
+
+    return preferred or fallback
+
+
+def parse_nifti_volume_bytes(payload_bytes: bytes) -> dict:
+    raw_bytes = gzip.decompress(payload_bytes) if payload_bytes[:2] == b"\x1f\x8b" else payload_bytes
+    if len(raw_bytes) < 352:
+        raise RuntimeError("Downloaded NIfTI payload is too small to contain a valid header.")
+
+    if struct.unpack("<I", raw_bytes[:4])[0] == 348:
+        endian = "<"
+    elif struct.unpack(">I", raw_bytes[:4])[0] == 348:
+        endian = ">"
+    else:
+        raise RuntimeError("Unsupported NIfTI header; sizeof_hdr is not 348.")
+
+    dimensions = struct.unpack(f"{endian}8h", raw_bytes[40:56])
+    rank = max(1, int(dimensions[0]))
+    dim_x = max(1, int(dimensions[1]))
+    dim_y = max(1, int(dimensions[2])) if rank >= 2 else 1
+    dim_z = max(1, int(dimensions[3])) if rank >= 3 else 1
+    datatype = int(struct.unpack(f"{endian}h", raw_bytes[70:72])[0])
+    bitpix = int(struct.unpack(f"{endian}h", raw_bytes[72:74])[0])
+    vox_offset = max(352, int(struct.unpack(f"{endian}f", raw_bytes[108:112])[0]))
+
+    format_map = {
+        2: "B",   # uint8
+        4: "h",   # int16
+        8: "i",   # int32
+        16: "f",  # float32
+        64: "d",  # float64
+        512: "H", # uint16
+        768: "I", # uint32
+    }
+    format_code = format_map.get(datatype)
+    if format_code is None:
+        raise RuntimeError(f"Unsupported NIfTI datatype: {datatype}")
+
+    bytes_per_value = bitpix // 8
+    voxel_count = dim_x * dim_y * dim_z
+    data_end = vox_offset + voxel_count * bytes_per_value
+    if len(raw_bytes) < data_end:
+        raise RuntimeError("Downloaded NIfTI payload ended before the declared voxel data completed.")
+
+    voxel_values = [
+        float(value)
+        for (value,) in struct.iter_unpack(
+            f"{endian}{format_code}",
+            raw_bytes[vox_offset:data_end],
+        )
+    ]
+    if len(voxel_values) != voxel_count:
+        raise RuntimeError("Parsed voxel count does not match the declared NIfTI dimensions.")
+
+    min_intensity = min(voxel_values)
+    max_intensity = max(voxel_values)
+    nonzero_voxel_count = sum(1 for value in voxel_values if value != 0.0)
+    mean_intensity = round(sum(voxel_values) / voxel_count, 4)
+
+    return {
+        "dimensions": [dim_x, dim_y, dim_z],
+        "voxelCount": voxel_count,
+        "nonzeroVoxelCount": nonzero_voxel_count,
+        "meanIntensity": mean_intensity,
+        "minIntensity": min_intensity,
+        "maxIntensity": max_intensity,
+        "voxelValues": voxel_values,
+    }
+
+
+def build_slice_svg(volume_metrics: dict) -> str:
+    dim_x, dim_y, dim_z = volume_metrics["dimensions"]
+    voxel_values = volume_metrics["voxelValues"]
+    center_z = dim_z // 2
+    offset = center_z * dim_x * dim_y
+    slice_values = voxel_values[offset : offset + dim_x * dim_y]
+    min_intensity = min(slice_values)
+    max_intensity = max(slice_values)
+    intensity_range = max(max_intensity - min_intensity, 1e-9)
+    cell_size = max(4, 64 // max(dim_x, dim_y, 1))
+    rects: list[str] = []
+
+    for y in range(dim_y):
+        for x in range(dim_x):
+            value = slice_values[y * dim_x + x]
+            normalized = int(round(((value - min_intensity) / intensity_range) * 255)) if intensity_range > 0 else 0
+            rects.append(
+                f'<rect x="{x * cell_size}" y="{y * cell_size}" width="{cell_size}" height="{cell_size}" fill="rgb({normalized},{normalized},{normalized})" />'
+            )
+
+    width = dim_x * cell_size
+    height = dim_y * cell_size
+    return "".join(
+        [
+            f'<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 {width} {height}" width="{width}" height="{height}" shape-rendering="crispEdges">',
+            '<rect width="100%" height="100%" fill="black" />',
+            *rects,
+            "</svg>",
+        ]
+    )
+
+
+def build_execution_context(
+    compute_mode: str,
+    source_series_instance_uid: str | None = None,
+    fallback_code: str | None = None,
+    fallback_detail: str | None = None,
+) -> dict:
+    return {
+        "computeMode": compute_mode,
+        "fallbackCode": fallback_code,
+        "fallbackDetail": fallback_detail,
+        "sourceSeriesInstanceUid": source_series_instance_uid,
+    }
+
+
+def build_inference_callback(
+    base_url: str,
+    case_id: str,
+    worker_id: str,
+    execution: dict,
+    correlation_id: str,
+) -> dict:
     case_context = execution.get("caseContext") or {}
     study_context = execution.get("studyContext") or {}
     package_manifest = execution.get("packageManifest") or {}
@@ -184,6 +348,177 @@ def build_inference_callback(case_id: str, worker_id: str, execution: dict) -> d
     if required_sequences:
         coverage_ratio = round(((len(required_sequences) - len(missing_required)) / len(required_sequences)) * 100.0, 2)
 
+    targets = persistence_targets_by_type(execution)
+    artifact_refs = [
+        planned_artifact_uri(targets, "qc-summary"),
+        planned_artifact_uri(targets, "metrics-json"),
+        planned_artifact_uri(targets, "overlay-preview"),
+        planned_artifact_uri(targets, "report-preview"),
+    ]
+
+    volume_input = select_volume_input(study_context)
+    if volume_input is not None:
+        volume_series_uid = str(volume_input.get("seriesInstanceUid") or study_instance_uid)
+        try:
+            download_url = str(volume_input.get("volumeDownloadUrl") or "").strip()
+            volume_bytes = download_binary_payload(base_url, download_url, correlation_id)
+        except Exception as exc:
+            fallback_code = "volume-download-failed"
+            fallback_detail = str(exc)
+        else:
+            try:
+                volume_metrics = parse_nifti_volume_bytes(volume_bytes)
+            except Exception as exc:
+                fallback_code = "volume-parse-failed"
+                fallback_detail = str(exc)
+            else:
+                dim_x, dim_y, dim_z = volume_metrics["dimensions"]
+                foreground_ratio = round(
+                    (volume_metrics["nonzeroVoxelCount"] / volume_metrics["voxelCount"]) * 100.0,
+                    2,
+                )
+                summary = (
+                    f"Voxel-backed draft for study {study_instance_uid} using {selected_package} "
+                    f"with volume {dim_x}x{dim_y}x{dim_z}."
+                )
+                findings = [
+                    f"Voxel-backed structural pass executed on series {volume_series_uid}.",
+                    f"Parsed volume dimensions: {dim_x}x{dim_y}x{dim_z} voxels.",
+                    f"Sequence coverage available to the worker: {sequence_text}.",
+                ]
+
+                indication = str(case_context.get("indication") or "").strip()
+                if indication:
+                    findings.append(f"Clinical indication supplied to the worker: {indication}.")
+
+                issues: list[str] = []
+                if missing_required:
+                    issues.append(
+                        "Missing required sequences for selected package: " + ", ".join(missing_required)
+                    )
+                if not archive_binding:
+                    issues.append("No archive binding was present in the execution contract.")
+
+                measurements = [
+                    {"label": "volume_voxel_count", "value": volume_metrics["voxelCount"], "unit": "count"},
+                    {"label": "nonzero_voxel_count", "value": volume_metrics["nonzeroVoxelCount"], "unit": "count"},
+                    {"label": "foreground_voxel_pct", "value": foreground_ratio, "unit": "percent"},
+                    {"label": "mean_intensity", "value": volume_metrics["meanIntensity"], "unit": "signal"},
+                ]
+
+                qc_summary = {
+                    "summary": summary,
+                    "checks": [
+                        {
+                            "checkId": "required-sequences",
+                            "status": "pass" if not missing_required else "warn",
+                            "detail": (
+                                "All required sequences are present in the execution contract."
+                                if not missing_required
+                                else "Missing required sequences: " + ", ".join(missing_required)
+                            ),
+                        },
+                        {
+                            "checkId": "volume-input",
+                            "status": "pass",
+                            "detail": f"Worker downloaded and parsed a NIfTI volume from {download_url}.",
+                        },
+                        {
+                            "checkId": "foreground-coverage",
+                            "status": "pass" if volume_metrics["nonzeroVoxelCount"] > 0 else "warn",
+                            "detail": (
+                                f"Foreground coverage is {foreground_ratio}% based on non-zero voxels."
+                                if volume_metrics["nonzeroVoxelCount"] > 0
+                                else "All voxels were zero-valued in the downloaded volume."
+                            ),
+                        },
+                    ],
+                    "metrics": [
+                        {"name": measurement["label"], "value": measurement["value"], "unit": measurement["unit"]}
+                        for measurement in measurements
+                    ],
+                }
+
+                metrics_payload = {
+                    "caseId": case_id,
+                    "workerId": worker_id,
+                    "selectedPackage": selected_package,
+                    "resourceClass": dispatch_profile.get("resourceClass"),
+                    "sourceSeriesInstanceUid": volume_series_uid,
+                    "metrics": measurements,
+                }
+                qc_payload = {
+                    "caseId": case_id,
+                    "workerId": worker_id,
+                    "studyInstanceUid": study_instance_uid,
+                    "qcDisposition": "pass" if volume_metrics["nonzeroVoxelCount"] > 0 and not missing_required else "warn",
+                    "summary": summary,
+                    "checks": qc_summary["checks"],
+                    "issues": issues,
+                }
+                svg_preview = build_slice_svg(volume_metrics)
+                report_preview = "".join(
+                    [
+                        "<html><body>",
+                        f"<h1>Voxel-backed MRI Worker Draft for {study_instance_uid}</h1>",
+                        f"<p>{summary}</p>",
+                        "<ul>",
+                        *[f"<li>{finding}</li>" for finding in findings],
+                        "</ul>",
+                        f"<p>Foreground coverage: {foreground_ratio}%</p>",
+                        "</body></html>",
+                    ]
+                )
+
+                artifact_payloads = [
+                    {
+                        "artifactRef": artifact_refs[0],
+                        "contentType": "application/json",
+                        "contentBase64": encode_json_payload(qc_payload),
+                    },
+                    {
+                        "artifactRef": artifact_refs[1],
+                        "contentType": "application/json",
+                        "contentBase64": encode_json_payload(metrics_payload),
+                    },
+                    {
+                        "artifactRef": artifact_refs[2],
+                        "contentType": "image/svg+xml",
+                        "contentBase64": encode_text_payload(svg_preview),
+                    },
+                    {
+                        "artifactRef": artifact_refs[3],
+                        "contentType": "text/html",
+                        "contentBase64": encode_text_payload(report_preview),
+                    },
+                ]
+
+                return {
+                    "caseId": case_id,
+                    "workerId": worker_id,
+                    "qcDisposition": qc_payload["qcDisposition"],
+                    "findings": findings,
+                    "measurements": measurements,
+                    "artifacts": artifact_refs,
+                    "artifactPayloads": artifact_payloads,
+                    "executionContext": build_execution_context(
+                        "voxel-backed",
+                        source_series_instance_uid=volume_series_uid,
+                    ),
+                    "issues": issues,
+                    "generatedSummary": summary,
+                    "qcSummary": qc_summary,
+                }
+        fallback_volume_issue = "Volume-backed pass unavailable; worker fell back to metadata-only mode: " + fallback_detail
+        fallback_code_for_context = fallback_code
+        fallback_detail_for_context = fallback_detail
+        fallback_series_uid = volume_series_uid
+    else:
+        fallback_volume_issue = "No volumeDownloadUrl was present in the execution contract."
+        fallback_code_for_context = "missing-volume-input"
+        fallback_detail_for_context = fallback_volume_issue
+        fallback_series_uid = None
+
     summary = (
         f"Metadata-derived draft for study {study_instance_uid} using {selected_package} "
         f"with {series_count} described series."
@@ -203,6 +538,10 @@ def build_inference_callback(case_id: str, worker_id: str, execution: dict) -> d
         findings.append("Archive binding is absent, so viewer-facing artifact links remain bounded placeholders.")
 
     issues = ["Metadata-derived worker draft only; no voxel-level inference executed."]
+    if volume_input is not None:
+        issues.append(fallback_volume_issue)
+    else:
+        issues.append(fallback_detail_for_context)
     if missing_required:
         issues.append(
             "Missing required sequences for selected package: " + ", ".join(missing_required)
@@ -260,14 +599,6 @@ def build_inference_callback(case_id: str, worker_id: str, execution: dict) -> d
             for measurement in measurements
         ],
     }
-
-    targets = persistence_targets_by_type(execution)
-    artifact_refs = [
-        planned_artifact_uri(targets, "qc-summary"),
-        planned_artifact_uri(targets, "metrics-json"),
-        planned_artifact_uri(targets, "overlay-preview"),
-        planned_artifact_uri(targets, "report-preview"),
-    ]
 
     qc_payload = {
         "caseId": case_id,
@@ -328,10 +659,41 @@ def build_inference_callback(case_id: str, worker_id: str, execution: dict) -> d
         "measurements": measurements,
         "artifacts": artifact_refs,
         "artifactPayloads": artifact_payloads,
+        "executionContext": build_execution_context(
+            "metadata-fallback",
+            source_series_instance_uid=fallback_series_uid,
+            fallback_code=fallback_code_for_context,
+            fallback_detail=fallback_detail_for_context,
+        ),
         "issues": issues,
         "generatedSummary": summary,
         "qcSummary": qc_summary,
     }
+
+
+def _classify_error(exc: BaseException) -> tuple[str, str]:
+    """Classify an exception as (failureClass, errorCode)."""
+    current: BaseException | None = exc
+    visited: set[int] = set()
+
+    while current is not None and id(current) not in visited:
+        visited.add(id(current))
+
+        if isinstance(current, error.HTTPError):
+            code = current.code
+            if 500 <= code < 600 or code == 429:
+                return ("transient", f"WORKER_HTTP_{code}")
+            return ("terminal", f"WORKER_HTTP_{code}")
+
+        if isinstance(current, (error.URLError, TimeoutError, OSError)):
+            return ("transient", "WORKER_NETWORK_ERROR")
+
+        if isinstance(current, (KeyError, ValueError, TypeError)):
+            return ("terminal", "WORKER_DATA_ERROR")
+
+        current = current.__cause__ if current.__cause__ is not None else current.__context__
+
+    return ("terminal", "WORKER_UNKNOWN_ERROR")
 
 
 def run_once() -> int:
@@ -370,40 +732,76 @@ def run_once() -> int:
         lease_id = dispatch["leaseId"]
         execution = claim_result.get("execution") or {}
 
-        heartbeat_result = post_signed_json(
-            base_url,
-            "/api/internal/dispatch/heartbeat",
-            {
-                "caseId": case_id,
-                "leaseId": lease_id,
-                "workerId": worker_id,
-                "stage": stage,
-                "leaseSeconds": heartbeat_lease_seconds,
-            },
-            secret,
-            correlation_id,
-            internal_api_token,
-        )
-        sys.stdout.write(
-            json.dumps(
+        try:
+            heartbeat_result = post_signed_json(
+                base_url,
+                "/api/internal/dispatch/heartbeat",
                 {
-                    "correlationId": correlation_id,
-                    "dispatch": dispatch,
-                    "heartbeat": heartbeat_result,
+                    "caseId": case_id,
+                    "leaseId": lease_id,
+                    "workerId": worker_id,
+                    "stage": stage,
+                    "leaseSeconds": heartbeat_lease_seconds,
                 },
-                indent=2,
+                secret,
+                correlation_id,
+                internal_api_token,
             )
-            + "\n"
-        )
+            sys.stdout.write(
+                json.dumps(
+                    {
+                        "correlationId": correlation_id,
+                        "dispatch": dispatch,
+                        "heartbeat": heartbeat_result,
+                    },
+                    indent=2,
+                )
+                + "\n"
+            )
 
-        callback_result = post_signed_json(
-            base_url,
-            "/api/internal/inference-callback",
-            build_inference_callback(case_id, worker_id, execution),
-            secret,
-            correlation_id,
-            internal_api_token,
-        )
+            callback_result = post_signed_json(
+                base_url,
+                "/api/internal/inference-callback",
+                build_inference_callback(base_url, case_id, worker_id, execution, correlation_id),
+                secret,
+                correlation_id,
+                internal_api_token,
+            )
+        except Exception as exc:
+            failure_class, error_code = _classify_error(exc)
+            detail = str(exc)[:500]
+            sys.stderr.write(
+                json.dumps(
+                    {
+                        "event": "inference_failure",
+                        "correlationId": correlation_id,
+                        "caseId": case_id,
+                        "failureClass": failure_class,
+                        "errorCode": error_code,
+                        "detail": detail,
+                    },
+                    indent=2,
+                )
+                + "\n"
+            )
+            try:
+                post_signed_json(
+                    base_url,
+                    "/api/internal/dispatch/fail",
+                    {
+                        "caseId": case_id,
+                        "leaseId": lease_id,
+                        "failureClass": failure_class,
+                        "errorCode": error_code,
+                        "detail": detail,
+                    },
+                    secret,
+                    correlation_id,
+                    internal_api_token,
+                )
+            except Exception as report_exc:
+                sys.stderr.write(f"Failed to report failure: {report_exc}\n")
+            return 1
     elif stage == "delivery":
         claim_result = post_internal_json(
             base_url,

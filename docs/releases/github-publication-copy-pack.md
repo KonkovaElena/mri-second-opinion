@@ -84,7 +84,7 @@ MRI Standalone is a public MRI-only, clinician-in-the-loop second-opinion workfl
 
 Current repository truth is deliberately narrow: a standalone TypeScript API, restart-safe local persistence, explicit workflow states, and conservative readiness gates. The repository is intended to be inspectable and contribution-ready without overstating maturity.
 
-Not implemented yet: database-backed durable state, queue-backed execution, object-store-backed artifacts, Python worker closure, clinician review UI, and launch-ready evidence.
+Not implemented yet: archive-native viewer truth, DICOM-derived or package-grade compute, distributed worker orchestration, clinician review UI, and higher-maturity launch evidence.
 
 Start here:
 

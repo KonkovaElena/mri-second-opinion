@@ -100,6 +100,7 @@ const studySeriesSchema = z.object({
   modality: optionalTrimmedString,
   sequenceLabel: optionalTrimmedString,
   instanceCount: optionalNumberField("studyContext.series[].instanceCount"),
+  volumeDownloadUrl: optionalTrimmedString,
 });
 
 const studyContextSchema = z
@@ -234,6 +235,27 @@ const artifactPayloadSchema = z.object({
   contentBase64: base64ContentSchema,
 });
 
+const executionContextSchema = z
+  .object({
+    computeMode: z.enum(["metadata-fallback", "voxel-backed"], {
+      errorMap: () => ({ message: "executionContext.computeMode must be metadata-fallback or voxel-backed" }),
+    }),
+    fallbackCode: z.preprocess(
+      (value) => (value === null ? undefined : value),
+      z.enum(["missing-volume-input", "volume-download-failed", "volume-parse-failed"]).optional(),
+    ),
+    fallbackDetail: optionalTrimmedString,
+    sourceSeriesInstanceUid: optionalTrimmedString,
+  })
+  .superRefine((value, ctx) => {
+    if (value.computeMode === "voxel-backed" && (value.fallbackCode || value.fallbackDetail)) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: "executionContext fallback fields are only allowed for metadata-fallback mode",
+      });
+    }
+  });
+
 const inferenceCallbackSchema = z.object({
   caseId: requiredTrimmedString("caseId"),
   qcDisposition: z.enum(["pass", "warn", "reject"], {
@@ -251,6 +273,11 @@ const inferenceCallbackSchema = z.object({
       z.array(artifactPayloadSchema, {
         invalid_type_error: "artifactPayloads must be an array",
       }).optional(),
+    ),
+  executionContext: z
+    .preprocess(
+      (value) => (typeof value === "undefined" ? undefined : value),
+      executionContextSchema.optional(),
     ),
   issues: optionalStringArrayField("issues"),
   generatedSummary: optionalTrimmedString,
@@ -355,6 +382,7 @@ export function parseInferenceCallbackInput(body: unknown): {
         contentType: artifactPayload.contentType,
         contentBase64: artifactPayload.contentBase64,
       })),
+      executionContext: parsed.executionContext as InferenceCallbackInput["executionContext"],
       issues: parsed.issues as string[] | undefined,
       generatedSummary: parsed.generatedSummary as string | undefined,
       qcSummary: parsed.qcSummary as QcSummaryInput | undefined,
@@ -409,6 +437,17 @@ const dispatchHeartbeatSchema = z.object({
   progress: optionalTrimmedString,
 });
 
+const dispatchFailSchema = z.object({
+  caseId: requiredTrimmedString("caseId"),
+  leaseId: requiredTrimmedString("leaseId"),
+  failureClass: z.enum(["transient", "terminal"], {
+    required_error: "failureClass is required",
+    invalid_type_error: "failureClass must be 'transient' or 'terminal'",
+  }),
+  errorCode: requiredTrimmedString("errorCode"),
+  detail: optionalTrimmedString,
+});
+
 export function parseDispatchClaimInput(body: unknown): {
   workerId?: string;
   capabilities?: string[];
@@ -432,5 +471,22 @@ export function parseDispatchHeartbeatInput(body: unknown): {
   return {
     leaseId: parsed.leaseId,
     progress: parsed.progress as string | undefined,
+  };
+}
+
+export function parseDispatchFailInput(body: unknown): {
+  caseId: string;
+  leaseId: string;
+  failureClass: "transient" | "terminal";
+  errorCode: string;
+  detail?: string;
+} {
+  const parsed = parseWithSchema(body, dispatchFailSchema);
+  return {
+    caseId: parsed.caseId,
+    leaseId: parsed.leaseId,
+    failureClass: parsed.failureClass,
+    errorCode: parsed.errorCode,
+    detail: parsed.detail as string | undefined,
   };
 }

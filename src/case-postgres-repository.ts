@@ -361,8 +361,9 @@ export class PostgresCaseRepository {
              completed_at,
              last_error,
              lease_id,
-             lease_expires_at
-           ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13)
+             lease_expires_at,
+             failure_class
+           ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14)
            ON CONFLICT (job_id) DO UPDATE SET
              case_id = EXCLUDED.case_id,
              status = EXCLUDED.status,
@@ -375,7 +376,8 @@ export class PostgresCaseRepository {
              completed_at = EXCLUDED.completed_at,
              last_error = EXCLUDED.last_error,
              lease_id = EXCLUDED.lease_id,
-             lease_expires_at = EXCLUDED.lease_expires_at`,
+             lease_expires_at = EXCLUDED.lease_expires_at,
+             failure_class = EXCLUDED.failure_class`,
           [
             jobId,
             inferenceJob.caseId,
@@ -390,6 +392,7 @@ export class PostgresCaseRepository {
             inferenceJob.lastError,
             inferenceJob.leaseId,
             inferenceJob.leaseExpiresAt,
+            inferenceJob.failureClass,
           ],
         );
       }

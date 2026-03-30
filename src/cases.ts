@@ -7,7 +7,7 @@ import {
   createEvidenceCards,
   createPlanEnvelope,
 } from "./case-planning";
-import { missingRequiredSequences, nowIso } from "./case-common";
+import { missingRequiredSequences, nowIso, type DispatchFailureClass, getRetryBackoffSeconds } from "./case-common";
 import {
   createCaseRepository,
   type CaseRepository,
@@ -60,6 +60,11 @@ export type BranchStatus =
 export type DeliveryOutcome = "pending" | "failed" | "delivered";
 export type DeliveryJobStatus = "queued" | "claimed" | "delivered" | "failed";
 export type InferenceJobStatus = "queued" | "claimed" | "completed" | "failed";
+export type StructuralComputeMode = "metadata-fallback" | "voxel-backed";
+export type StructuralFallbackCode =
+  | "missing-volume-input"
+  | "volume-download-failed"
+  | "volume-parse-failed";
 
 export class WorkflowError extends Error {
   constructor(
@@ -102,9 +107,17 @@ export interface InferenceCallbackInput {
   measurements: Array<{ label: string; value: number; unit?: string }>;
   artifacts: string[];
   artifactPayloads?: ArtifactPayloadInput[];
+  executionContext?: StructuralExecutionContext;
   issues?: string[];
   generatedSummary?: string;
   qcSummary?: QcSummaryInput;
+}
+
+export interface StructuralExecutionContext {
+  computeMode: StructuralComputeMode;
+  fallbackCode: StructuralFallbackCode | null;
+  fallbackDetail: string | null;
+  sourceSeriesInstanceUid: string | null;
 }
 
 export interface CaseHistoryEntry {
@@ -158,6 +171,7 @@ export interface InferenceJobRecord {
   claimedAt: string | null;
   completedAt: string | null;
   lastError: string | null;
+  failureClass: DispatchFailureClass | null;
   leaseId: string | null;
   leaseExpiresAt: string | null;
 }
@@ -214,6 +228,7 @@ export interface StructuralExecutionEnvelope {
   completedAt: string;
   resourceClass: string;
   callbackSource: "internal-inference";
+  executionContext: StructuralExecutionContext;
   artifactIds: string[];
 }
 
@@ -277,6 +292,7 @@ export interface ReportPayload {
   };
   findings: string[];
   measurements: Array<{ label: string; value: number; unit?: string }>;
+  executionContext: StructuralExecutionContext;
   uncertaintySummary: string;
   issues: string[];
   artifacts: string[];
@@ -357,6 +373,15 @@ function assertNonEmptyString(value: unknown, fieldName: string) {
   return value.trim();
 }
 
+function normalizeNullableString(value: unknown) {
+  if (typeof value !== "string") {
+    return null;
+  }
+
+  const normalized = value.trim();
+  return normalized.length > 0 ? normalized : null;
+}
+
 function assertStringArray(value: unknown, fieldName: string) {
   if (!Array.isArray(value)) {
     throw new WorkflowError(400, `${fieldName} must be an array`, "INVALID_INPUT");
@@ -416,6 +441,7 @@ function createInferenceJobRecord(caseId: string): InferenceJobRecord {
     claimedAt: null,
     completedAt: null,
     lastError: null,
+    failureClass: null,
     leaseId: null,
     leaseExpiresAt: null,
   };
@@ -437,6 +463,7 @@ function createInferenceFingerprint(input: InferenceCallbackInput) {
     findings: input.findings,
     measurements: normalizeMeasurementSet(input.measurements),
     artifacts: input.artifacts,
+    executionContext: input.executionContext ?? null,
     artifactPayloads: (input.artifactPayloads ?? []).map((artifactPayload) => ({
       artifactRef: artifactPayload.artifactRef,
       contentType: artifactPayload.contentType,
@@ -590,6 +617,7 @@ export class MemoryCaseService {
           inferenceJob: activeInferenceJob,
           executionStatus: "qc-rejected",
           completedAt,
+          executionContext: normalizedInput.executionContext,
           artifactIds: [],
         });
         record.qcSummary = createQcSummaryRecord({
@@ -620,6 +648,7 @@ export class MemoryCaseService {
         inferenceJob: activeInferenceJob,
         executionStatus: "completed",
         completedAt,
+        executionContext: normalizedInput.executionContext,
         artifactIds: [],
       });
       record.qcSummary = createQcSummaryRecord({
@@ -881,6 +910,66 @@ export class MemoryCaseService {
       };
       this.repository.setInferenceJob(updated);
       return cloneCase(updated);
+    });
+  }
+
+  async failInferenceJob(input: {
+    caseId: string;
+    leaseId: string;
+    failureClass: DispatchFailureClass;
+    errorCode: string;
+    detail?: string;
+  }) {
+    const inferenceJobs = await this.repository.listInferenceJobs();
+    const job = inferenceJobs.find(
+      (j) => j.leaseId === input.leaseId && j.caseId === input.caseId && j.status === "claimed",
+    );
+
+    if (!job) {
+      throw new WorkflowError(404, "No active claimed job found for the given caseId/leaseId", "JOB_NOT_FOUND");
+    }
+
+    const now = nowIso();
+    const errorMessage = input.detail
+      ? `${input.errorCode}: ${input.detail}`
+      : input.errorCode;
+
+    if (input.failureClass === "transient") {
+      const backoffSeconds = getRetryBackoffSeconds("standard", job.attemptCount);
+      const availableAt = new Date(Date.now() + backoffSeconds * 1000).toISOString();
+
+      return this.persistQueueMutation(async () => {
+        const requeued: InferenceJobRecord = {
+          ...job,
+          status: "queued",
+          availableAt,
+          updatedAt: now,
+          workerId: null,
+          claimedAt: null,
+          lastError: errorMessage,
+          failureClass: "transient",
+          leaseId: null,
+          leaseExpiresAt: null,
+        };
+        this.repository.setInferenceJob(requeued);
+        return { failureClass: "transient" as const, requeued: true, jobId: job.jobId };
+      });
+    }
+
+    // terminal — mark as permanently failed
+    return this.persistQueueMutation(async () => {
+      const failed: InferenceJobRecord = {
+        ...job,
+        status: "failed",
+        updatedAt: now,
+        completedAt: now,
+        lastError: errorMessage,
+        failureClass: "terminal",
+        leaseId: null,
+        leaseExpiresAt: null,
+      };
+      this.repository.setInferenceJob(failed);
+      return { failureClass: "terminal" as const, requeued: false, jobId: job.jobId };
     });
   }
 
@@ -1199,6 +1288,26 @@ export class MemoryCaseService {
       }
     }
 
+    const computeMode = input.executionContext?.computeMode === "voxel-backed" ? "voxel-backed" : "metadata-fallback";
+    const fallbackCode = input.executionContext?.fallbackCode;
+
+    if (
+      fallbackCode !== undefined &&
+      fallbackCode !== null &&
+      fallbackCode !== "missing-volume-input" &&
+      fallbackCode !== "volume-download-failed" &&
+      fallbackCode !== "volume-parse-failed"
+    ) {
+      throw new WorkflowError(400, "executionContext.fallbackCode is invalid", "INVALID_INPUT");
+    }
+
+    const normalizedExecutionContext: StructuralExecutionContext = {
+      computeMode,
+      fallbackCode: computeMode === "metadata-fallback" ? fallbackCode ?? null : null,
+      fallbackDetail: computeMode === "metadata-fallback" ? normalizeNullableString(input.executionContext?.fallbackDetail) : null,
+      sourceSeriesInstanceUid: normalizeNullableString(input.executionContext?.sourceSeriesInstanceUid),
+    };
+
     return {
       qcDisposition: input.qcDisposition,
       findings: input.findings.map((value) => String(value)),
@@ -1209,6 +1318,7 @@ export class MemoryCaseService {
       })),
       artifacts,
       artifactPayloads: artifactPayloads.length > 0 ? artifactPayloads : undefined,
+      executionContext: normalizedExecutionContext,
       issues: Array.isArray(input.issues) ? input.issues.map((value) => String(value)) : [],
       generatedSummary: input.generatedSummary,
       qcSummary: input.qcSummary,
@@ -1373,6 +1483,7 @@ export class MemoryCaseService {
       claimedAt: activeJob?.claimedAt ?? completedAt,
       completedAt,
       lastError: null,
+      failureClass: null,
       leaseId: null,
       leaseExpiresAt: null,
     });

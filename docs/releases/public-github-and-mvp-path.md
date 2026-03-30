@@ -28,7 +28,7 @@ The current repository is best understood as:
 1. publicly hosted on GitHub with a conservative publication posture
 2. local workflow baseline and closure evidence exist for the standalone API path
 3. Track A repository-content work is complete, with remaining GitHub-UI follow-up tracked separately
-4. Wave 1.5 same-head hosted evidence closure is still open because the current `main` head `b295a2a98362168df11b7e36600733893f22e154` has not yet been captured by both hosted `ci` and `docs-governance`, even though the earlier runtime-bearing head `f6021ecdb45f4ecf5aece2c52cc0e6f462361d49` already has hosted `ci` proof and the publication verdict remains `PUBLIC_GITHUB_READY`
+4. Wave 1.5 hosted evidence closure is complete on `04cb0a57d1e64f8a5cf03a22b4a5c60d37dffc3a`; that head carries both hosted workflows for the worker-execution-contract alignment and release-doc reconciliation, while `f6021ecdb45f4ecf5aece2c52cc0e6f462361d49` remains the earlier Wave 2A artifact-persistence milestone
 5. workflow MVP is not yet closed
 6. repository verdict is `PUBLIC_GITHUB_READY`
 
@@ -112,21 +112,20 @@ Do the tracks in this order.
 After repository publication is safe, use this order for follow-up work.
 
 1. close the remaining GitHub UI and operator follow-up captured in `pending-manual-github-actions.md`
-2. finish the remaining Wave 1.5 same-head hosted evidence closure described in `../roadmap-and-validation.md`
-3. resume Track B in the current work-package order: `WP-1`, `WP-2`, `WP-3`, `WP-4`, `WP-6`
+2. resume Wave 3A archive/viewer work while keeping the hosted-evidence ledger current for later runtime-bearing heads
+3. resume Track B with `WP-3` treated as locally closed bounded compute evidence and `WP-4` as the next code-bearing step
 4. reopen deeper phase-1 expansion only after the bounded MVP slice and its evidence ledger are current
 
 ## Remaining-Wave Rule
 
-After Wave 1.5, the project should not branch into multiple major implementation waves at once.
+Wave 1.5 is now closed, so the project should not branch into multiple major implementation waves at once.
 
-Use `../academic/action-plan.md` as the authority for the remaining order. The current `main` history already includes the Wave 2A local closure from `f6021ecdb45f4ecf5aece2c52cc0e6f462361d49` together with the later reconciliation head `b295a2a98362168df11b7e36600733893f22e154`, so the next runtime wave after Wave 1.5 remains:
+Use `../academic/action-plan.md` as the authority for the remaining order. The current `main` history already includes the Wave 2A local closure from `f6021ecdb45f4ecf5aece2c52cc0e6f462361d49`, the later hosted-validated reconciliation head `04cb0a57d1e64f8a5cf03a22b4a5c60d37dffc3a`, and the bounded Wave 2B compute closure recorded in `../verification/wave-2b-bounded-compute-audit-2026-03-29.md`, so the next runtime wave after Wave 2B is:
 
-1. real compute path
-2. archive and viewer truth
-3. artifact and report closure
-4. exports and regulatory hardening
-5. clinical evidence
+1. archive and viewer truth
+2. artifact and report closure
+3. exports and regulatory hardening
+4. clinical evidence
 
 This prevents a false impression that public publication safety is the same thing as product maturity.
 

@@ -37,6 +37,7 @@ test("worker-facing execution contract stays aligned with persisted case truth",
             seriesInstanceUid: "2.25.execution.contract.1",
             sequenceLabel: "T1w",
             instanceCount: 176,
+            volumeDownloadUrl: "https://fixtures.example.test/t1w-volume.nii",
           },
           {
             seriesInstanceUid: "2.25.execution.contract.2",
@@ -83,6 +84,10 @@ test("worker-facing execution contract stays aligned with persisted case truth",
     );
     assert.equal(contract.studyContext.series.length, 2);
     assert.equal(contract.studyContext.series[0]?.sequenceLabel, "T1w");
+    assert.equal(
+      contract.studyContext.series[0]?.volumeDownloadUrl,
+      "https://fixtures.example.test/t1w-volume.nii",
+    );
     assert.equal(contract.studyContext.series[1]?.instanceCount, 164);
 
     assert.deepEqual(contract.requiredArtifacts, reloaded.planEnvelope.requiredArtifacts);

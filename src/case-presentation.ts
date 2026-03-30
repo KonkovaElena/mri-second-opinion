@@ -9,14 +9,38 @@ type OperationsSummary = Awaited<
   ReturnType<import("./cases").MemoryCaseService["getOperationsSummary"]>
 >;
 
-function presentArtifactDescriptor(artifact: DerivedArtifactDescriptor) {
-  if (!artifact.retrievalUrl) {
-    return artifact;
+function buildViewerPath(caseId: string, artifact: DerivedArtifactDescriptor) {
+  if (!artifact.viewerReady || !artifact.viewerDescriptor) {
+    return null;
   }
 
+  const params = new URLSearchParams({
+    caseId,
+    panel: "viewer",
+    artifactId: artifact.artifactId,
+  });
+
+  return `/workbench?${params.toString()}`;
+}
+
+function buildArchiveStudyUrl(artifact: DerivedArtifactDescriptor) {
+  return artifact.viewerDescriptor?.dicomWebBaseUrl ?? artifact.archiveLocator.dicomWebBaseUrl ?? null;
+}
+
+function presentArtifactDescriptor(caseId: string, artifact: DerivedArtifactDescriptor) {
+  const presentedArtifact = artifact.retrievalUrl
+    ? {
+        ...artifact,
+        storageUri: artifact.retrievalUrl,
+      }
+    : {
+        ...artifact,
+      };
+
   return {
-    ...artifact,
-    storageUri: artifact.retrievalUrl,
+    ...presentedArtifact,
+    viewerPath: buildViewerPath(caseId, artifact),
+    archiveStudyUrl: buildArchiveStudyUrl(artifact),
   };
 }
 
@@ -38,7 +62,7 @@ export function presentCaseListItem(caseRecord: CaseRecord) {
 }
 
 export function presentCaseDetail(caseRecord: CaseRecord) {
-  const reportArtifacts = caseRecord.artifactManifest.map((artifact) => presentArtifactDescriptor(artifact));
+  const reportArtifacts = caseRecord.artifactManifest.map((artifact) => presentArtifactDescriptor(caseRecord.caseId, artifact));
   const selectedPackage = caseRecord.structuralExecution?.packageId ?? caseRecord.planEnvelope.packageResolution.selectedPackage;
 
   return {
@@ -60,6 +84,7 @@ export function presentCaseDetail(caseRecord: CaseRecord) {
       ? {
           reviewStatus: caseRecord.report.reviewStatus,
           processingSummary: caseRecord.report.processingSummary,
+          executionContext: caseRecord.report.executionContext,
           finalImpression: caseRecord.report.finalImpression ?? null,
           artifactCount: reportArtifacts.length,
         }
@@ -83,10 +108,11 @@ export function presentReport(report: ReportPayload) {
     sequenceCoverage: report.sequenceCoverage,
     findings: report.findings,
     measurements: report.measurements,
+    executionContext: report.executionContext,
     uncertaintySummary: report.uncertaintySummary,
     issues: report.issues,
     artifactRefs: report.artifacts,
-    artifacts: (report.derivedArtifacts ?? []).map((artifact) => presentArtifactDescriptor(artifact)),
+    artifacts: (report.derivedArtifacts ?? []).map((artifact) => presentArtifactDescriptor(report.caseId, artifact)),
     provenance: report.provenance,
     reviewStatus: report.reviewStatus,
     disclaimerProfile: report.disclaimerProfile,
@@ -123,6 +149,7 @@ export function presentInferenceJob(inferenceJob: InferenceJobRecord) {
     claimedAt: inferenceJob.claimedAt,
     completedAt: inferenceJob.completedAt,
     lastError: inferenceJob.lastError,
+    failureClass: inferenceJob.failureClass,
   };
 }
 

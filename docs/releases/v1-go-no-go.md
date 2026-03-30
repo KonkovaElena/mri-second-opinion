@@ -16,13 +16,13 @@ Only these verdicts are allowed:
 
 ## Why
 
-The seven launch gates in `../launch-readiness-checklist.md` remain satisfied for the conservative public-publication posture: the repository is independently buildable, the bounded workflow slice is locally verified, the built-in review workbench and synthetic demo path are real, public repository hygiene is hosted-proof-backed on the latest fully hosted-validated head, and documentation honesty is aligned to current runtime truth. The current local and remote `main` head is now `b295a2a98362168df11b7e36600733893f22e154`; the earlier runtime-bearing head `f6021ecdb45f4ecf5aece2c52cc0e6f462361d49` already extends Wave 2A truth with local artifact persistence and public artifact retrieval. Wave 1.5 still needs one same-head hosted `ci` plus `docs-governance` capture on `b295a2a98362168df11b7e36600733893f22e154` or a newer reconciliation head before the next runtime wave advances. That gap does not reopen the conservative publication verdict. Remaining gaps are still real, and they belong to higher product-maturity work rather than to safe public GitHub publication.
+The seven launch gates in `../launch-readiness-checklist.md` remain satisfied for the conservative public-publication posture: the repository is independently buildable, the bounded workflow slice is locally verified, the built-in review workbench and synthetic demo path are real, public repository hygiene is hosted-proof-backed on the latest fully hosted-validated head, and documentation honesty is aligned to current runtime truth. The latest fully hosted-validated head is now `04cb0a57d1e64f8a5cf03a22b4a5c60d37dffc3a`, which closes Wave 1.5 for the current platform-sensitive and release-evidence baseline. The earlier runtime-bearing head `f6021ecdb45f4ecf5aece2c52cc0e6f462361d49` remains the Wave 2A artifact-persistence milestone, and `1e340b978bfa35a2ed339adcdb0d2add56cc08c3` remains the prior full hosted-validation milestone. Later docs-only evidence refresh commits do not reopen Wave 1.5 or the publication verdict unless they change platform-sensitive runtime behavior or GitHub workflow surfaces. Remaining gaps are still real, and they belong to higher product-maturity work rather than to safe public GitHub publication.
 
 ## Evidence Basis
 
 For the current evidence ledger and the publication reconciliation lessons behind this verdict, use `../verification/launch-evidence-index.md` together with `../verification/publication-retrospective-audit-2026-03-27.md`.
 
-The active evidence ledger also records that the current local and remote `main` head is `b295a2a98362168df11b7e36600733893f22e154`, while the latest head with both hosted `ci` and `docs-governance` proof is `1e340b978bfa35a2ed339adcdb0d2add56cc08c3`; the earlier runtime-bearing head `f6021ecdb45f4ecf5aece2c52cc0e6f462361d49` already has hosted `ci` proof. That keeps Wave 1.5 evidence closure open until `b295a2a98362168df11b7e36600733893f22e154` or the next docs-reconciliation head carries both hosted workflows without changing the repository-level verdict.
+The active evidence ledger records that `04cb0a57d1e64f8a5cf03a22b4a5c60d37dffc3a` is now the latest head with both hosted `ci` and `docs-governance` proof, while `f6021ecdb45f4ecf5aece2c52cc0e6f462361d49` remains the earlier runtime-bearing artifact-persistence milestone and `1e340b978bfa35a2ed339adcdb0d2add56cc08c3` remains the prior fully hosted-validated head. That closes Wave 1.5 without changing the repository-level verdict.
 
 Supporting artifacts that exist now:
 
@@ -51,7 +51,7 @@ Supporting artifacts that exist now:
 
 Open evidence that still blocks higher product-maturity claims:
 
-1. same-head hosted `ci` plus `docs-governance` capture on the next docs-reconciliation head as part of Wave 1.5 evidence closure
+1. real Python compute proof beyond the current bounded single-volume NIfTI worker and delivery loops
 2. release-linked or hosted workflow execution beyond the local bounded slice
 3. broader real-PostgreSQL runtime durability proof beyond clean bootstrap and targeted queue coverage
 4. distributed or external worker execution proof

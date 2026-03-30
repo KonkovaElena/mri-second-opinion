@@ -1,5 +1,6 @@
 import express from "express";
 import { resolve } from "node:path";
+import { createArchiveLookupClient } from "./archive-lookup";
 import type { AppConfig } from "./config";
 import type { PostgresPoolFactory } from "./case-postgres-repository";
 import { MemoryCaseService, WorkflowError } from "./cases";
@@ -13,15 +14,18 @@ import {
   presentReport,
 } from "./case-presentation";
 import { buildHealthSnapshot, buildReadinessSnapshot } from "./health";
+import { buildDicomSrExport, buildFhirDiagnosticReport } from "./case-exports";
 import { createInternalAuthMiddleware } from "./internal-auth";
 import { createHmacAuthMiddleware } from "./hmac-auth";
 import { MemoryReplayStore } from "./replay-store";
 import { getRequestId, requestContextMiddleware, requestLoggingMiddleware } from "./request-context";
 import {
   parseClaimJobInput,
+  type parseCreateCaseInput as parseCreateCaseInputType,
   parseCreateCaseInput,
   parseDeliveryCallbackInput,
   parseDispatchClaimInput,
+  parseDispatchFailInput,
   parseDispatchHeartbeatInput,
   parseFinalizeCaseInput,
   parseInferenceCallbackInput,
@@ -37,6 +41,10 @@ export interface CreateAppOptions {
 export function createApp(config: AppConfig, options: CreateAppOptions = {}) {
   const app = express();
   const publicApiRateLimiter = createPublicApiRateLimiter(config);
+  const archiveLookupClient = createArchiveLookupClient({
+    archiveLookupBaseUrl: config.archiveLookupBaseUrl,
+    archiveLookupSource: config.archiveLookupSource,
+  });
   const caseService = new MemoryCaseService({
     caseStoreFilePath: config.caseStoreFile,
     storageMode: config.caseStoreMode,
@@ -55,6 +63,74 @@ export function createApp(config: AppConfig, options: CreateAppOptions = {}) {
   app.use("/api", publicApiRateLimiter);
   app.use(express.json({ limit: config.jsonBodyLimit ?? "1mb" }));
   app.use("/workbench", express.static(workbenchRoot, { index: false }));
+
+  type ParsedCreateCaseInput = ReturnType<typeof parseCreateCaseInput>;
+
+  function hasUsableSeries(input: ParsedCreateCaseInput["studyContext"]) {
+    return Array.isArray(input?.series) && input.series.length > 0;
+  }
+
+  function mergeStudyContext(
+    primary: ParsedCreateCaseInput["studyContext"],
+    fallback: ParsedCreateCaseInput["studyContext"],
+  ): ParsedCreateCaseInput["studyContext"] {
+    if (!primary && !fallback) {
+      return undefined;
+    }
+
+    const merged = {
+      studyInstanceUid: primary?.studyInstanceUid ?? fallback?.studyInstanceUid,
+      accessionNumber: primary?.accessionNumber ?? fallback?.accessionNumber,
+      studyDate: primary?.studyDate ?? fallback?.studyDate,
+      sourceArchive: primary?.sourceArchive ?? fallback?.sourceArchive,
+      dicomWebBaseUrl: primary?.dicomWebBaseUrl ?? fallback?.dicomWebBaseUrl,
+      metadataSummary:
+        primary?.metadataSummary && primary.metadataSummary.length > 0
+          ? primary.metadataSummary
+          : fallback?.metadataSummary,
+      series: hasUsableSeries(primary) ? primary?.series : fallback?.series,
+    };
+
+    if (
+      !merged.studyInstanceUid &&
+      !merged.accessionNumber &&
+      !merged.studyDate &&
+      !merged.sourceArchive &&
+      !merged.dicomWebBaseUrl &&
+      (!merged.metadataSummary || merged.metadataSummary.length === 0) &&
+      (!merged.series || merged.series.length === 0)
+    ) {
+      return undefined;
+    }
+
+    return merged;
+  }
+
+  function needsArchiveLookup(input: ParsedCreateCaseInput) {
+    return (
+      archiveLookupClient.isConfigured() &&
+      (!input.studyContext ||
+        !input.studyContext.studyInstanceUid ||
+        !hasUsableSeries(input.studyContext) ||
+        (!input.studyContext.sourceArchive && !input.studyContext.dicomWebBaseUrl))
+    );
+  }
+
+  async function enrichCreateCaseInput(input: ParsedCreateCaseInput): Promise<ParsedCreateCaseInput> {
+    if (!needsArchiveLookup(input)) {
+      return input;
+    }
+
+    const lookedUpStudyContext = await archiveLookupClient.lookupStudy(input.studyUid);
+    if (!lookedUpStudyContext) {
+      return input;
+    }
+
+    return {
+      ...input,
+      studyContext: mergeStudyContext(input.studyContext, lookedUpStudyContext),
+    };
+  }
 
   function handleError(res: express.Response, error: unknown) {
     const requestId = getRequestId(res);
@@ -92,6 +168,8 @@ export function createApp(config: AppConfig, options: CreateAppOptions = {}) {
           "POST /api/cases/:caseId/review",
           "POST /api/cases/:caseId/finalize",
           "GET /api/cases/:caseId/report",
+          "GET /api/cases/:caseId/exports/dicom-sr",
+          "GET /api/cases/:caseId/exports/fhir-diagnostic-report",
           "GET /api/cases/:caseId/artifacts/:artifactId",
           "GET /api/operations/summary",
           "POST /api/delivery/:caseId/retry",
@@ -107,6 +185,7 @@ export function createApp(config: AppConfig, options: CreateAppOptions = {}) {
           "POST /api/internal/delivery-callback",
           "POST /api/internal/dispatch/claim",
           "POST /api/internal/dispatch/heartbeat",
+          "POST /api/internal/dispatch/fail",
         ],
       },
       docs: {
@@ -138,7 +217,8 @@ export function createApp(config: AppConfig, options: CreateAppOptions = {}) {
 
   app.post("/api/cases", async (req, res) => {
     try {
-      const created = await caseService.createCase(parseCreateCaseInput(req.body));
+      const parsed = parseCreateCaseInput(req.body);
+      const created = await caseService.createCase(await enrichCreateCaseInput(parsed));
 
       res.status(201).json({ case: created });
     } catch (error) {
@@ -192,6 +272,25 @@ export function createApp(config: AppConfig, options: CreateAppOptions = {}) {
     }
   });
 
+  app.get("/api/cases/:caseId/exports/dicom-sr", async (req, res) => {
+    try {
+      const report = await caseService.getReport(req.params.caseId);
+      res.json({ dicomSr: buildDicomSrExport(report) });
+    } catch (error) {
+      handleError(res, error);
+    }
+  });
+
+  app.get("/api/cases/:caseId/exports/fhir-diagnostic-report", async (req, res) => {
+    try {
+      const record = await caseService.getCase(req.params.caseId);
+      const report = await caseService.getReport(req.params.caseId);
+      res.json({ diagnosticReport: buildFhirDiagnosticReport(report, record.patientAlias) });
+    } catch (error) {
+      handleError(res, error);
+    }
+  });
+
   app.get("/api/cases/:caseId/artifacts/:artifactId", async (req, res) => {
     try {
       const artifact = await caseService.getArtifact(req.params.caseId, req.params.artifactId);
@@ -217,7 +316,8 @@ export function createApp(config: AppConfig, options: CreateAppOptions = {}) {
 
   app.post("/api/internal/ingest", async (req, res) => {
     try {
-      const created = await caseService.ingestCase(parseCreateCaseInput(req.body));
+      const parsed = parseCreateCaseInput(req.body);
+      const created = await caseService.ingestCase(await enrichCreateCaseInput(parsed));
 
       res.status(201).json({ case: created });
     } catch (error) {
@@ -349,6 +449,16 @@ export function createApp(config: AppConfig, options: CreateAppOptions = {}) {
         leaseExpiresAt: renewed.leaseExpiresAt,
         jobId: renewed.jobId,
       });
+    } catch (error) {
+      handleError(res, error);
+    }
+  });
+
+  app.post("/api/internal/dispatch/fail", hmacAuth, async (req, res) => {
+    try {
+      const input = parseDispatchFailInput(req.body);
+      const result = await caseService.failInferenceJob(input);
+      res.json(result);
     } catch (error) {
       handleError(res, error);
     }

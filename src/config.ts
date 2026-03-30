@@ -6,6 +6,8 @@ export interface AppConfig {
   port: number;
   caseStoreFile: string;
   caseStoreMode: CaseStoreMode;
+  archiveLookupBaseUrl?: string;
+  archiveLookupSource?: string;
   caseStoreDatabaseUrl?: string;
   caseStoreSchema?: string;
   databaseUrl?: string;
@@ -53,6 +55,8 @@ export function getConfig(): AppConfig {
       ? resolve(__dirname, "..", ".mri-data", "cases.sqlite")
       : resolve(__dirname, "..", ".mri-data", "cases.json");
   const caseStoreFile = process.env.MRI_CASE_STORE_FILE ?? defaultCaseStoreFile;
+  const archiveLookupBaseUrl = process.env.MRI_ARCHIVE_LOOKUP_BASE_URL?.trim() || undefined;
+  const archiveLookupSource = process.env.MRI_ARCHIVE_LOOKUP_SOURCE?.trim() || undefined;
   const databaseUrl = process.env.DATABASE_URL?.trim() || undefined;
   const caseStoreDatabaseUrl = process.env.MRI_CASE_STORE_DATABASE_URL?.trim() || databaseUrl;
   const caseStoreSchema = process.env.MRI_CASE_STORE_SCHEMA?.trim() || "public";
@@ -140,6 +144,8 @@ export function getConfig(): AppConfig {
     port,
     caseStoreFile,
     caseStoreMode,
+    archiveLookupBaseUrl,
+    archiveLookupSource,
     caseStoreDatabaseUrl,
     caseStoreSchema,
     databaseUrl,

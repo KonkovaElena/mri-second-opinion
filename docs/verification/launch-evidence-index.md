@@ -7,10 +7,15 @@ Every claim about launch readiness should link back to one or more artifacts lis
 ## Repository Status
 
 - Current verdict: `PUBLIC_GITHUB_READY`
-- Last reviewed: 2026-03-29
-- Current remote head: `b295a2a98362168df11b7e36600733893f22e154`
-- Latest hosted-validated head: `1e340b978bfa35a2ed339adcdb0d2add56cc08c3`
-- Wave 1.5 evidence status: in progress until one same-head reconciliation commit carries both hosted `ci` and `docs-governance`; the current remote head `b295a2a98362168df11b7e36600733893f22e154` is the active reconciliation head, `f6021ecdb45f4ecf5aece2c52cc0e6f462361d49` already has hosted `ci`, and `1e340b978bfa35a2ed339adcdb0d2add56cc08c3` remains the latest head with both proofs
+- Last reviewed: 2026-03-30
+- Latest hosted-validated head: `04cb0a57d1e64f8a5cf03a22b4a5c60d37dffc3a`
+- Previous hosted-validated head: `1e340b978bfa35a2ed339adcdb0d2add56cc08c3`
+- Wave 1.5 evidence status: closed on `04cb0a57d1e64f8a5cf03a22b4a5c60d37dffc3a`; GitHub-hosted `ci` and `docs-governance` both succeeded on the same runtime-and-doc reconciliation head after the worker execution-contract alignment landed. Later docs-only evidence refreshes do not reopen Wave 1.5 unless they change platform-sensitive runtime paths or GitHub workflow surfaces.
+- Wave 2B evidence status: locally closed on the bounded compute seam recorded in `docs/verification/wave-2b-bounded-compute-audit-2026-03-29.md`; the remaining compute gaps are DICOM-derived or package-grade execution and distributed worker infrastructure, not the absence of a real worker boundary.
+- Wave 3A evidence status: locally closed on the bounded archive lookup and clinician-facing viewer path recorded in `docs/verification/archive-viewer-seam-audit-2026-03-27.md` v2.0.0 and `docs/verification/workbench-frontend-audit-2026-03-27.md` v2.0.0; 95 tests pass, 0 fail.
+- Wave 3B evidence status: locally closed; 4 new artifact/report closure tests confirm report-preview retrieval, provenance chain integrity, archive truth preservation through review/finalize/report surfaces, and lossless report artifact delivery; 99 tests pass, 0 fail. No new production code changes needed — existing Waves 2A/3A implementation already satisfies all 3 exit gates.
+- Wave 4 evidence status: locally closed; DICOM SR and FHIR R4 DiagnosticReport export seams implemented and tested end-to-end; regulatory governance pack (PCCP, IEC 62304, ISO 14971, data governance, vulnerability SOP) created with honest-claim discipline; 102 tests pass, 0 fail.
+- Wave 5 evidence status: locally closed; clinical evidence program complete — reader-study protocol, subgroup analysis plan, PMS activation criteria, and release-linked validation packet created; no new code changes, 102 tests unchanged.
 - Public repository: `https://github.com/KonkovaElena/mri-second-opinion`
 - Auditor handoff: `docs/verification/ai-auditor-handoff-2026-03-25.md` (historical snapshot dated 2026-03-25; current verdict advanced later)
 - Repository-status retrospective: `docs/verification/publication-retrospective-audit-2026-03-27.md`
@@ -21,12 +26,19 @@ Every claim about launch readiness should link back to one or more artifacts lis
 - Workbench frontend audit: `docs/verification/workbench-frontend-audit-2026-03-27.md`
 - Durable delivery queue audit: `docs/verification/durable-delivery-queue-audit-2026-03-27.md`
 - Inference queue lease audit: `docs/verification/inference-queue-lease-audit-2026-03-27.md`
+- Wave 2B bounded compute audit: `docs/verification/wave-2b-bounded-compute-audit-2026-03-29.md`
+- Worker artifact contract samples: `docs/verification/worker-artifact-contract-samples.md`
 - PostgreSQL bootstrap audit: `docs/verification/postgres-bootstrap-audit-2026-03-27.md`
 - Phase-1 governance pack: `docs/security/sbom-policy.md`, `docs/security/threat-model.md`, `docs/academic/bias-analysis-framework.md`, `docs/regulatory/pms-plan.md`
+- Wave 4 regulatory pack: `docs/regulatory/pccp-plan.md`, `docs/regulatory/iec-62304-classification.md`, `docs/regulatory/iso-14971-risk-baseline.md`, `docs/regulatory/data-governance-policy.md`, `docs/security/vulnerability-response-sop.md`
+- Wave 4 interop exports: `src/case-exports.ts` (DICOM SR + FHIR R4 builders), `GET /api/cases/:caseId/exports/dicom-sr`, `GET /api/cases/:caseId/exports/fhir-diagnostic-report`
+- Wave 5 clinical evidence: `docs/academic/reader-study-protocol.md`, `docs/academic/subgroup-analysis-plan.md`, `docs/academic/pms-activation.md`, `docs/verification/release-validation-packet.md`
 - Formal system analysis: `docs/academic/formal-system-analysis.md`
 - Standalone closure audit: `docs/verification/standalone-closure-audit-2026-03-27.md`
 - Repository audit: `docs/verification/repository-audit-2026-03-25.md`
 - Hosted evidence scaffold: `docs/verification/hosted-evidence-capture-template.md`
+
+The queue audits dated 2026-03-27 remain authoritative for queue semantics, restart safety, and delivery behavior. Their open-gap sections predate the bounded Wave 2B compute closure and are superseded on compute-plane status by `docs/verification/wave-2b-bounded-compute-audit-2026-03-29.md`.
 
 ## Hosted Workflow Snapshot
 
@@ -52,10 +64,14 @@ Recorded hosted evidence for the latest hosted-validated head:
   `https://github.com/KonkovaElena/mri-second-opinion/actions/runs/23684738468`
 10. `ci` succeeded on `f6021ecdb45f4ecf5aece2c52cc0e6f462361d49` after local artifact persistence and public artifact retrieval landed:
   `https://github.com/KonkovaElena/mri-second-opinion/actions/runs/23693425627`
+11. `ci` succeeded on `04cb0a57d1e64f8a5cf03a22b4a5c60d37dffc3a` after worker execution-contract alignment across API, Python worker, and release evidence:
+  `https://github.com/KonkovaElena/mri-second-opinion/actions/runs/23713131052`
+12. `docs-governance` succeeded on `04cb0a57d1e64f8a5cf03a22b4a5c60d37dffc3a`:
+  `https://github.com/KonkovaElena/mri-second-opinion/actions/runs/23713131054`
 
-The current local and remote `main` refs now both resolve to `b295a2a98362168df11b7e36600733893f22e154`, the latest head with both hosted `ci` and `docs-governance` proof is still `1e340b978bfa35a2ed339adcdb0d2add56cc08c3`, and the active reconciliation head `b295a2a98362168df11b7e36600733893f22e154` has not yet been captured by both hosted workflows in this ledger. The previous runtime-bearing head `f6021ecdb45f4ecf5aece2c52cc0e6f462361d49` already has hosted `ci`. That keeps Wave 1.5 evidence closure open until `b295a2a98362168df11b7e36600733893f22e154` or a newer reconciliation head carries both hosted workflows even though the conservative publication verdict is unchanged.
+The latest head with both hosted `ci` and `docs-governance` proof is now `04cb0a57d1e64f8a5cf03a22b4a5c60d37dffc3a`. That head also carries the worker execution-contract alignment and the active release-doc reconciliation that previously kept Wave 1.5 open. The earlier runtime-bearing head `f6021ecdb45f4ecf5aece2c52cc0e6f462361d49` remains the first local artifact-persistence milestone, and `1e340b978bfa35a2ed339adcdb0d2add56cc08c3` remains the prior fully hosted-validated head. Wave 1.5 is therefore closed on `04cb0a57d1e64f8a5cf03a22b4a5c60d37dffc3a`. Later docs-only evidence refresh commits may advance `main`, but they do not reopen this gate unless they modify platform-sensitive runtime behavior or GitHub workflow surfaces.
 
-Local reconciliation also exists beyond the latest hosted-validated head:
+Recent reconciliation history leading to the latest hosted-validated head:
 
 1. `7bf7ae3` closed the stash-pop merge and revalidated the full standalone build plus test baseline locally before push
 2. `d352d9c` corrected the final docs-governance drift in `README.md` and `package.json` and re-ran the equivalent local workflow assertions before push
@@ -64,7 +80,7 @@ Local reconciliation also exists beyond the latest hosted-validated head:
 5. `6c2cfee` hardened the runtime further and promoted typed artifact truth to first-class durable case state before the new hosted workflow closure
 6. `1e340b978bfa35a2ed339adcdb0d2add56cc08c3` aligned persisted execution-contract truth on case detail and report surfaces and became the latest head with both hosted `ci` and `docs-governance` proof
 7. `f6021ecdb45f4ecf5aece2c52cc0e6f462361d49` extends Wave 2A truth with local file-backed artifact persistence and public artifact retrieval
-8. `b295a2a98362168df11b7e36600733893f22e154` is the current local and remote `main` head and reconciles launch evidence and wave status ahead of the next same-head hosted refresh
+8. `04cb0a57d1e64f8a5cf03a22b4a5c60d37dffc3a` aligns the worker execution contract across the API, Python worker, and release evidence and becomes the latest hosted-validated head closing Wave 1.5
 
 ## Priority Tracks
 
@@ -121,8 +137,10 @@ Record:
   - `docs-governance` green on `6c2cfee`: `https://github.com/KonkovaElena/mri-second-opinion/actions/runs/23682412696`
   - `ci` green on `1e340b978bfa35a2ed339adcdb0d2add56cc08c3`: `https://github.com/KonkovaElena/mri-second-opinion/actions/runs/23684738474`
   - `docs-governance` green on `1e340b978bfa35a2ed339adcdb0d2add56cc08c3`: `https://github.com/KonkovaElena/mri-second-opinion/actions/runs/23684738468`
-  - previous runtime head `f6021ecdb45f4ecf5aece2c52cc0e6f462361d49` already has hosted `ci`: `https://github.com/KonkovaElena/mri-second-opinion/actions/runs/23693425627`
-  - current `main` head `b295a2a98362168df11b7e36600733893f22e154` still needs a same-head `docs-governance` run plus workflow-dispatched `ci` before Wave 1.5 closes
+  - `ci` green on `f6021ecdb45f4ecf5aece2c52cc0e6f462361d49`: `https://github.com/KonkovaElena/mri-second-opinion/actions/runs/23693425627`
+  - `ci` green on `04cb0a57d1e64f8a5cf03a22b4a5c60d37dffc3a`: `https://github.com/KonkovaElena/mri-second-opinion/actions/runs/23713131052`
+  - `docs-governance` green on `04cb0a57d1e64f8a5cf03a22b4a5c60d37dffc3a`: `https://github.com/KonkovaElena/mri-second-opinion/actions/runs/23713131054`
+  - latest hosted-validated head `04cb0a57d1e64f8a5cf03a22b4a5c60d37dffc3a` closes Wave 1.5 for the platform-sensitive baseline; later docs-only evidence refreshes do not reopen that gate unless they change runtime or workflow surfaces
 - Artifact links:
   - `package.json`
   - `package-lock.json`
@@ -258,7 +276,10 @@ Record:
   - `docs-governance` green on `6c2cfee`: `https://github.com/KonkovaElena/mri-second-opinion/actions/runs/23682412696`
   - `ci` green on `1e340b978bfa35a2ed339adcdb0d2add56cc08c3`: `https://github.com/KonkovaElena/mri-second-opinion/actions/runs/23684738474`
   - `docs-governance` green on `1e340b978bfa35a2ed339adcdb0d2add56cc08c3`: `https://github.com/KonkovaElena/mri-second-opinion/actions/runs/23684738468`
-  - previous runtime-bearing head `f6021ecdb45f4ecf5aece2c52cc0e6f462361d49` keeps the same conservative publication verdict and already has hosted `ci`, while the current `main` head `b295a2a98362168df11b7e36600733893f22e154` still needs same-head hosted capture here before Wave 1.5 closes
+  - `ci` green on `f6021ecdb45f4ecf5aece2c52cc0e6f462361d49`: `https://github.com/KonkovaElena/mri-second-opinion/actions/runs/23693425627`
+  - `ci` green on `04cb0a57d1e64f8a5cf03a22b4a5c60d37dffc3a`: `https://github.com/KonkovaElena/mri-second-opinion/actions/runs/23713131052`
+  - `docs-governance` green on `04cb0a57d1e64f8a5cf03a22b4a5c60d37dffc3a`: `https://github.com/KonkovaElena/mri-second-opinion/actions/runs/23713131054`
+  - latest hosted-validated head `04cb0a57d1e64f8a5cf03a22b4a5c60d37dffc3a` closes Wave 1.5 while preserving the conservative publication verdict
   - public repository is live with About metadata applied
   - remaining GitHub-UI follow-up is tracked separately and does not change the current repository-content verdict
 - Artifact links:
@@ -325,7 +346,7 @@ Required artifacts:
 Record:
 
 - Status: complete
-- Note: current authority docs were reconciled again on 2026-03-29 so the active release and evidence layer reflects the current `main` head `b295a2a98362168df11b7e36600733893f22e154`, treats `1e340b978bfa35a2ed339adcdb0d2add56cc08c3` as the latest fully hosted-validated head, preserves `PUBLIC_GITHUB_READY` as the conservative publication verdict, acknowledges the earlier Wave 2A runtime milestone at `f6021ecdb45f4ecf5aece2c52cc0e6f462361d49`, and keeps Wave 1.5 hosted evidence refresh explicitly open until one same-head reconciliation commit carries both hosted workflows
+- Note: current authority docs now treat `04cb0a57d1e64f8a5cf03a22b4a5c60d37dffc3a` as the latest hosted-validated head, preserve `PUBLIC_GITHUB_READY` as the conservative publication verdict, acknowledge the earlier Wave 2A runtime milestone at `f6021ecdb45f4ecf5aece2c52cc0e6f462361d49`, and record Wave 1.5 as closed on the `04cb0a57d1e64f8a5cf03a22b4a5c60d37dffc3a` runtime-and-doc reconciliation head. Later docs-only evidence refreshes do not reopen that closure unless they modify platform-sensitive runtime behavior or GitHub workflow surfaces.
 - Artifact links:
   - `docs/verification/documentation-honesty-review.md`
   - `docs/verification/repository-audit-2026-03-25.md`

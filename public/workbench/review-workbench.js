@@ -3,6 +3,7 @@ const query = new URLSearchParams(window.location.search);
 const state = {
   cases: [],
   selectedCaseId: query.get("caseId"),
+  selectedArtifactId: query.get("artifactId"),
   summary: null,
 };
 
@@ -12,6 +13,7 @@ const elements = {
   queueList: document.getElementById("queue-list"),
   caseDetail: document.getElementById("case-detail"),
   reportPreview: document.getElementById("report-preview"),
+  viewerLaunch: document.getElementById("viewer-launch"),
   operationsSummary: document.getElementById("operations-summary"),
   selectedCaseChip: document.getElementById("selected-case-chip"),
   reviewForm: document.getElementById("review-form"),
@@ -44,13 +46,18 @@ async function fetchJson(path, init) {
   return body;
 }
 
-function updateQuery(caseId, panel) {
+function updateQuery(caseId, panel, artifactId = null) {
   const next = new URLSearchParams(window.location.search);
   if (caseId) {
     next.set("caseId", caseId);
   }
   if (panel) {
     next.set("panel", panel);
+  }
+  if (artifactId) {
+    next.set("artifactId", artifactId);
+  } else {
+    next.delete("artifactId");
   }
   window.history.replaceState({}, "", `${window.location.pathname}?${next.toString()}`);
 }
@@ -98,7 +105,8 @@ function renderQueue() {
   for (const button of elements.queueList.querySelectorAll("[data-case-id]")) {
     button.addEventListener("click", () => {
       state.selectedCaseId = button.getAttribute("data-case-id");
-      updateQuery(state.selectedCaseId, "detail");
+      state.selectedArtifactId = null;
+      updateQuery(state.selectedCaseId, "detail", null);
       refresh();
     });
   }
@@ -148,8 +156,11 @@ function renderCaseDetail(detail) {
 function renderReport(report) {
   if (!report) {
     elements.reportPreview.innerHTML = "Report preview appears here after inference finishes.";
+    elements.viewerLaunch.innerHTML = "Viewer path appears here when a case contains archive-linked viewer-ready artifacts.";
     return;
   }
+
+  const viewerReadyArtifacts = report.artifacts.filter((artifact) => artifact.viewerPath);
 
   elements.reportPreview.innerHTML = `
     <div class="report-card">
@@ -169,10 +180,36 @@ function renderReport(report) {
       <ul class="artifact-list">
         ${report.artifacts
           .map(
-            (artifact) => `<li>${artifact.artifactType} · viewerReady=${artifact.viewerReady} · ${artifact.storageUri}</li>`,
+            (artifact) => `<li>
+              <span>${artifact.artifactType} · viewerReady=${artifact.viewerReady} · ${artifact.storageUri}</span>
+              ${artifact.viewerPath ? `<a class="hero-link" href="${artifact.viewerPath}">Open viewer path</a>` : "<span>Viewer unavailable</span>"}
+            </li>`,
           )
           .join("")}
       </ul>
+    </div>
+  `;
+
+  if (viewerReadyArtifacts.length === 0) {
+    elements.viewerLaunch.innerHTML = "Viewer path appears here when a case contains archive-linked viewer-ready artifacts.";
+    return;
+  }
+
+  let selectedArtifact = viewerReadyArtifacts.find((artifact) => artifact.artifactId === state.selectedArtifactId) ?? null;
+  if (!selectedArtifact) {
+    selectedArtifact = viewerReadyArtifacts[0];
+    state.selectedArtifactId = selectedArtifact?.artifactId ?? null;
+    updateQuery(state.selectedCaseId, "viewer", state.selectedArtifactId);
+  }
+
+  elements.viewerLaunch.innerHTML = `
+    <div class="report-card">
+      <strong>${selectedArtifact.label}</strong>
+      <p><strong>Viewer mode:</strong> ${selectedArtifact.viewerDescriptor?.viewerMode ?? "unavailable"}</p>
+      <p><strong>Study UID:</strong> ${selectedArtifact.archiveLocator.studyInstanceUid}</p>
+      <p><strong>Primary series:</strong> ${selectedArtifact.viewerDescriptor?.primarySeriesInstanceUid ?? "not required"}</p>
+      <p><strong>Archive:</strong> ${selectedArtifact.archiveLocator.sourceArchive ?? "unbound"}</p>
+      ${selectedArtifact.archiveStudyUrl ? `<p><a class="hero-link" href="${selectedArtifact.archiveStudyUrl}" target="_blank" rel="noreferrer">Open archive study</a></p>` : "<p>No archive study URL is available.</p>"}
     </div>
   `;
 }

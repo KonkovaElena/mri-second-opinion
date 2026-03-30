@@ -4,7 +4,8 @@ import { spawn, spawnSync } from "node:child_process";
 import { createServer, type Server } from "node:http";
 import type { AddressInfo } from "node:net";
 import { mkdtempSync, rmSync } from "node:fs";
-import { join } from "node:path";
+import { dirname, join } from "node:path";
+import { fileURLToPath } from "node:url";
 import { tmpdir } from "node:os";
 import { DatabaseSync } from "node:sqlite";
 import { newDb } from "pg-mem";
@@ -17,6 +18,9 @@ import {
   computeSignature,
   serializeSignedJsonPayload,
 } from "../src/hmac-auth";
+
+/** Repo root derived from test file location — does not depend on process.cwd(). */
+const REPO_ROOT = dirname(dirname(fileURLToPath(import.meta.url)));
 
 function createTestStoreFile() {
   const tempDir = mkdtempSync(join(tmpdir(), "mri-second-opinion-"));
@@ -63,6 +67,228 @@ async function startServer(
     server,
     baseUrl: `http://127.0.0.1:${address.port}`,
   };
+}
+
+function createTinyNifti1Buffer(
+  values: number[],
+  dimensions: readonly [number, number, number] = [2, 2, 2],
+) {
+  const [dimX, dimY, dimZ] = dimensions;
+  const voxelCount = dimX * dimY * dimZ;
+  assert.equal(values.length, voxelCount, "NIfTI fixture values must match the requested dimensions");
+
+  const headerBytes = 352;
+  const buffer = Buffer.alloc(headerBytes + voxelCount * 4);
+
+  buffer.writeInt32LE(348, 0);
+  buffer.writeInt16LE(3, 40);
+  buffer.writeInt16LE(dimX, 42);
+  buffer.writeInt16LE(dimY, 44);
+  buffer.writeInt16LE(dimZ, 46);
+  buffer.writeInt16LE(1, 48);
+  buffer.writeInt16LE(1, 50);
+  buffer.writeInt16LE(1, 52);
+  buffer.writeInt16LE(1, 54);
+  buffer.writeInt16LE(16, 70);
+  buffer.writeInt16LE(32, 72);
+  buffer.writeFloatLE(1, 76);
+  buffer.writeFloatLE(1, 80);
+  buffer.writeFloatLE(1, 84);
+  buffer.writeFloatLE(1, 88);
+  buffer.writeFloatLE(headerBytes, 108);
+  buffer.write("n+1\0", 344, "ascii");
+
+  values.forEach((value, index) => {
+    buffer.writeFloatLE(value, headerBytes + index * 4);
+  });
+
+  return buffer;
+}
+
+async function withBinaryFixtureServer(
+  payload: Buffer,
+  callback: (downloadUrl: string) => Promise<void>,
+) {
+  const server = createServer((request, response) => {
+    if (request.url !== "/fixtures/t1w-volume.nii") {
+      response.statusCode = 404;
+      response.end();
+      return;
+    }
+
+    response.statusCode = 200;
+    response.setHeader("content-type", "application/octet-stream");
+    response.setHeader("content-length", String(payload.length));
+    response.end(payload);
+  });
+
+  await new Promise<void>((resolve) => {
+    server.listen(0, resolve);
+  });
+
+  const address = server.address() as AddressInfo;
+
+  try {
+    await callback(`http://127.0.0.1:${address.port}/fixtures/t1w-volume.nii`);
+  } finally {
+    await new Promise<void>((resolve, reject) => {
+      server.close((error) => {
+        if (error) {
+          reject(error);
+          return;
+        }
+
+        resolve();
+      });
+    });
+  }
+}
+
+async function withArchiveMetadataServer(
+  studyPayloads: Record<string, { statusCode?: number; body?: Record<string, unknown> }>,
+  callback: (archiveBaseUrl: string) => Promise<void>,
+) {
+  const server = createServer((request, response) => {
+    const requestUrl = new URL(request.url ?? "/", "http://127.0.0.1");
+
+    if (request.method !== "GET" || !requestUrl.pathname.startsWith("/studies/")) {
+      response.statusCode = 404;
+      response.end();
+      return;
+    }
+
+    const studyUid = decodeURIComponent(requestUrl.pathname.slice("/studies/".length));
+    const payload = studyPayloads[studyUid];
+
+    if (!payload) {
+      response.statusCode = 404;
+      response.setHeader("content-type", "application/json");
+      response.end(JSON.stringify({ error: "study-not-found" }));
+      return;
+    }
+
+    const statusCode = payload.statusCode ?? 200;
+    const body = Buffer.from(JSON.stringify(payload.body ?? {}), "utf-8");
+    response.statusCode = statusCode;
+    response.setHeader("content-type", "application/json");
+    response.setHeader("content-length", String(body.length));
+    response.end(body);
+  });
+
+  await new Promise<void>((resolve) => {
+    server.listen(0, resolve);
+  });
+
+  const address = server.address() as AddressInfo;
+
+  try {
+    await callback(`http://127.0.0.1:${address.port}`);
+  } finally {
+    await new Promise<void>((resolve, reject) => {
+      server.close((error) => {
+        if (error) {
+          reject(error);
+          return;
+        }
+
+        resolve();
+      });
+    });
+  }
+}
+
+async function withFailingInferenceCallbackProxy(
+  upstreamBaseUrl: string,
+  interception: {
+    statusCode: number;
+    body: Record<string, unknown>;
+  },
+  callback: (proxyBaseUrl: string) => Promise<void>,
+) {
+  const server = createServer((request, response) => {
+    void (async () => {
+      const method = request.method ?? "GET";
+      const path = request.url ?? "/";
+      const chunks: Buffer[] = [];
+
+      for await (const chunk of request) {
+        chunks.push(Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk));
+      }
+
+      if (method === "POST" && path === "/api/internal/inference-callback") {
+        const body = Buffer.from(JSON.stringify(interception.body), "utf-8");
+        response.statusCode = interception.statusCode;
+        response.setHeader("content-type", "application/json");
+        response.setHeader("content-length", String(body.length));
+        response.end(body);
+        return;
+      }
+
+      const forwardedHeaders = new Headers();
+      for (const [name, value] of Object.entries(request.headers)) {
+        if (typeof value === "undefined") {
+          continue;
+        }
+
+        if (name === "host" || name === "connection" || name === "content-length") {
+          continue;
+        }
+
+        if (Array.isArray(value)) {
+          value.forEach((entry) => forwardedHeaders.append(name, entry));
+          continue;
+        }
+
+        forwardedHeaders.set(name, value);
+      }
+
+      const upstreamResponse = await fetch(`${upstreamBaseUrl}${path}`, {
+        method,
+        headers: forwardedHeaders,
+        body: chunks.length > 0 ? Buffer.concat(chunks) : undefined,
+      });
+
+      response.statusCode = upstreamResponse.status;
+      upstreamResponse.headers.forEach((value, name) => {
+        if (name === "connection" || name === "transfer-encoding") {
+          return;
+        }
+
+        response.setHeader(name, value);
+      });
+
+      response.end(Buffer.from(await upstreamResponse.arrayBuffer()));
+    })().catch((error: unknown) => {
+      response.statusCode = 500;
+      response.setHeader("content-type", "application/json");
+      response.end(
+        JSON.stringify({
+          error: error instanceof Error ? error.message : "proxy-request-failed",
+        }),
+      );
+    });
+  });
+
+  await new Promise<void>((resolve) => {
+    server.listen(0, resolve);
+  });
+
+  const address = server.address() as AddressInfo;
+
+  try {
+    await callback(`http://127.0.0.1:${address.port}`);
+  } finally {
+    await new Promise<void>((resolve, reject) => {
+      server.close((error) => {
+        if (error) {
+          reject(error);
+          return;
+        }
+
+        resolve();
+      });
+    });
+  }
 }
 
 async function startPostgresServer(
@@ -249,8 +475,8 @@ async function runPythonWorker(
   const python = resolvePythonLaunch();
 
   return await new Promise((resolve, reject) => {
-    const child = spawn(python.command, [...python.args, join(process.cwd(), "worker", "main.py")], {
-      cwd: process.cwd(),
+    const child = spawn(python.command, [...python.args, join(REPO_ROOT, "worker", "main.py")], {
+      cwd: REPO_ROOT,
       env: {
         ...process.env,
         MRI_API_BASE_URL: baseUrl,
@@ -1139,6 +1365,7 @@ test("review workbench shell is served with real static assets", async () => {
       assert.equal(page.response.status, 200);
       assert.match(page.response.headers.get("content-type") ?? "", /text\/html/);
       assert.match(page.body, /MRI Review Workbench/);
+      assert.match(page.body, /Viewer Path/i);
       assert.match(page.body, /\/workbench\/review-workbench\.css/);
       assert.match(page.body, /\/workbench\/review-workbench\.js/);
 
@@ -1146,11 +1373,165 @@ test("review workbench shell is served with real static assets", async () => {
       assert.equal(script.response.status, 200);
       assert.match(script.response.headers.get("content-type") ?? "", /javascript/);
       assert.match(script.body, /loadCases|renderQueue|review/i);
+      assert.match(script.body, /viewerPath|archiveStudyUrl|panel=viewer/i);
 
       const stylesheet = await textRequest("/workbench/review-workbench.css");
       assert.equal(stylesheet.response.status, 200);
       assert.match(stylesheet.response.headers.get("content-type") ?? "", /text\/css/);
       assert.match(stylesheet.body, /\.workbench|--surface|font-family/i);
+    });
+  } finally {
+    rmSync(tempDir, { recursive: true, force: true });
+  }
+});
+
+test("case intake enriches missing study context from archive lookup and exposes viewer path", async () => {
+  const { tempDir, caseStoreFile } = createTestStoreFile();
+
+  try {
+    await withArchiveMetadataServer(
+      {
+        "1.2.840.lookup.1": {
+          body: {
+            studyInstanceUid: "2.25.lookup.1",
+            accessionNumber: "ACC-LOOKUP-001",
+            studyDate: "2026-03-30",
+            sourceArchive: "lookup-orthanc",
+            dicomWebBaseUrl: "https://archive.example.test/dicom-web/studies/2.25.lookup.1",
+            metadataSummary: ["Lookup hydrated study", "Archive returned two MR series"],
+            series: [
+              {
+                seriesInstanceUid: "2.25.lookup.1.1",
+                seriesDescription: "Sag T1 archive",
+                modality: "MR",
+                sequenceLabel: "T1w",
+                instanceCount: 180,
+              },
+              {
+                seriesInstanceUid: "2.25.lookup.1.2",
+                seriesDescription: "Ax FLAIR archive",
+                modality: "MR",
+                sequenceLabel: "FLAIR",
+                instanceCount: 42,
+              },
+            ],
+          },
+        },
+      },
+      async (archiveBaseUrl) => {
+        await withServer(
+          caseStoreFile,
+          async ({ jsonRequest }) => {
+            const created = await jsonRequest("/api/cases", {
+              method: "POST",
+              body: JSON.stringify({
+                patientAlias: "archive-lookup-patient",
+                studyUid: "1.2.840.lookup.1",
+                sequenceInventory: ["T1w", "FLAIR"],
+              }),
+            });
+
+            assert.equal(created.response.status, 201);
+            const caseId = created.body.case.caseId as string;
+
+            const detailBeforeInference = await jsonRequest(`/api/cases/${caseId}`);
+            assert.equal(detailBeforeInference.response.status, 200);
+            assert.equal(detailBeforeInference.body.case.studyContext.studyInstanceUid, "2.25.lookup.1");
+            assert.equal(detailBeforeInference.body.case.studyContext.sourceArchive, "lookup-orthanc");
+            assert.equal(detailBeforeInference.body.case.studyContext.series.length, 2);
+
+            const inferred = await jsonRequest("/api/internal/inference-callback", {
+              method: "POST",
+              body: JSON.stringify({
+                caseId,
+                qcDisposition: "pass",
+                findings: ["Archive-enriched intake produced a viewer-ready overlay artifact."],
+                measurements: [{ label: "whole_brain_ml", value: 1108 }],
+                artifacts: ["artifact://overlay-preview", "artifact://report-preview"],
+                generatedSummary: "Archive-enriched draft ready for review.",
+              }),
+            });
+
+            assert.equal(inferred.response.status, 200);
+
+            const report = await jsonRequest(`/api/cases/${caseId}/report`);
+            assert.equal(report.response.status, 200);
+            const overlayArtifact = report.body.report.artifacts.find(
+              (artifact: { artifactType: string }) => artifact.artifactType === "overlay-preview",
+            );
+            assert.notEqual(overlayArtifact, undefined);
+            assert.equal(overlayArtifact.viewerReady, true);
+            assert.equal(
+              overlayArtifact.viewerPath,
+              `/workbench?caseId=${caseId}&panel=viewer&artifactId=${overlayArtifact.artifactId}`,
+            );
+            assert.equal(
+              overlayArtifact.archiveStudyUrl,
+              "https://archive.example.test/dicom-web/studies/2.25.lookup.1",
+            );
+          },
+          {
+            archiveLookupBaseUrl: archiveBaseUrl,
+            archiveLookupSource: "lookup-fallback-source",
+          },
+        );
+      },
+    );
+  } finally {
+    rmSync(tempDir, { recursive: true, force: true });
+  }
+});
+
+test("case intake falls back cleanly when archive lookup cannot resolve the study", async () => {
+  const { tempDir, caseStoreFile } = createTestStoreFile();
+
+  try {
+    await withArchiveMetadataServer({}, async (archiveBaseUrl) => {
+      await withServer(
+        caseStoreFile,
+        async ({ jsonRequest }) => {
+          const created = await jsonRequest("/api/cases", {
+            method: "POST",
+            body: JSON.stringify({
+              patientAlias: "archive-fallback-patient",
+              studyUid: "1.2.840.lookup.missing",
+              sequenceInventory: ["T1w", "FLAIR"],
+            }),
+          });
+
+          assert.equal(created.response.status, 201);
+          const caseId = created.body.case.caseId as string;
+
+          const inferred = await jsonRequest("/api/internal/inference-callback", {
+            method: "POST",
+            body: JSON.stringify({
+              caseId,
+              qcDisposition: "pass",
+              findings: ["Archive lookup fallback preserved case creation."],
+              measurements: [{ label: "whole_brain_ml", value: 1099 }],
+              artifacts: ["artifact://overlay-preview"],
+              generatedSummary: "Archive fallback draft ready for review.",
+            }),
+          });
+
+          assert.equal(inferred.response.status, 200);
+
+          const detail = await jsonRequest(`/api/cases/${caseId}`);
+          assert.equal(detail.response.status, 200);
+          assert.equal(detail.body.case.studyContext.studyInstanceUid, "1.2.840.lookup.missing");
+
+          const report = await jsonRequest(`/api/cases/${caseId}/report`);
+          assert.equal(report.response.status, 200);
+          assert.equal(report.body.report.artifacts.length, 1);
+          assert.equal(report.body.report.artifacts[0].viewerReady, false);
+          assert.equal(report.body.report.artifacts[0].viewerPath, null);
+          assert.equal(report.body.report.artifacts[0].archiveStudyUrl, null);
+        },
+        {
+          archiveLookupBaseUrl: archiveBaseUrl,
+          archiveLookupSource: "lookup-fallback-source",
+        },
+      );
     });
   } finally {
     rmSync(tempDir, { recursive: true, force: true });
@@ -1557,11 +1938,23 @@ test("python worker derives metadata-backed outputs from the dispatch execution 
         assert.equal(detail.body.case.status, "AWAITING_REVIEW");
         assert.equal(detail.body.case.qcSummary.disposition, "pass");
         assert.equal(detail.body.case.artifactManifest.length, 4);
+        assert.deepEqual(detail.body.case.structuralExecution.executionContext, {
+          computeMode: "metadata-fallback",
+          fallbackCode: "missing-volume-input",
+          fallbackDetail: "No volumeDownloadUrl was present in the execution contract.",
+          sourceSeriesInstanceUid: null,
+        });
         assert.match(detail.body.case.reportSummary.processingSummary, /Metadata-derived draft/);
 
         const report = await jsonRequest(`/api/cases/${caseId}/report`);
         assert.equal(report.response.status, 200);
         assert.match(report.body.report.processingSummary, /2\.25\.python\.worker\.study\.001/);
+        assert.deepEqual(report.body.report.executionContext, {
+          computeMode: "metadata-fallback",
+          fallbackCode: "missing-volume-input",
+          fallbackDetail: "No volumeDownloadUrl was present in the execution contract.",
+          sourceSeriesInstanceUid: null,
+        });
         assert.match(report.body.report.findings[0], /Metadata-derived structural triage/);
         assert.match(report.body.report.findings[1], /T1w, FLAIR/);
         assert.match(report.body.report.issues[0], /no voxel-level inference executed/i);
@@ -1581,6 +1974,355 @@ test("python worker derives metadata-backed outputs from the dispatch execution 
         assert.equal(qcBody.workerId, "python-worker-contract-001");
         assert.equal(qcBody.studyInstanceUid, "2.25.python.worker.study.001");
         assert.match(qcBody.summary, /Metadata-derived draft/);
+      },
+      {
+        internalApiToken: DEFAULT_INTERNAL_API_TOKEN,
+        hmacSecret: DEFAULT_HMAC_SECRET,
+      },
+    );
+  } finally {
+    rmSync(tempDir, { recursive: true, force: true });
+  }
+});
+
+test("python worker performs a voxel-backed pass when a T1w volume URL is present", async () => {
+  const { tempDir, caseStoreFile } = createTestStoreFile();
+  const niftiFixture = createTinyNifti1Buffer([0, 0, 1, 2, 3, 4, 5, 6]);
+
+  try {
+    await withBinaryFixtureServer(niftiFixture, async (volumeDownloadUrl) => {
+      await withServer(
+        caseStoreFile,
+        async ({ baseUrl, jsonRequest }) => {
+          const created = await jsonRequest("/api/cases", {
+            method: "POST",
+            body: JSON.stringify({
+              patientAlias: "synthetic-python-worker-volume-001",
+              studyUid: "1.2.840.python.worker.volume.1",
+              sequenceInventory: ["T1w"],
+              indication: "real-volume structural review",
+              studyContext: {
+                studyInstanceUid: "2.25.python.worker.volume.study.001",
+                accessionNumber: "PY-WORKER-VOLUME-001",
+                studyDate: "2026-03-29",
+                sourceArchive: "fixture-http",
+                metadataSummary: ["Tiny NIfTI fixture for Wave 2B"],
+                series: [
+                  {
+                    seriesInstanceUid: "2.25.python.worker.volume.study.001.1",
+                    seriesDescription: "Fixture T1w",
+                    modality: "MR",
+                    sequenceLabel: "T1w",
+                    instanceCount: 1,
+                    volumeDownloadUrl,
+                  },
+                ],
+              },
+            }),
+          });
+
+          assert.equal(created.response.status, 201);
+          const caseId = created.body.case.caseId as string;
+
+          const worker = await runPythonWorker(baseUrl, {
+            MRI_WORKER_ID: "python-worker-volume-001",
+            MRI_INTERNAL_API_TOKEN: DEFAULT_INTERNAL_API_TOKEN,
+          });
+
+          assert.equal(worker.exitCode, 0, `${worker.stderr}\n${worker.stdout}`);
+
+          const detail = await jsonRequest(`/api/cases/${caseId}`);
+          assert.equal(detail.response.status, 200);
+          assert.equal(detail.body.case.status, "AWAITING_REVIEW");
+          assert.equal(detail.body.case.qcSummary.disposition, "pass");
+          assert.equal(detail.body.case.artifactManifest.length, 4);
+          assert.deepEqual(detail.body.case.structuralExecution.executionContext, {
+            computeMode: "voxel-backed",
+            fallbackCode: null,
+            fallbackDetail: null,
+            sourceSeriesInstanceUid: "2.25.python.worker.volume.study.001.1",
+          });
+          assert.match(detail.body.case.reportSummary.processingSummary, /voxel-backed/i);
+
+          const report = await jsonRequest(`/api/cases/${caseId}/report`);
+          assert.equal(report.response.status, 200);
+          assert.match(report.body.report.processingSummary, /voxel-backed/i);
+          assert.deepEqual(report.body.report.executionContext, {
+            computeMode: "voxel-backed",
+            fallbackCode: null,
+            fallbackDetail: null,
+            sourceSeriesInstanceUid: "2.25.python.worker.volume.study.001.1",
+          });
+          assert.equal(
+            report.body.report.issues.some((issue: string) => /no voxel-level inference executed/i.test(issue)),
+            false,
+          );
+          assert.equal(
+            report.body.report.measurements.some(
+              (measurement: { label: string }) => measurement.label === "volume_voxel_count",
+            ),
+            true,
+          );
+
+          const overlayArtifact = detail.body.case.artifactManifest.find(
+            (artifact: { artifactType: string }) => artifact.artifactType === "overlay-preview",
+          );
+          assert.notEqual(overlayArtifact, undefined);
+
+          const overlayResponse = await fetch(`${baseUrl}${overlayArtifact.storageUri}`);
+          assert.equal(overlayResponse.status, 200);
+          assert.match(overlayResponse.headers.get("content-type") ?? "", /image\/svg\+xml/);
+          assert.match(await overlayResponse.text(), /<svg/i);
+        },
+        {
+          internalApiToken: DEFAULT_INTERNAL_API_TOKEN,
+          hmacSecret: DEFAULT_HMAC_SECRET,
+        },
+      );
+    });
+  } finally {
+    rmSync(tempDir, { recursive: true, force: true });
+  }
+});
+
+test("python worker records classified fallback metadata when a volume URL cannot be parsed", async () => {
+  const { tempDir, caseStoreFile } = createTestStoreFile();
+  const invalidFixture = Buffer.from("not-a-valid-nifti", "utf-8");
+
+  try {
+    await withBinaryFixtureServer(invalidFixture, async (volumeDownloadUrl) => {
+      await withServer(
+        caseStoreFile,
+        async ({ baseUrl, jsonRequest }) => {
+          const created = await jsonRequest("/api/cases", {
+            method: "POST",
+            body: JSON.stringify({
+              patientAlias: "synthetic-python-worker-fallback-001",
+              studyUid: "1.2.840.python.worker.fallback.1",
+              sequenceInventory: ["T1w"],
+              indication: "fallback classification review",
+              studyContext: {
+                studyInstanceUid: "2.25.python.worker.fallback.study.001",
+                accessionNumber: "PY-WORKER-FALLBACK-001",
+                studyDate: "2026-03-29",
+                sourceArchive: "fixture-http",
+                metadataSummary: ["Invalid NIfTI fixture for fallback classification"],
+                series: [
+                  {
+                    seriesInstanceUid: "2.25.python.worker.fallback.study.001.1",
+                    seriesDescription: "Broken Fixture T1w",
+                    modality: "MR",
+                    sequenceLabel: "T1w",
+                    instanceCount: 1,
+                    volumeDownloadUrl,
+                  },
+                ],
+              },
+            }),
+          });
+
+          assert.equal(created.response.status, 201);
+          const caseId = created.body.case.caseId as string;
+
+          const worker = await runPythonWorker(baseUrl, {
+            MRI_WORKER_ID: "python-worker-fallback-001",
+            MRI_INTERNAL_API_TOKEN: DEFAULT_INTERNAL_API_TOKEN,
+          });
+
+          assert.equal(worker.exitCode, 0, `${worker.stderr}\n${worker.stdout}`);
+
+          const detail = await jsonRequest(`/api/cases/${caseId}`);
+          assert.equal(detail.response.status, 200);
+          assert.deepEqual(detail.body.case.structuralExecution.executionContext, {
+            computeMode: "metadata-fallback",
+            fallbackCode: "volume-parse-failed",
+            fallbackDetail: "Downloaded NIfTI payload is too small to contain a valid header.",
+            sourceSeriesInstanceUid: "2.25.python.worker.fallback.study.001.1",
+          });
+          assert.match(detail.body.case.reportSummary.processingSummary, /Metadata-derived draft/);
+
+          const report = await jsonRequest(`/api/cases/${caseId}/report`);
+          assert.equal(report.response.status, 200);
+          assert.deepEqual(report.body.report.executionContext, {
+            computeMode: "metadata-fallback",
+            fallbackCode: "volume-parse-failed",
+            fallbackDetail: "Downloaded NIfTI payload is too small to contain a valid header.",
+            sourceSeriesInstanceUid: "2.25.python.worker.fallback.study.001.1",
+          });
+          assert.equal(
+            report.body.report.issues.some((issue: string) => /fell back to metadata-only mode/i.test(issue)),
+            true,
+          );
+        },
+        {
+          internalApiToken: DEFAULT_INTERNAL_API_TOKEN,
+          hmacSecret: DEFAULT_HMAC_SECRET,
+        },
+      );
+    });
+  } finally {
+    rmSync(tempDir, { recursive: true, force: true });
+  }
+});
+
+test("python worker re-queues the job when inference callback returns an upstream 502", async () => {
+  const { tempDir, caseStoreFile } = createTestStoreFile();
+
+  try {
+    await withServer(
+      caseStoreFile,
+      async ({ baseUrl, jsonRequest }) => {
+        const created = await jsonRequest("/api/cases", {
+          method: "POST",
+          body: JSON.stringify({
+            patientAlias: "synthetic-python-worker-transient-001",
+            studyUid: "1.2.840.python.worker.transient.1",
+            sequenceInventory: ["T1w", "FLAIR"],
+            indication: "transient callback failure classification",
+            studyContext: {
+              studyInstanceUid: "2.25.python.worker.transient.study.001",
+              accessionNumber: "PY-WORKER-TRANSIENT-001",
+              studyDate: "2026-03-29",
+              sourceArchive: "demo-orthanc",
+              metadataSummary: ["Synthetic transient callback failure study"],
+              series: [
+                {
+                  seriesInstanceUid: "2.25.python.worker.transient.study.001.1",
+                  seriesDescription: "Sag T1",
+                  modality: "MR",
+                  sequenceLabel: "T1w",
+                  instanceCount: 176,
+                },
+              ],
+            },
+          }),
+        });
+
+        assert.equal(created.response.status, 201);
+        const caseId = created.body.case.caseId as string;
+
+        await withFailingInferenceCallbackProxy(
+          baseUrl,
+          {
+            statusCode: 502,
+            body: {
+              error: "Synthetic upstream outage.",
+            },
+          },
+          async (proxyBaseUrl) => {
+            const worker = await runPythonWorker(proxyBaseUrl, {
+              MRI_WORKER_ID: "python-worker-transient-001",
+              MRI_INTERNAL_API_TOKEN: DEFAULT_INTERNAL_API_TOKEN,
+            });
+
+            assert.equal(worker.exitCode, 1, `${worker.stderr}\n${worker.stdout}`);
+            assert.match(worker.stderr, /"event": "inference_failure"/);
+            assert.match(worker.stderr, /WORKER_HTTP_502/);
+          },
+        );
+
+        const jobs = await jsonRequest("/api/internal/inference-jobs", {
+          method: "GET",
+          headers: {
+            authorization: `Bearer ${DEFAULT_INTERNAL_API_TOKEN}`,
+          },
+        });
+
+        assert.equal(jobs.response.status, 200);
+        const job = jobs.body.jobs.find((entry: { caseId: string }) => entry.caseId === caseId);
+        assert.notEqual(job, undefined);
+        assert.equal(job.status, "queued");
+        assert.equal(job.failureClass, "transient");
+        assert.match(job.lastError, /WORKER_HTTP_502/);
+      },
+      {
+        internalApiToken: DEFAULT_INTERNAL_API_TOKEN,
+        hmacSecret: DEFAULT_HMAC_SECRET,
+      },
+    );
+  } finally {
+    rmSync(tempDir, { recursive: true, force: true });
+  }
+});
+
+test("python worker marks the job failed when inference callback returns a terminal 400", async () => {
+  const { tempDir, caseStoreFile } = createTestStoreFile();
+
+  try {
+    await withServer(
+      caseStoreFile,
+      async ({ baseUrl, jsonRequest }) => {
+        const created = await jsonRequest("/api/cases", {
+          method: "POST",
+          body: JSON.stringify({
+            patientAlias: "synthetic-python-worker-terminal-001",
+            studyUid: "1.2.840.python.worker.terminal.1",
+            sequenceInventory: ["T1w", "FLAIR"],
+            indication: "terminal callback failure classification",
+            studyContext: {
+              studyInstanceUid: "2.25.python.worker.terminal.study.001",
+              accessionNumber: "PY-WORKER-TERMINAL-001",
+              studyDate: "2026-03-29",
+              sourceArchive: "demo-orthanc",
+              metadataSummary: ["Synthetic terminal callback failure study"],
+              series: [
+                {
+                  seriesInstanceUid: "2.25.python.worker.terminal.study.001.1",
+                  seriesDescription: "Sag T1",
+                  modality: "MR",
+                  sequenceLabel: "T1w",
+                  instanceCount: 176,
+                },
+              ],
+            },
+          }),
+        });
+
+        assert.equal(created.response.status, 201);
+        const caseId = created.body.case.caseId as string;
+
+        await withFailingInferenceCallbackProxy(
+          baseUrl,
+          {
+            statusCode: 400,
+            body: {
+              code: "INVALID_CALLBACK",
+              error: "Synthetic callback contract rejection.",
+            },
+          },
+          async (proxyBaseUrl) => {
+            const worker = await runPythonWorker(proxyBaseUrl, {
+              MRI_WORKER_ID: "python-worker-terminal-001",
+              MRI_INTERNAL_API_TOKEN: DEFAULT_INTERNAL_API_TOKEN,
+            });
+
+            assert.equal(worker.exitCode, 1, `${worker.stderr}\n${worker.stdout}`);
+            assert.match(worker.stderr, /"event": "inference_failure"/);
+            assert.match(worker.stderr, /WORKER_HTTP_400/);
+          },
+        );
+
+        const jobs = await jsonRequest("/api/internal/inference-jobs", {
+          method: "GET",
+          headers: {
+            authorization: `Bearer ${DEFAULT_INTERNAL_API_TOKEN}`,
+          },
+        });
+
+        assert.equal(jobs.response.status, 200);
+        const job = jobs.body.jobs.find((entry: { caseId: string }) => entry.caseId === caseId);
+        assert.notEqual(job, undefined);
+        assert.equal(job.status, "failed");
+        assert.equal(job.failureClass, "terminal");
+        assert.match(job.lastError, /WORKER_HTTP_400/);
+
+        const reclaim = await signedJsonRequest(baseUrl, "/api/internal/dispatch/claim", {
+          body: { workerId: "python-worker-terminal-retry-001" },
+          nonce: "python-worker-terminal-retry-nonce-001",
+        });
+
+        assert.equal(reclaim.response.status, 200);
+        assert.equal(reclaim.body.dispatch, null);
       },
       {
         internalApiToken: DEFAULT_INTERNAL_API_TOKEN,
@@ -2863,6 +3605,930 @@ test("deterministic synthetic demo flow covers intake through delivered state", 
       assert.equal(summary.response.status, 200);
       assert.equal(summary.body.summary.byStatus.DELIVERED, 1);
       assert.equal(summary.body.summary.recentOperations[0].caseId, caseId);
+    });
+  } finally {
+    rmSync(tempDir, { recursive: true, force: true });
+  }
+});
+
+// ---------------------------------------------------------------------------
+// dispatch/fail — error classification (Wave 2B exit gate #2)
+// ---------------------------------------------------------------------------
+
+test("dispatch/fail with transient failure re-queues the inference job", async () => {
+  const { tempDir, caseStoreFile } = createTestStoreFile();
+
+  try {
+    await withServer(
+      caseStoreFile,
+      async ({ baseUrl, jsonRequest }) => {
+        // Create a case so there's a job to claim
+        const created = await jsonRequest("/api/cases", {
+          method: "POST",
+          body: JSON.stringify({
+            patientAlias: "fail-transient-001",
+            studyUid: "1.2.840.fail.transient.1",
+            sequenceInventory: ["T1w", "FLAIR"],
+          }),
+        });
+        assert.equal(created.response.status, 201);
+        const caseId = created.body.case.caseId;
+
+        // Claim the inference job via dispatch
+        const claim = await signedJsonRequest(baseUrl, "/api/internal/dispatch/claim", {
+          body: { workerId: "fail-test-worker-001" },
+          nonce: "transient-claim-nonce-001",
+        });
+        assert.equal(claim.response.status, 200);
+        assert.notEqual(claim.body.dispatch, null);
+        const { leaseId } = claim.body.dispatch;
+
+        // Report transient failure
+        const fail = await signedJsonRequest(baseUrl, "/api/internal/dispatch/fail", {
+          body: {
+            caseId,
+            leaseId,
+            failureClass: "transient",
+            errorCode: "WORKER_HTTP_ERROR",
+            detail: "HTTP 502 from upstream",
+          },
+          nonce: "transient-fail-nonce-001",
+        });
+        assert.equal(fail.response.status, 200);
+        assert.equal(fail.body.failureClass, "transient");
+        assert.equal(fail.body.requeued, true);
+
+        // Verify the inference job is back in "queued" status
+        // (it has a backoff delay so immediate re-claim would not find it)
+        const jobsList = await jsonRequest("/api/internal/inference-jobs", {
+          headers: { authorization: `Bearer ${DEFAULT_INTERNAL_API_TOKEN}` },
+        });
+        assert.equal(jobsList.response.status, 200);
+        const requeued = jobsList.body.jobs.find((j: { caseId: string }) => j.caseId === caseId);
+        assert.ok(requeued, "transient failure should re-queue the job");
+        assert.equal(requeued.status, "queued");
+        assert.equal(requeued.failureClass, "transient");
+        assert.ok(requeued.lastError?.includes("WORKER_HTTP_ERROR"));
+      },
+      {
+        internalApiToken: DEFAULT_INTERNAL_API_TOKEN,
+        hmacSecret: DEFAULT_HMAC_SECRET,
+      },
+    );
+  } finally {
+    rmSync(tempDir, { recursive: true, force: true });
+  }
+});
+
+test("dispatch/fail with terminal failure marks job as failed (no re-queue)", async () => {
+  const { tempDir, caseStoreFile } = createTestStoreFile();
+
+  try {
+    await withServer(
+      caseStoreFile,
+      async ({ baseUrl, jsonRequest }) => {
+        const created = await jsonRequest("/api/cases", {
+          method: "POST",
+          body: JSON.stringify({
+            patientAlias: "fail-terminal-001",
+            studyUid: "1.2.840.fail.terminal.1",
+            sequenceInventory: ["T1w", "FLAIR"],
+          }),
+        });
+        assert.equal(created.response.status, 201);
+        const caseId = created.body.case.caseId;
+
+        const claim = await signedJsonRequest(baseUrl, "/api/internal/dispatch/claim", {
+          body: { workerId: "fail-test-worker-003" },
+          nonce: "terminal-claim-nonce-001",
+        });
+        assert.equal(claim.response.status, 200);
+        const { leaseId } = claim.body.dispatch;
+
+        // Report terminal failure
+        const fail = await signedJsonRequest(baseUrl, "/api/internal/dispatch/fail", {
+          body: {
+            caseId,
+            leaseId,
+            failureClass: "terminal",
+            errorCode: "MISSING_CONFIG",
+            detail: "Required secret not found",
+          },
+          nonce: "terminal-fail-nonce-001",
+        });
+        assert.equal(fail.response.status, 200);
+        assert.equal(fail.body.failureClass, "terminal");
+        assert.equal(fail.body.requeued, false);
+
+        // Verify the job is NOT re-queued (no claimable jobs)
+        const reClaim = await signedJsonRequest(baseUrl, "/api/internal/dispatch/claim", {
+          body: { workerId: "fail-test-worker-004" },
+          nonce: "terminal-re-claim-nonce-001",
+        });
+        assert.equal(reClaim.response.status, 200);
+        assert.equal(reClaim.body.dispatch, null, "terminal failure must not re-queue");
+      },
+      {
+        internalApiToken: DEFAULT_INTERNAL_API_TOKEN,
+        hmacSecret: DEFAULT_HMAC_SECRET,
+      },
+    );
+  } finally {
+    rmSync(tempDir, { recursive: true, force: true });
+  }
+});
+
+test("dispatch/fail requires HMAC auth", async () => {
+  const { tempDir, caseStoreFile } = createTestStoreFile();
+
+  try {
+    await withServer(
+      caseStoreFile,
+      async ({ jsonRequest }) => {
+        // Bearer-only (no HMAC) on dispatch/fail should be rejected
+        const bearerOnly = await jsonRequest("/api/internal/dispatch/fail", {
+          method: "POST",
+          headers: {
+            authorization: `Bearer ${DEFAULT_INTERNAL_API_TOKEN}`,
+          },
+          body: JSON.stringify({
+            caseId: "fake-case-id",
+            leaseId: "fake-lease-id",
+            failureClass: "transient",
+            errorCode: "TEST_ERROR",
+          }),
+        });
+        assert.equal(bearerOnly.response.status, 401, "Bearer-only must be rejected on dispatch/fail");
+      },
+      {
+        internalApiToken: DEFAULT_INTERNAL_API_TOKEN,
+        hmacSecret: DEFAULT_HMAC_SECRET,
+      },
+    );
+  } finally {
+    rmSync(tempDir, { recursive: true, force: true });
+  }
+});
+
+test("dispatch/fail returns 404 for unknown lease", async () => {
+  const { tempDir, caseStoreFile } = createTestStoreFile();
+
+  try {
+    await withServer(
+      caseStoreFile,
+      async ({ baseUrl }) => {
+        const fail = await signedJsonRequest(baseUrl, "/api/internal/dispatch/fail", {
+          body: {
+            caseId: "nonexistent-case-id",
+            leaseId: "nonexistent-lease-id",
+            failureClass: "transient",
+            errorCode: "TEST_ERROR",
+          },
+        });
+        assert.equal(fail.response.status, 404);
+      },
+      {
+        internalApiToken: DEFAULT_INTERNAL_API_TOKEN,
+        hmacSecret: DEFAULT_HMAC_SECRET,
+      },
+    );
+  } finally {
+    rmSync(tempDir, { recursive: true, force: true });
+  }
+});
+
+test("dispatch/fail rejects invalid failureClass", async () => {
+  const { tempDir, caseStoreFile } = createTestStoreFile();
+
+  try {
+    await withServer(
+      caseStoreFile,
+      async ({ baseUrl }) => {
+        const fail = await signedJsonRequest(baseUrl, "/api/internal/dispatch/fail", {
+          body: {
+            caseId: "any-case",
+            leaseId: "any-lease",
+            failureClass: "bogus",
+            errorCode: "TEST_ERROR",
+          },
+        });
+        assert.equal(fail.response.status, 400, "Invalid failureClass must be rejected");
+      },
+      {
+        internalApiToken: DEFAULT_INTERNAL_API_TOKEN,
+        hmacSecret: DEFAULT_HMAC_SECRET,
+      },
+    );
+  } finally {
+    rmSync(tempDir, { recursive: true, force: true });
+  }
+});
+
+// ---------------------------------------------------------------------------
+// Wave 3B — Artifact and Report Closure
+// ---------------------------------------------------------------------------
+
+test("report-preview artifact is persisted and retrievable with correct MIME type", async () => {
+  const { tempDir, caseStoreFile } = createTestStoreFile();
+
+  try {
+    await withServer(caseStoreFile, async ({ baseUrl, jsonRequest }) => {
+      const created = await jsonRequest("/api/cases", {
+        method: "POST",
+        body: JSON.stringify({
+          patientAlias: "wave3b-report-preview-001",
+          studyUid: "1.2.840.wave3b.rp.1",
+          sequenceInventory: ["T1w", "FLAIR"],
+          studyContext: {
+            studyInstanceUid: "2.25.wave3b.rp.1",
+            accessionNumber: "ACC-3B-RP-001",
+            studyDate: "2026-03-30",
+            sourceArchive: "pacs-demo",
+            dicomWebBaseUrl: "https://dicom.example.test/studies/2.25.wave3b.rp.1",
+            metadataSummary: ["Wave 3B report-preview test"],
+            series: [
+              {
+                seriesInstanceUid: "2.25.wave3b.rp.1.1",
+                seriesDescription: "Sag T1 MPRAGE",
+                modality: "MR",
+                sequenceLabel: "T1w",
+                instanceCount: 176,
+              },
+            ],
+          },
+        }),
+      });
+      assert.equal(created.response.status, 201);
+      const caseId = created.body.case.caseId as string;
+
+      const reportHtml = "<html><body><h1>Structural Report Preview</h1><p>Brain volume: 1105 ml</p></body></html>";
+
+      await jsonRequest("/api/internal/inference-callback", {
+        method: "POST",
+        body: JSON.stringify({
+          caseId,
+          qcDisposition: "pass",
+          findings: ["Report-preview persistence verification."],
+          measurements: [{ label: "brain_volume_ml", value: 1105 }],
+          artifacts: ["artifact://overlay-preview", "artifact://report-preview", "artifact://qc-summary"],
+          artifactPayloads: [
+            {
+              artifactRef: "artifact://overlay-preview",
+              contentType: "image/png",
+              contentBase64: Buffer.from("PNG-3B-TEST", "utf-8").toString("base64"),
+            },
+            {
+              artifactRef: "artifact://report-preview",
+              contentType: "text/html",
+              contentBase64: Buffer.from(reportHtml, "utf-8").toString("base64"),
+            },
+            {
+              artifactRef: "artifact://qc-summary",
+              contentType: "application/json",
+              contentBase64: Buffer.from(JSON.stringify({ summary: "pass", checks: 2 }), "utf-8").toString("base64"),
+            },
+          ],
+          generatedSummary: "Wave 3B report preview test draft.",
+        }),
+      });
+
+      // Retrieve case detail and find the report-preview artifact
+      const detail = await jsonRequest(`/api/cases/${caseId}`);
+      assert.equal(detail.response.status, 200);
+
+      const reportPreviewArtifact = detail.body.case.artifactManifest.find(
+        (a: { artifactType: string }) => a.artifactType === "report-preview",
+      );
+      assert.ok(reportPreviewArtifact, "report-preview artifact must exist in manifest");
+      assert.equal(reportPreviewArtifact.mimeType, "text/html");
+      assert.equal(typeof reportPreviewArtifact.retrievalUrl, "string", "report-preview must have a retrievalUrl");
+
+      // Retrieve the artifact content via API
+      const rpResponse = await fetch(`${baseUrl}${reportPreviewArtifact.retrievalUrl}`);
+      assert.equal(rpResponse.status, 200);
+      assert.equal(rpResponse.headers.get("content-type"), "text/html");
+      const rpContent = await rpResponse.text();
+      assert.equal(rpContent, reportHtml, "report-preview content must round-trip");
+    });
+  } finally {
+    rmSync(tempDir, { recursive: true, force: true });
+  }
+});
+
+test("artifact provenance chain traces back to producing package and archive", async () => {
+  const { tempDir, caseStoreFile } = createTestStoreFile();
+
+  try {
+    await withServer(caseStoreFile, async ({ jsonRequest }) => {
+      const created = await jsonRequest("/api/cases", {
+        method: "POST",
+        body: JSON.stringify({
+          patientAlias: "wave3b-provenance-001",
+          studyUid: "1.2.840.wave3b.prov.1",
+          sequenceInventory: ["T1w", "FLAIR"],
+          studyContext: {
+            studyInstanceUid: "2.25.wave3b.prov.1",
+            accessionNumber: "ACC-3B-PROV-001",
+            studyDate: "2026-03-30",
+            sourceArchive: "pacs-main",
+            dicomWebBaseUrl: "https://archive.hospital.test/dicom/studies/2.25.wave3b.prov.1",
+            metadataSummary: ["Wave 3B provenance chain test"],
+            series: [
+              {
+                seriesInstanceUid: "2.25.wave3b.prov.1.1",
+                seriesDescription: "Sag T1 MPRAGE",
+                modality: "MR",
+                sequenceLabel: "T1w",
+                instanceCount: 176,
+              },
+              {
+                seriesInstanceUid: "2.25.wave3b.prov.1.2",
+                seriesDescription: "Ax FLAIR",
+                modality: "MR",
+                sequenceLabel: "FLAIR",
+                instanceCount: 36,
+              },
+            ],
+          },
+        }),
+      });
+      assert.equal(created.response.status, 201);
+      const caseId = created.body.case.caseId as string;
+
+      await jsonRequest("/api/internal/inference-callback", {
+        method: "POST",
+        body: JSON.stringify({
+          caseId,
+          qcDisposition: "pass",
+          findings: ["Provenance chain verification."],
+          measurements: [{ label: "brain_volume_ml", value: 1098 }],
+          artifacts: ["artifact://overlay-preview", "artifact://qc-summary"],
+          artifactPayloads: [
+            {
+              artifactRef: "artifact://overlay-preview",
+              contentType: "image/png",
+              contentBase64: Buffer.from("PROV-TEST-OVERLAY", "utf-8").toString("base64"),
+            },
+            {
+              artifactRef: "artifact://qc-summary",
+              contentType: "application/json",
+              contentBase64: Buffer.from(JSON.stringify({ summary: "pass" }), "utf-8").toString("base64"),
+            },
+          ],
+          generatedSummary: "Provenance chain draft.",
+        }),
+      });
+
+      const detail = await jsonRequest(`/api/cases/${caseId}`);
+      assert.equal(detail.response.status, 200);
+
+      const { artifactManifest } = detail.body.case;
+      assert.ok(artifactManifest.length >= 2, "at least 2 artifacts expected");
+
+      for (const artifact of artifactManifest) {
+        // Producing package provenance
+        assert.equal(artifact.producingPackageId, "brain-structural-fastsurfer",
+          `artifact ${artifact.artifactId} must reference producing package`);
+        assert.equal(typeof artifact.producingPackageVersion, "string",
+          `artifact ${artifact.artifactId} must have package version`);
+        assert.ok(artifact.producingPackageVersion.length > 0,
+          `artifact ${artifact.artifactId} package version must be non-empty`);
+
+        // Archive locator provenance
+        assert.equal(artifact.archiveLocator.studyInstanceUid, "2.25.wave3b.prov.1",
+          `artifact ${artifact.artifactId} archiveLocator must reference original study`);
+        assert.equal(artifact.archiveLocator.sourceArchive, "pacs-main",
+          `artifact ${artifact.artifactId} archiveLocator must reference source archive`);
+        assert.equal(artifact.archiveLocator.dicomWebBaseUrl,
+          "https://archive.hospital.test/dicom/studies/2.25.wave3b.prov.1",
+          `artifact ${artifact.artifactId} archiveLocator must carry DICOMWeb URL`);
+        assert.ok(artifact.archiveLocator.seriesInstanceUids.length >= 1,
+          `artifact ${artifact.artifactId} archiveLocator must list series UIDs`);
+
+        // Temporal provenance
+        assert.equal(typeof artifact.generatedAt, "string",
+          `artifact ${artifact.artifactId} must have generatedAt timestamp`);
+        assert.ok(!Number.isNaN(Date.parse(artifact.generatedAt)),
+          `artifact ${artifact.artifactId} generatedAt must be a valid ISO date`);
+      }
+
+      // Verify report provenance chain as well
+      const report = await jsonRequest(`/api/cases/${caseId}/report`);
+      assert.equal(report.response.status, 200);
+      assert.equal(typeof report.body.report.provenance.workflowVersion, "string");
+      assert.ok(report.body.report.provenance.workflowVersion.length > 0,
+        "report provenance must include workflow version");
+      assert.equal(typeof report.body.report.provenance.plannerVersion, "string");
+      assert.ok(report.body.report.provenance.plannerVersion.length > 0,
+        "report provenance must include planner version");
+      assert.equal(typeof report.body.report.provenance.generatedAt, "string");
+      assert.ok(!Number.isNaN(Date.parse(report.body.report.provenance.generatedAt)),
+        "report provenance generatedAt must be a valid ISO date");
+    });
+  } finally {
+    rmSync(tempDir, { recursive: true, force: true });
+  }
+});
+
+test("archive truth is preserved through review, finalize, and report surfaces", async () => {
+  const { tempDir, caseStoreFile } = createTestStoreFile();
+
+  try {
+    await withServer(caseStoreFile, async ({ jsonRequest }) => {
+      const created = await jsonRequest("/api/cases", {
+        method: "POST",
+        body: JSON.stringify({
+          patientAlias: "wave3b-archive-truth-001",
+          studyUid: "1.2.840.wave3b.at.1",
+          sequenceInventory: ["T1w", "FLAIR"],
+          studyContext: {
+            studyInstanceUid: "2.25.wave3b.at.1",
+            accessionNumber: "ACC-3B-AT-001",
+            studyDate: "2026-03-30",
+            sourceArchive: "hospital-pacs",
+            dicomWebBaseUrl: "https://pacs.hospital.test/dicom/studies/2.25.wave3b.at.1",
+            metadataSummary: ["Wave 3B archive truth preservation test"],
+            series: [
+              {
+                seriesInstanceUid: "2.25.wave3b.at.1.1",
+                seriesDescription: "Sag T1 MPRAGE",
+                modality: "MR",
+                sequenceLabel: "T1w",
+                instanceCount: 176,
+              },
+              {
+                seriesInstanceUid: "2.25.wave3b.at.1.2",
+                seriesDescription: "Ax FLAIR",
+                modality: "MR",
+                sequenceLabel: "FLAIR",
+                instanceCount: 40,
+              },
+            ],
+          },
+        }),
+      });
+      assert.equal(created.response.status, 201);
+      const caseId = created.body.case.caseId as string;
+
+      await jsonRequest("/api/internal/inference-callback", {
+        method: "POST",
+        body: JSON.stringify({
+          caseId,
+          qcDisposition: "pass",
+          findings: ["Archive truth preservation check."],
+          measurements: [{ label: "brain_volume_ml", value: 1100 }],
+          artifacts: ["artifact://overlay-preview", "artifact://report-preview", "artifact://qc-summary"],
+          artifactPayloads: [
+            {
+              artifactRef: "artifact://overlay-preview",
+              contentType: "image/png",
+              contentBase64: Buffer.from("AT-TEST-OVERLAY", "utf-8").toString("base64"),
+            },
+            {
+              artifactRef: "artifact://report-preview",
+              contentType: "text/html",
+              contentBase64: Buffer.from("<html><body>Archive truth test</body></html>", "utf-8").toString("base64"),
+            },
+            {
+              artifactRef: "artifact://qc-summary",
+              contentType: "application/json",
+              contentBase64: Buffer.from(JSON.stringify({ summary: "pass" }), "utf-8").toString("base64"),
+            },
+          ],
+          generatedSummary: "Archive truth preservation draft.",
+        }),
+      });
+
+      // STAGE 1: Verify archive binding exists after inference (AWAITING_REVIEW)
+      const afterInference = await jsonRequest(`/api/cases/${caseId}`);
+      assert.equal(afterInference.body.case.status, "AWAITING_REVIEW");
+      const overlayAfterInference = afterInference.body.case.artifactManifest.find(
+        (a: { artifactType: string }) => a.artifactType === "overlay-preview",
+      );
+      assert.ok(overlayAfterInference.viewerReady, "overlay must be viewer-ready after inference");
+      assert.ok(overlayAfterInference.viewerPath, "overlay must have viewerPath after inference");
+      assert.equal(overlayAfterInference.archiveLocator.dicomWebBaseUrl,
+        "https://pacs.hospital.test/dicom/studies/2.25.wave3b.at.1");
+      assert.ok(overlayAfterInference.archiveStudyUrl, "overlay must have archiveStudyUrl");
+
+      // STAGE 2: Review
+      await jsonRequest(`/api/cases/${caseId}/review`, {
+        method: "POST",
+        body: JSON.stringify({
+          reviewerId: "clinician-3b-at",
+          reviewerRole: "neuroradiologist",
+          finalImpression: "Archive truth confirmed during review.",
+        }),
+      });
+      const afterReview = await jsonRequest(`/api/cases/${caseId}`);
+      assert.equal(afterReview.body.case.status, "REVIEWED");
+      const overlayAfterReview = afterReview.body.case.artifactManifest.find(
+        (a: { artifactType: string }) => a.artifactType === "overlay-preview",
+      );
+      assert.ok(overlayAfterReview.viewerReady, "overlay must stay viewer-ready after review");
+      assert.ok(overlayAfterReview.viewerPath, "overlay must retain viewerPath after review");
+      assert.equal(overlayAfterReview.archiveLocator.studyInstanceUid, "2.25.wave3b.at.1",
+        "archive locator study UID must survive review");
+
+      // STAGE 3: Finalize
+      await jsonRequest(`/api/cases/${caseId}/finalize`, {
+        method: "POST",
+        body: JSON.stringify({ finalSummary: "Archive truth finalize summary." }),
+      });
+      const afterFinalize = await jsonRequest(`/api/cases/${caseId}`);
+      assert.equal(afterFinalize.body.case.status, "DELIVERY_PENDING");
+      const overlayAfterFinalize = afterFinalize.body.case.artifactManifest.find(
+        (a: { artifactType: string }) => a.artifactType === "overlay-preview",
+      );
+      assert.ok(overlayAfterFinalize.viewerReady, "overlay must stay viewer-ready after finalize");
+      assert.ok(overlayAfterFinalize.viewerPath, "overlay must retain viewerPath after finalize");
+      assert.equal(overlayAfterFinalize.archiveLocator.dicomWebBaseUrl,
+        "https://pacs.hospital.test/dicom/studies/2.25.wave3b.at.1",
+        "archive locator DICOMWeb URL must survive finalize");
+
+      // STAGE 4: Report surface preserves archive binding
+      const report = await jsonRequest(`/api/cases/${caseId}/report`);
+      assert.equal(report.response.status, 200);
+      assert.ok(Array.isArray(report.body.report.artifacts), "report must expose artifacts array");
+
+      const reportOverlay = report.body.report.artifacts.find(
+        (a: { artifactType: string }) => a.artifactType === "overlay-preview",
+      );
+      assert.ok(reportOverlay, "report surface must include overlay artifact");
+      assert.ok(reportOverlay.viewerReady, "report overlay must be viewer-ready");
+      assert.equal(reportOverlay.archiveLocator.studyInstanceUid, "2.25.wave3b.at.1",
+        "report overlay must carry archive locator");
+      assert.equal(reportOverlay.archiveLocator.dicomWebBaseUrl,
+        "https://pacs.hospital.test/dicom/studies/2.25.wave3b.at.1",
+        "report overlay must carry DICOMWeb URL");
+      assert.ok(reportOverlay.viewerPath, "report overlay must have viewerPath");
+      assert.ok(reportOverlay.archiveStudyUrl, "report overlay must have archiveStudyUrl");
+
+      const reportPreview = report.body.report.artifacts.find(
+        (a: { artifactType: string }) => a.artifactType === "report-preview",
+      );
+      assert.ok(reportPreview, "report surface must include report-preview artifact");
+      assert.equal(reportPreview.archiveLocator.sourceArchive, "hospital-pacs",
+        "report-preview must carry source archive in locator");
+    });
+  } finally {
+    rmSync(tempDir, { recursive: true, force: true });
+  }
+});
+
+test("report derivedArtifacts carry full provenance and are not lossy copies", async () => {
+  const { tempDir, caseStoreFile } = createTestStoreFile();
+
+  try {
+    await withServer(caseStoreFile, async ({ jsonRequest }) => {
+      const created = await jsonRequest("/api/cases", {
+        method: "POST",
+        body: JSON.stringify({
+          patientAlias: "wave3b-report-artifacts-001",
+          studyUid: "1.2.840.wave3b.ra.1",
+          sequenceInventory: ["T1w", "FLAIR"],
+          studyContext: {
+            studyInstanceUid: "2.25.wave3b.ra.1",
+            accessionNumber: "ACC-3B-RA-001",
+            studyDate: "2026-03-30",
+            sourceArchive: "archive-primary",
+            dicomWebBaseUrl: "https://archive-primary.test/dicom/studies/2.25.wave3b.ra.1",
+            metadataSummary: ["Wave 3B report artifact losslessness test"],
+            series: [
+              {
+                seriesInstanceUid: "2.25.wave3b.ra.1.1",
+                seriesDescription: "Sag T1",
+                modality: "MR",
+                sequenceLabel: "T1w",
+                instanceCount: 176,
+              },
+            ],
+          },
+        }),
+      });
+      assert.equal(created.response.status, 201);
+      const caseId = created.body.case.caseId as string;
+
+      await jsonRequest("/api/internal/inference-callback", {
+        method: "POST",
+        body: JSON.stringify({
+          caseId,
+          qcDisposition: "pass",
+          findings: ["Lossless artifact check."],
+          measurements: [{ label: "brain_volume_ml", value: 1112 }],
+          artifacts: ["artifact://overlay-preview", "artifact://qc-summary"],
+          artifactPayloads: [
+            {
+              artifactRef: "artifact://overlay-preview",
+              contentType: "image/png",
+              contentBase64: Buffer.from("LOSS-TEST", "utf-8").toString("base64"),
+            },
+            {
+              artifactRef: "artifact://qc-summary",
+              contentType: "application/json",
+              contentBase64: Buffer.from(JSON.stringify({ ok: true }), "utf-8").toString("base64"),
+            },
+          ],
+          generatedSummary: "Lossless report draft.",
+        }),
+      });
+
+      // Get case detail and report to compare artifact representations
+      const detail = await jsonRequest(`/api/cases/${caseId}`);
+      const report = await jsonRequest(`/api/cases/${caseId}/report`);
+
+      assert.equal(detail.response.status, 200);
+      assert.equal(report.response.status, 200);
+
+      const detailArtifacts = detail.body.case.artifactManifest;
+      const reportArtifacts = report.body.report.artifacts;
+
+      assert.equal(detailArtifacts.length, reportArtifacts.length,
+        "report must expose same number of artifacts as case detail");
+
+      for (let i = 0; i < detailArtifacts.length; i++) {
+        const da = detailArtifacts[i];
+        const ra = reportArtifacts[i];
+
+        // Core identity
+        assert.equal(ra.artifactId, da.artifactId, "artifact IDs must match");
+        assert.equal(ra.artifactType, da.artifactType, "artifact types must match");
+
+        // Provenance must not be lost
+        assert.equal(ra.producingPackageId, da.producingPackageId,
+          `producingPackageId must survive report surface for ${da.artifactId}`);
+        assert.equal(ra.producingPackageVersion, da.producingPackageVersion,
+          `producingPackageVersion must survive report surface for ${da.artifactId}`);
+        assert.equal(ra.generatedAt, da.generatedAt,
+          `generatedAt must survive report surface for ${da.artifactId}`);
+
+        // Archive locator must not be lost
+        assert.deepEqual(ra.archiveLocator, da.archiveLocator,
+          `archiveLocator must survive report surface for ${da.artifactId}`);
+
+        // Viewer descriptor must not be lost
+        assert.equal(ra.viewerReady, da.viewerReady,
+          `viewerReady must survive report surface for ${da.artifactId}`);
+        if (da.viewerDescriptor) {
+          assert.deepEqual(ra.viewerDescriptor, da.viewerDescriptor,
+            `viewerDescriptor must survive report surface for ${da.artifactId}`);
+        }
+      }
+    });
+  } finally {
+    rmSync(tempDir, { recursive: true, force: true });
+  }
+});
+
+// ═══════════════════════════════════════════════════════════
+// Wave 4: Interop export seams (DICOM SR + FHIR)
+// ═══════════════════════════════════════════════════════════
+
+test("Wave 4: DICOM SR export returns structurally valid envelope for finalized case", async () => {
+  const { tempDir, caseStoreFile } = createTestStoreFile();
+  try {
+    await withServer(caseStoreFile, async ({ jsonRequest }) => {
+      // Create and complete a case through finalization
+      const created = await jsonRequest("/api/cases", {
+        method: "POST",
+        body: JSON.stringify({
+          patientAlias: "DICOMSR-001",
+          studyUid: "1.2.840.113619.2.55.3.99.1",
+          indication: "MRI brain structural analysis",
+          sequenceInventory: ["T1w"],
+          studyContext: {
+            studyInstanceUid: "1.2.840.113619.2.55.3.99.1",
+            sourceArchive: "orthanc-local",
+            dicomWebBaseUrl: "http://orthanc:8042/dicom-web",
+            series: [{ seriesInstanceUid: "1.2.840.113619.2.55.3.99.1.1", modality: "MR", description: "T1 MPRAGE" }],
+          },
+        }),
+      });
+      assert.equal(created.response.status, 201);
+      const caseId = created.body.case.caseId as string;
+
+      // Simulate inference callback
+      await jsonRequest("/api/internal/inference-callback", {
+        method: "POST",
+        body: JSON.stringify({
+          caseId,
+          qcDisposition: "pass",
+          findings: ["Normal brain morphometry", "No significant atrophy"],
+          measurements: [
+            { label: "Total Brain Volume", value: 1250.3, unit: "cm3" },
+            { label: "Hippocampal Volume L", value: 3.8, unit: "cm3" },
+          ],
+          artifacts: [],
+          generatedSummary: "Structural MRI analysis complete",
+        }),
+      });
+
+      // Review
+      await jsonRequest(`/api/cases/${caseId}/review`, {
+        method: "POST",
+        body: JSON.stringify({
+          reviewerId: "dr-export-test",
+          reviewerRole: "neuroradiologist",
+          finalImpression: "Normal structural MRI",
+        }),
+      });
+
+      // Finalize
+      await jsonRequest(`/api/cases/${caseId}/finalize`, {
+        method: "POST",
+        body: JSON.stringify({ finalSummary: "Normal structural MRI locked for export." }),
+      });
+
+      // Request DICOM SR export
+      const srExport = await jsonRequest(`/api/cases/${caseId}/exports/dicom-sr`);
+      assert.equal(srExport.response.status, 200);
+      assert.match(srExport.response.headers.get("content-type") ?? "", /application\/json/);
+
+      const sr = srExport.body.dicomSr;
+
+      // Structural validity: DICOM SR envelope
+      assert.ok(sr, "response must contain dicomSr envelope");
+      assert.equal(sr.sopClassUid, "1.2.840.10008.5.1.4.1.1.88.33",
+        "SOP Class UID must be Comprehensive SR");
+      assert.equal(sr.modality, "SR", "modality must be SR");
+      assert.ok(sr.studyInstanceUid, "must include study instance UID");
+      assert.equal(sr.studyInstanceUid, "1.2.840.113619.2.55.3.99.1");
+
+      // Content: findings and measurements
+      assert.ok(Array.isArray(sr.contentSequence), "must have contentSequence array");
+      const findingsContainer = sr.contentSequence.find((item: any) =>
+        item.conceptNameCode?.meaning === "Findings");
+      assert.ok(findingsContainer, "must have Findings container");
+      assert.ok(findingsContainer.items.length >= 2, "must include at least 2 findings");
+
+      const measurementsContainer = sr.contentSequence.find((item: any) =>
+        item.conceptNameCode?.meaning === "Measurements");
+      assert.ok(measurementsContainer, "must have Measurements container");
+      assert.ok(measurementsContainer.items.length >= 2, "must include at least 2 measurements");
+
+      // Each measurement must have label, value, unit
+      for (const m of measurementsContainer.items) {
+        assert.ok(m.conceptNameCode?.meaning, "measurement must have label");
+        assert.ok(typeof m.numericValue === "number", "measurement must have numeric value");
+      }
+
+      // Provenance
+      assert.ok(sr.provenance, "must include provenance");
+      assert.ok(sr.provenance.generatedAt, "provenance must have generatedAt");
+      assert.ok(sr.provenance.workflowVersion, "provenance must have workflowVersion");
+
+      // Disclaimer
+      assert.ok(sr.disclaimer, "must include disclaimer");
+      assert.match(sr.disclaimer, /research/i, "disclaimer must reference research use");
+    });
+  } finally {
+    rmSync(tempDir, { recursive: true, force: true });
+  }
+});
+
+test("Wave 4: FHIR DiagnosticReport export returns valid R4 resource for finalized case", async () => {
+  const { tempDir, caseStoreFile } = createTestStoreFile();
+  try {
+    await withServer(caseStoreFile, async ({ baseUrl, jsonRequest }) => {
+      // Create and complete a case through finalization
+      const created = await jsonRequest("/api/cases", {
+        method: "POST",
+        body: JSON.stringify({
+          patientAlias: "FHIR-001",
+          studyUid: "1.2.840.113619.2.55.3.99.2",
+          indication: "MRI brain structural",
+          sequenceInventory: ["T1w"],
+          studyContext: {
+            studyInstanceUid: "1.2.840.113619.2.55.3.99.2",
+            sourceArchive: "orthanc-local",
+            dicomWebBaseUrl: "http://orthanc:8042/dicom-web",
+            series: [{ seriesInstanceUid: "1.2.840.113619.2.55.3.99.2.1", modality: "MR", description: "T1 MPRAGE" }],
+          },
+        }),
+      });
+      assert.equal(created.response.status, 201);
+      const caseId = created.body.case.caseId as string;
+
+      // Inference callback
+      await jsonRequest("/api/internal/inference-callback", {
+        method: "POST",
+        body: JSON.stringify({
+          caseId,
+          qcDisposition: "pass",
+          findings: ["Mild left hippocampal volume reduction"],
+          measurements: [
+            { label: "Hippocampal Volume L", value: 2.9, unit: "cm3" },
+            { label: "Hippocampal Volume R", value: 3.5, unit: "cm3" },
+          ],
+          artifacts: [],
+          generatedSummary: "Structural analysis complete",
+        }),
+      });
+
+      // Review + Finalize
+      await jsonRequest(`/api/cases/${caseId}/review`, {
+        method: "POST",
+        body: JSON.stringify({
+          reviewerId: "dr-fhir-test",
+          reviewerRole: "neuroradiologist",
+          finalImpression: "Mild left hippocampal volume reduction noted",
+        }),
+      });
+      await jsonRequest(`/api/cases/${caseId}/finalize`, {
+        method: "POST",
+        body: JSON.stringify({ finalSummary: "FHIR export finalized." }),
+      });
+
+      // Request FHIR export
+      const fhirExport = await jsonRequest(`/api/cases/${caseId}/exports/fhir-diagnostic-report`);
+      assert.equal(fhirExport.response.status, 200);
+      assert.match(fhirExport.response.headers.get("content-type") ?? "", /application\/json/);
+
+      const dr = fhirExport.body.diagnosticReport;
+
+      // FHIR R4 structural validity
+      assert.ok(dr, "response must contain diagnosticReport envelope");
+      assert.equal(dr.resourceType, "DiagnosticReport", "resourceType must be DiagnosticReport");
+      assert.equal(dr.status, "final", "status must be final for finalized case");
+
+      // Code
+      assert.ok(dr.code, "must have code");
+      assert.ok(dr.code.coding, "code must have coding array");
+      assert.ok(dr.code.coding.length > 0, "code must have at least one coding");
+      const coding = dr.code.coding[0];
+      assert.ok(coding.system, "coding must have system");
+      assert.ok(coding.code, "coding must have code");
+
+      // Subject
+      assert.ok(dr.subject, "must have subject reference");
+      assert.ok(dr.subject.display, "subject must have display name");
+
+      // Effective date
+      assert.ok(dr.effectiveDateTime, "must have effectiveDateTime");
+
+      // Conclusion
+      assert.ok(dr.conclusion, "must have conclusion");
+      assert.match(dr.conclusion, /hippocampal/i, "conclusion must include clinical finding");
+
+      // Observations (measurements as contained resources)
+      assert.ok(Array.isArray(dr.result), "must have result array");
+      assert.ok(dr.result.length >= 2, "must have at least 2 observation results");
+
+      if (dr.contained) {
+        const observations = dr.contained.filter((r: any) => r.resourceType === "Observation");
+        assert.ok(observations.length >= 2, "must contain at least 2 Observation resources");
+
+        for (const obs of observations) {
+          assert.equal(obs.resourceType, "Observation");
+          assert.equal(obs.status, "final");
+          assert.ok(obs.code?.text, "observation must have code text");
+          assert.ok(obs.valueQuantity?.value !== undefined, "observation must have valueQuantity.value");
+        }
+      }
+
+      // Presented form (report attachment)
+      assert.ok(Array.isArray(dr.presentedForm), "must have presentedForm");
+      assert.ok(dr.presentedForm.length > 0, "presentedForm must not be empty");
+      assert.ok(dr.presentedForm[0].contentType, "presentedForm must have contentType");
+
+      // Meta
+      assert.ok(dr.meta, "must have meta");
+      assert.ok(dr.meta.lastUpdated, "meta must have lastUpdated");
+
+      // Disclaimer extension
+      const disclaimerExt = dr.extension?.find((e: any) =>
+        e.url?.includes("disclaimer") || e.url?.includes("research-use"));
+      assert.ok(disclaimerExt, "must have disclaimer extension");
+    });
+  } finally {
+    rmSync(tempDir, { recursive: true, force: true });
+  }
+});
+
+test("Wave 4: export endpoints return 404 for cases without finalized reports", async () => {
+  const { tempDir, caseStoreFile } = createTestStoreFile();
+  try {
+    await withServer(caseStoreFile, async ({ jsonRequest }) => {
+      // Create a case but do NOT finalize
+      const created = await jsonRequest("/api/cases", {
+        method: "POST",
+        body: JSON.stringify({
+          patientAlias: "NOEXPORT-001",
+          studyUid: "1.2.840.113619.2.55.3.99.9",
+          sequenceInventory: ["T1w"],
+        }),
+      });
+      assert.equal(created.response.status, 201);
+      const caseId = created.body.case.caseId as string;
+
+      // Both export endpoints must reject unfinalized cases
+      const srExport = await jsonRequest(`/api/cases/${caseId}/exports/dicom-sr`);
+      assert.equal(srExport.response.status, 404, "DICOM SR export must reject case without report");
+      assert.ok(srExport.body.code, "error response must include error code");
+
+      const fhirExport = await jsonRequest(`/api/cases/${caseId}/exports/fhir-diagnostic-report`);
+      assert.equal(fhirExport.response.status, 404, "FHIR export must reject case without report");
+      assert.ok(fhirExport.body.code, "error response must include error code");
     });
   } finally {
     rmSync(tempDir, { recursive: true, force: true });

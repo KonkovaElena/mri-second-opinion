@@ -2,7 +2,10 @@ import { mkdirSync } from "node:fs";
 import { dirname } from "node:path";
 import { DatabaseSync } from "node:sqlite";
 import type { CaseRecord, DeliveryJobRecord, InferenceJobRecord } from "./cases";
-import { backfillStructuralExecutionEnvelope } from "./case-planning";
+import {
+  backfillStructuralExecutionEnvelope,
+  createDefaultStructuralExecutionContext,
+} from "./case-planning";
 import { createDerivedArtifactDescriptors } from "./case-artifacts";
 import { formatWorkflowPackageVersion, getWorkflowPackageManifest } from "./workflow-packages";
 
@@ -82,7 +85,8 @@ export function openCaseDatabase(databaseFilePath: string) {
       completed_at TEXT,
       last_error TEXT,
       lease_id TEXT,
-      lease_expires_at TEXT
+      lease_expires_at TEXT,
+      failure_class TEXT
     );
 
     CREATE INDEX IF NOT EXISTS idx_inference_jobs_status_available
@@ -106,6 +110,10 @@ export function openCaseDatabase(databaseFilePath: string) {
 
   if (!inferenceJobColumns.has("lease_expires_at")) {
     database.exec("ALTER TABLE inference_jobs ADD COLUMN lease_expires_at TEXT;");
+  }
+
+  if (!inferenceJobColumns.has("failure_class")) {
+    database.exec("ALTER TABLE inference_jobs ADD COLUMN failure_class TEXT;");
   }
 
   return database;
@@ -167,6 +175,9 @@ export function normalizeStoredCaseRecord(parsed: CaseRecord): CaseRecord {
     ? {
         ...parsed.report,
         derivedArtifacts: undefined,
+        executionContext: createDefaultStructuralExecutionContext(
+          parsed.report.executionContext ?? parsed.structuralExecution?.executionContext,
+        ),
         provenance: {
           ...parsed.report.provenance,
           workflowVersion:
@@ -179,6 +190,9 @@ export function normalizeStoredCaseRecord(parsed: CaseRecord): CaseRecord {
   const structuralExecution = parsed.structuralExecution
     ? {
         ...parsed.structuralExecution,
+        executionContext: createDefaultStructuralExecutionContext(
+          parsed.structuralExecution.executionContext ?? report?.executionContext,
+        ),
         artifactIds: Array.isArray(parsed.structuralExecution.artifactIds)
           ? [...parsed.structuralExecution.artifactIds]
           : normalizedArtifactManifest.map((artifact) => artifact.artifactId),
@@ -247,6 +261,7 @@ export function parseStoredInferenceJobRecord(row: {
   last_error: string | null;
   lease_id?: string | null;
   lease_expires_at?: string | null;
+  failure_class?: string | null;
 }): LoadedSqliteInferenceJobRecord {
   return {
     inferenceJob: {
@@ -263,6 +278,7 @@ export function parseStoredInferenceJobRecord(row: {
       lastError: row.last_error ?? null,
       leaseId: row.lease_id ?? null,
       leaseExpiresAt: row.lease_expires_at ?? null,
+      failureClass: (row.failure_class as InferenceJobRecord["failureClass"]) ?? null,
     },
   };
 }

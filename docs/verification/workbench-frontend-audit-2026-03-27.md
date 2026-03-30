@@ -1,9 +1,9 @@
 ---
 title: "Workbench Frontend Audit 2026-03-27"
 status: "active"
-version: "1.0.0"
-last_updated: "2026-03-27"
-tags: [verification, frontend, workbench, mri]
+version: "2.0.0"
+last_updated: "2026-03-30"
+tags: [verification, frontend, workbench, mri, wave-3a]
 role: evidence
 ---
 
@@ -55,12 +55,48 @@ Validation completed on 2026-03-27:
 4. standalone subtree build passed via `npm run build`
 5. live screenshots were captured from the running workbench into `docs/screenshots/`
 
+## Wave 3A: Viewer Path In Built-In Workbench
+
+The following Wave 3A capability was implemented and verified on 2026-03-30:
+
+The workbench now renders an explicit Viewer Path panel between the Report Preview and Operations Summary panels. When a case has `viewerReady` artifacts with trusted archive binding, the panel renders:
+
+1. a navigable `viewerPath` URL routed back to the workbench with artifact context
+2. an `archiveStudyUrl` link to the resolved DICOMWeb study endpoint
+
+The clinician-facing viewer path is fully integrated into the existing review workbench. No parallel UI or external viewer app was added.
+
+### Implementation surfaces
+
+1. `public/workbench/index.html` — new Viewer Path panel section
+2. `public/workbench/review-workbench.js` — viewer panel rendering, `selectedArtifactId` state, archive study link population
+3. `src/case-presentation.ts` — `buildViewerPath()` and `buildArchiveStudyUrl()` helpers
+
+### Validation
+
+1. `tests/workflow-api.test.ts` — workbench shell assertion now covers Viewer Path text
+2. 95 tests pass, 0 fail
+
+## UI To Endpoint Mapping (updated)
+
+The workbench now exposes these real surfaces:
+
+1. queue dashboard -> `GET /api/cases`
+2. case detail -> `GET /api/cases/:caseId`
+3. report preview -> `GET /api/cases/:caseId/report`
+4. operations summary -> `GET /api/operations/summary`
+5. clinician review -> `POST /api/cases/:caseId/review`
+6. finalization -> `POST /api/cases/:caseId/finalize`
+7. delivery retry -> `POST /api/delivery/:caseId/retry`
+8. synthetic demo draft generation -> `POST /api/internal/inference-callback`
+9. viewer path (archive study link) -> computed from artifact `viewerDescriptor` and `archiveLocator`
+
 ## Audit Decision
 
-The current standalone frontend closure is complete for the built-in synthetic-demo workbench surface.
+The current standalone frontend closure is complete for the built-in review workbench surface including the Wave 3A clinician-facing viewer path.
 
 Future frontend work remains out of scope for this audit:
 
-1. OHIF deployment
-2. production imaging viewer UX
-3. worker-driven real-time progress UI
+1. OHIF deployment or embedded production imaging viewer
+2. real-time worker progress UI
+3. multi-study comparison UI

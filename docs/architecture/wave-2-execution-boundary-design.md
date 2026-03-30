@@ -12,18 +12,18 @@ Its purpose is to convert the current truthful control-plane baseline into a min
 
 The full local execution-truth slice of Wave 2A is now closed in the current `main` history.
 
-Authority-doc reconciliation and same-head hosted Wave 1.5 closure still remain open.
+Authority-doc reconciliation and hosted Wave 1.5 closure are now recorded on `04cb0a57d1e64f8a5cf03a22b4a5c60d37dffc3a`.
 
 The repository now proves:
 
 1. internal-route bearer-token protection for worker-facing mutations
 2. durable package, plan-envelope, and artifact-manifest state on case reads
 3. restart-safe inference and delivery queue state
-4. hosted `ci` and `docs-governance` proof for the latest fully hosted-validated head `1e340b978bfa35a2ed339adcdb0d2add56cc08c3`
+4. hosted `ci` and `docs-governance` proof for the latest fully hosted-validated head `04cb0a57d1e64f8a5cf03a22b4a5c60d37dffc3a`
 5. HMAC-authenticated `/api/internal/dispatch/claim` and `/api/internal/dispatch/heartbeat` routes that return or renew a bounded execution lease
 6. local file-backed artifact persistence plus public artifact retrieval on the earlier runtime-bearing head `f6021ecdb45f4ecf5aece2c52cc0e6f462361d49`, which remains part of the current `main` history
 
-The next runtime wave after the current docs and evidence reconciliation is Wave 2B real Python compute path. Wave 2A no longer needs another artifact or retrieval implementation slice.
+Wave 2A no longer needs another artifact or retrieval implementation slice. The bounded Wave 2B compute seam has now landed in the current repository state, so the next runtime wave after the current docs and evidence reconciliation is Wave 3A archive and viewer truth.
 
 The minimal additive contract implemented in this slice is:
 
@@ -161,9 +161,9 @@ This slice is complete when:
 
 ## Follow-On Step
 
-After this slice, the next Wave 2A step should move the new execution contracts from single-process durability into real artifact write and read paths behind the already-implemented dispatch contract.
+The Wave 2A execution-truth closure described by this design has already landed, and the repository now also carries a bounded Wave 2B worker handoff and compute plane.
 
-Only after that execution-truth closure lands should Wave 2B move the same contract into a real worker handoff and compute plane.
+Subsequent work should treat this document as Wave 2 design history and build Wave 3A archive/viewer truth on top of the existing dispatch, callback, and artifact contracts.
 
 The key truth boundary is now explicit:
 

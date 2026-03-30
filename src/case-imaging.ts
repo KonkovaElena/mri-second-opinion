@@ -6,6 +6,7 @@ export interface StudySeriesInput {
   modality?: string;
   sequenceLabel?: string;
   instanceCount?: number;
+  volumeDownloadUrl?: string;
 }
 
 export interface StudyContextInput {
@@ -24,6 +25,7 @@ export interface StudySeriesRecord {
   modality: string;
   sequenceLabel: string | null;
   instanceCount: number | null;
+  volumeDownloadUrl: string | null;
 }
 
 export interface StudyContextRecord {
@@ -100,6 +102,7 @@ export function createStudyContextRecord(input: {
     modality: normalizeString(entry.modality) ?? "MR",
     sequenceLabel: normalizeString(entry.sequenceLabel),
     instanceCount: typeof entry.instanceCount === "number" ? entry.instanceCount : null,
+    volumeDownloadUrl: normalizeString(entry.volumeDownloadUrl),
   }));
 
   return {

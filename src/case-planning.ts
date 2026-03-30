@@ -7,6 +7,7 @@ import type {
   PlanEnvelope,
   PolicyGateRecord,
   ReportPayload,
+  StructuralExecutionContext,
   StructuralExecutionEnvelope,
 } from "./cases";
 import type { ArtifactStorageOverride } from "./case-artifacts";
@@ -246,7 +247,53 @@ export function createEvidenceCards(caseRecord: CaseRecord): EvidenceCard[] {
           : null,
   });
 
+  if (caseRecord.structuralExecution) {
+    const executionContext = caseRecord.structuralExecution.executionContext;
+    const executionSummary =
+      executionContext.computeMode === "voxel-backed"
+        ? `Worker completed a voxel-backed pass${
+            executionContext.sourceSeriesInstanceUid ? ` on series ${executionContext.sourceSeriesInstanceUid}` : "."
+          }`
+        : executionContext.fallbackCode
+          ? `Worker fell back to metadata-only mode (${executionContext.fallbackCode}).`
+          : "Worker completed in metadata-only mode.";
+
+    cards.push({
+      cardType: "execution",
+      cardVersion: "0.1.0",
+      caseId: caseRecord.caseId,
+      headline:
+        executionContext.computeMode === "voxel-backed"
+          ? "Voxel-backed execution recorded"
+          : "Metadata fallback recorded",
+      severity: executionContext.computeMode === "voxel-backed" ? "info" : "warn",
+      status: executionContext.computeMode === "voxel-backed" ? "good" : "warn",
+      summary: executionSummary,
+      supportingRefs: [
+        executionContext.computeMode,
+        ...(executionContext.fallbackCode ? [executionContext.fallbackCode] : []),
+        ...(executionContext.sourceSeriesInstanceUid ? [executionContext.sourceSeriesInstanceUid] : []),
+      ],
+      recommendedAction:
+        executionContext.computeMode === "voxel-backed"
+          ? null
+          : "Review fallback details before treating the draft as more than metadata-derived evidence.",
+    });
+  }
+
   return cards;
+}
+
+export function createDefaultStructuralExecutionContext(
+  input: Partial<StructuralExecutionContext> = {},
+): StructuralExecutionContext {
+  const computeMode = input.computeMode === "voxel-backed" ? "voxel-backed" : "metadata-fallback";
+  return {
+    computeMode,
+    fallbackCode: computeMode === "metadata-fallback" ? input.fallbackCode ?? null : null,
+    fallbackDetail: computeMode === "metadata-fallback" ? input.fallbackDetail ?? null : null,
+    sourceSeriesInstanceUid: input.sourceSeriesInstanceUid ?? null,
+  };
 }
 
 export function createStructuralExecutionEnvelope(input: {
@@ -254,6 +301,7 @@ export function createStructuralExecutionEnvelope(input: {
   inferenceJob: InferenceJobRecord | null;
   executionStatus: StructuralExecutionEnvelope["executionStatus"];
   completedAt?: string;
+  executionContext?: StructuralExecutionContext;
   artifactIds: string[];
 }): StructuralExecutionEnvelope | null {
   const packageManifest = getWorkflowPackageManifest(input.caseRecord.planEnvelope.packageResolution.selectedPackage);
@@ -274,6 +322,7 @@ export function createStructuralExecutionEnvelope(input: {
     completedAt: input.completedAt ?? nowIso(),
     resourceClass: input.caseRecord.planEnvelope.dispatchProfile.resourceClass,
     callbackSource: "internal-inference",
+    executionContext: createDefaultStructuralExecutionContext(input.executionContext),
     artifactIds: [...input.artifactIds],
   };
 }
@@ -291,6 +340,7 @@ export function backfillStructuralExecutionEnvelope(input: {
     inferenceJob: null,
     executionStatus: input.caseRecord.status === "QC_REJECTED" ? "qc-rejected" : "completed",
     completedAt: input.caseRecord.report.provenance.generatedAt,
+    executionContext: input.caseRecord.report.executionContext,
     artifactIds: input.artifactIds,
   });
 }
@@ -340,6 +390,7 @@ export function createDraftReport(
     },
     findings: input.findings,
     measurements: input.measurements,
+    executionContext: createDefaultStructuralExecutionContext(input.executionContext),
     uncertaintySummary: "Human review remains mandatory for all machine findings.",
     issues: input.issues ?? [],
     artifacts: input.artifacts,

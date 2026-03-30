@@ -330,8 +330,9 @@ class SqliteCaseRepository implements CaseRepository {
         completed_at,
         last_error,
         lease_id,
-        lease_expires_at
-       ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+        lease_expires_at,
+        failure_class
+       ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
      );
      this.updateInferenceJobStatement = this.database.prepare(
       `UPDATE inference_jobs
@@ -346,7 +347,8 @@ class SqliteCaseRepository implements CaseRepository {
           completed_at = ?,
            last_error = ?,
            lease_id = ?,
-           lease_expires_at = ?
+           lease_expires_at = ?,
+           failure_class = ?
          WHERE job_id = ?`,
      );
     this.deleteCaseStatement = this.database.prepare(
@@ -493,6 +495,7 @@ class SqliteCaseRepository implements CaseRepository {
       last_error: string | null;
       lease_id: string | null;
       lease_expires_at: string | null;
+      failure_class: string | null;
     }>) {
       const { inferenceJob } = parseStoredInferenceJobRecord(row);
       this.inferenceJobs.set(row.job_id, inferenceJob);
@@ -601,6 +604,7 @@ class SqliteCaseRepository implements CaseRepository {
             inferenceJob.lastError,
             inferenceJob.leaseId,
             inferenceJob.leaseExpiresAt,
+            inferenceJob.failureClass,
             jobId,
           );
         } else {
@@ -618,6 +622,7 @@ class SqliteCaseRepository implements CaseRepository {
             inferenceJob.lastError,
             inferenceJob.leaseId,
             inferenceJob.leaseExpiresAt,
+            inferenceJob.failureClass,
           );
         }
       }
