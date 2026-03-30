@@ -62,7 +62,7 @@ The repository has locally closed all five wave gates:
 
 ### Recorded proof
 
-1. local validation snapshot — `npm run build` plus `npm test` pass with 114 total tests, 113 pass, 0 fail, and 1 skipped after the finalized-only export regression coverage landed
+1. local validation snapshot — `npm run build` plus `npm test` pass with 115 total tests, 114 pass, 0 fail, and 1 skipped after finalized-only export regression coverage and audit remediation (order-safe fingerprint, security headers, archive timeout, metrics error handling) landed
 2. 5 regulatory governance documents with honest-claim discipline (Wave 4)
 3. 4 clinical evidence documents with explicit execution-pending gaps (Wave 5)
 4. `docs/verification/release-validation-packet.md` — completeness matrix and known gaps

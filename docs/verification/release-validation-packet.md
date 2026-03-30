@@ -15,7 +15,7 @@ It satisfies Wave 5 exit gate 3: evidence ledger links runtime version, docs ver
 | Repository | mri-second-opinion |
 | Repository base head | `3d0df4f74010e6acc27164e2c0a581b145a11572` |
 | Latest hosted-validated head | `04cb0a57d1e64f8a5cf03a22b4a5c60d37dffc3a` |
-| Local validation scope | finalized-only export gating and release-doc reconciliation on the working tree above the base head |
+| Local validation scope | finalized-only export gating, release-doc reconciliation, and audit remediation (order-safe fingerprint, security headers, archive timeout, metrics error handling) on the working tree above the base head |
 | Node.js target | 22+ |
 | TypeScript target | ES2022 |
 | Test runner | `npm test` (`node --import tsx --test tests/**/*.test.ts`) |
@@ -24,11 +24,11 @@ It satisfies Wave 5 exit gate 3: evidence ledger links runtime version, docs ver
 
 | Metric | Value |
 |--------|-------|
-| Total tests | 114 |
-| Passing | 113 |
+| Total tests | 115 |
+| Passing | 114 |
 | Failing | 0 |
 | Skipped | 1 |
-| Duration | ~3.2 s |
+| Duration | ~3.0 s |
 | Runner | `npm test` (`node --import tsx --test tests/**/*.test.ts`) |
 
 ### Test Coverage By Wave
@@ -43,6 +43,7 @@ It satisfies Wave 5 exit gate 3: evidence ledger links runtime version, docs ver
 | Wave 3B | State machine guards | ~99 (all passed at RED) |
 | Wave 4 | DICOM SR, FHIR R4, finalized-only export gating | ~104 |
 | Post-Wave reconciliation | additional runtime, PostgreSQL, and workflow regression coverage | 114 |
+| Audit remediation | order-safe fingerprint, security headers, archive timeout, metrics error handling | 115 |
 
 ## TypeScript Compilation
 
@@ -104,7 +105,7 @@ Status: clean (`npm run build` -> `tsc -p tsconfig.json`)
 
 | Validation dimension | Artifact | Status |
 |---------------------|----------|--------|
-| Functional correctness | 114 tests, 113 pass, 0 fail, 1 skipped | Complete |
+| Functional correctness | 115 tests, 114 pass, 0 fail, 1 skipped | Complete |
 | Type safety | `npm run build` clean | Complete |
 | Interoperability | DICOM SR + FHIR R4 exports validated | Complete |
 | Regulatory readiness | 5-document governance pack | Complete |

@@ -30,6 +30,7 @@
 8. `POST /api/internal/delivery-callback`
 9. `POST /api/internal/dispatch/claim`
 10. `POST /api/internal/dispatch/heartbeat`
+11. `POST /api/internal/dispatch/fail`
 
 Route descriptions and public nouns should follow `docs/public-vocabulary.md`.
 

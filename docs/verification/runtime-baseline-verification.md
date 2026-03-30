@@ -185,7 +185,7 @@ Specifically, this note does not claim current proof for:
 4. `src/artifact-store.ts`
 5. `tests/postgres-integration.test.ts`
 6. an active Redis-backed dispatch substrate
-7. nonce replay enforcement in the merged `src/app.ts` (note: HMAC request signing IS active on dispatch routes since Wave 2; only nonce replay wiring remains absent)
+7. ~~nonce replay enforcement~~ — now wired: `MemoryReplayStore` is active in `src/app.ts` dispatch middleware since audit remediation wave
 
 Those references belonged to earlier intermediate publication states and should not be reused as current runtime truth.
 

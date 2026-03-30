@@ -33,7 +33,7 @@ Implemented claims in this document are grounded in:
 
 The following remain target seams or open gaps, not implemented standalone truth:
 
-1. nonce replay defense on dispatch routes (HMAC request signing is implemented for `/api/internal/dispatch/*`; replay store exists but is not yet wired into the live middleware)
+1. ~~nonce replay defense~~ — closed: HMAC request signing with nonce replay enforcement is active on all `/api/internal/dispatch/*` routes
 2. inference-worker lease, heartbeat, and expiry-driven requeue scheduler
 3. production PostgreSQL durability
 4. distributed or externally brokered workers
@@ -290,7 +290,7 @@ $$
 | `S-06` | delivery callback cannot mutate the case without an active persisted delivery job | implemented |
 | `S-07` | early delivery-job claim before `availableAt` is blocked | implemented |
 | `S-08` | authenticated machine credentials are rejected on review/finalize | absent in standalone runtime |
-| `S-09` | nonce replay on internal routes is rejected | replay store implemented but not yet wired into live HMAC middleware |
+| `S-09` | nonce replay on internal routes is rejected | implemented: `MemoryReplayStore` wired into dispatch HMAC middleware with configurable TTL and max-entries |
 
 ### 6.2. Liveness Properties
 
@@ -321,7 +321,7 @@ $$
 | duplicate inference callback replay | mitigated by fingerprint-based replay detection |
 | premature delivery callback after queue loss | mitigated by active delivery-job guard |
 | machine impersonation of clinician actions | open gap because clinician identity is recorded as data, not separately authenticated proof |
-| internal route replay or signature spoofing | partially mitigated: HMAC request signing is active on dispatch routes; nonce replay enforcement is implemented but not yet wired into the live middleware |
+| internal route replay or signature spoofing | mitigated: HMAC request signing with nonce replay enforcement is active on dispatch routes |
 | artifact tampering after generation | open gap because checksum verification is not implemented |
 | inference-worker crash and silent work loss | open liveness gap because lease and scheduler recovery are not implemented |
 
