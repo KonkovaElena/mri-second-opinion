@@ -27,7 +27,7 @@ evidence_sources: |
 |---|---|
 | TypeScript API | 27 файлов, ~10 000 LOC |
 | Python worker | 1 файл, 853 LOC |
-| Тесты | 13 файлов, ~5 200 LOC |
+| Тесты | 15 файлов, ~7 100 LOC |
 | Документация | 87 файлов (82 Markdown + 5 binary), ~2.7 МБ |
 | Маршруты API | 27 (16 public + 11 internal) |
 | Инфраструктура | Dockerfile, docker-compose, healthchecks |
@@ -46,7 +46,7 @@ evidence_sources: |
 | 5 | Worker (compute) | 8/10 | 10/10 | Real ML models |
 | 6 | Interoperability | 8/10 | 10/10 | Binary DICOM SR |
 | 7 | Clinical viewer | 3/10 | 10/10 | OHIF integration |
-| 8 | Artifact management | 9/10 | 10/10 | S3 backend |
+| 8 | Artifact management | 9.5/10 | 10/10 | Retention + multipart + MinIO closure |
 | 9 | Тестирование | 9.5/10 | 10/10 | E2E + load |
 | 10 | CI/CD | 9/10 | 10/10 | Coverage, staging |
 | 11 | Documentation | 9.5/10 | 10/10 | SOUP, PCCP |
@@ -89,24 +89,30 @@ app.use(helmet({
 
 ---
 
-### A2. S3-compatible Artifact Backend (3-5 дней, 1/10 gap)
+### A2. S3-compatible Artifact Backend (core backend completed 2026-03-31; closure follow-up remains)
 
-**Что:** Реализовать `IArtifactStore` interface с двумя backends:
+**Статус:** core `s3-compatible` backend реализован; remaining work смещён в integration/hardening closure.
+
+**Что сделано:**
+- введён `ArtifactStore` seam с `LocalFileArtifactStore` и `S3CompatibleArtifactStore`
+- добавлен config/env surface для `MRI_ARTIFACT_STORE_PROVIDER`, base path, endpoint, bucket, region, path-style и pre-sign TTL
+- стабильный route `GET /api/cases/:caseId/artifacts/:artifactId` теперь для object-store artifacts возвращает redirect на pre-signed download URL вместо нарушения публичного API контракта
+- покрытие добавлено в `case-artifacts.test.ts`, `config-artifact-store.test.ts`, `object-store-artifact-routing.test.ts`
+
+**Архитектура:**
 
 ```
-IArtifactStore
+ArtifactStore
 ├── LocalFileArtifactStore (текущий)
-└── S3ArtifactStore (новый)
+└── S3CompatibleArtifactStore (новый)
 ```
 
-**Детали:**
-- `@aws-sdk/client-s3` (MIT, 2025 stable)
-- Config: `MRI_ARTIFACT_STORE_PROVIDER=s3-compatible`
-- Pre-signed URLs для artifact serving (GET /api/cases/:caseId/artifacts/:artifactId)
-- Retention policy: 90 дней для RUO, configurable
-- Multipart upload для файлов > 5 МБ
+**Что остаётся:**
+- retention policy: 90 дней для RUO, configurable
+- multipart upload для файлов > 5 МБ
+- MinIO testcontainer verification для object-store path
 
-**Верификация:** Unit-тесты с MinIO testcontainer.
+**Верификация:** `npm run build`; `npm test`; route-level redirect regression для object-store-backed artifacts.
 
 ---
 

@@ -17,6 +17,7 @@ function buildStorageSnapshot(config: AppConfig) {
   return {
     mode: config.caseStoreMode,
     persistenceMode: resolvePersistenceMode(config),
+    artifactStoreProvider: config.artifactStoreProvider,
   };
 }
 

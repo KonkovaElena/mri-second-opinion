@@ -58,6 +58,10 @@ const FILE_SCHEME_PREFIX = "file://";
 const ARTIFACT_SCHEME_PREFIX = "artifact://";
 const OBJECT_STORE_SCHEME_PREFIX = "object-store://";
 
+function supportsApiArtifactRetrieval(storageUri: string) {
+  return storageUri.startsWith(FILE_SCHEME_PREFIX) || storageUri.startsWith(OBJECT_STORE_SCHEME_PREFIX);
+}
+
 function normalizePathSegments(value: string) {
   return value.replace(/\\/gu, "/").replace(/\/+/gu, "/");
 }
@@ -322,7 +326,7 @@ export function createDerivedArtifactDescriptors(input: {
       artifactType,
       label: labelForArtifactType(artifactType),
       storageUri,
-      retrievalUrl: storageUri.startsWith(FILE_SCHEME_PREFIX)
+      retrievalUrl: supportsApiArtifactRetrieval(storageUri)
         ? `/api/cases/${input.caseId}/artifacts/${artifactId}`
         : null,
       mimeType: storageOverride?.mimeType ?? mimeTypeForArtifactType(artifactType),

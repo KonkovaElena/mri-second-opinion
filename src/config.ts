@@ -1,11 +1,19 @@
+import type { ArtifactStoreProvider } from "./case-artifact-storage";
 import type { CaseStoreMode } from "./case-repository";
-import { resolve } from "node:path";
+import { dirname, resolve } from "node:path";
 
 export interface AppConfig {
   nodeEnv: string;
   port: number;
   caseStoreFile: string;
   caseStoreMode: CaseStoreMode;
+  artifactStoreProvider: ArtifactStoreProvider;
+  artifactStoreBasePath: string;
+  artifactStoreEndpoint?: string;
+  artifactStoreBucket?: string;
+  artifactStoreRegion: string;
+  artifactStoreForcePathStyle: boolean;
+  artifactStorePresignTtlSeconds: number;
   archiveLookupBaseUrl?: string;
   archiveLookupSource?: string;
   caseStoreDatabaseUrl?: string;
@@ -41,6 +49,20 @@ function parsePositiveInteger(value: string, name: string) {
   return parsed;
 }
 
+function parseBoolean(value: string, name: string) {
+  const normalized = value.trim().toLowerCase();
+
+  if (normalized === "true" || normalized === "1") {
+    return true;
+  }
+
+  if (normalized === "false" || normalized === "0") {
+    return false;
+  }
+
+  throw new Error(`${name} must be true/false or 1/0`);
+}
+
 export function getConfig(): AppConfig {
   const rawPort = process.env.PORT;
   const port = rawPort ? Number(rawPort) : DEFAULT_PORT;
@@ -55,6 +77,29 @@ export function getConfig(): AppConfig {
       ? resolve(__dirname, "..", ".mri-data", "cases.sqlite")
       : resolve(__dirname, "..", ".mri-data", "cases.json");
   const caseStoreFile = process.env.MRI_CASE_STORE_FILE ?? defaultCaseStoreFile;
+  const rawArtifactStoreProvider = process.env.MRI_ARTIFACT_STORE_PROVIDER?.trim() || "local-file";
+  if (rawArtifactStoreProvider !== "local-file" && rawArtifactStoreProvider !== "s3-compatible") {
+    throw new Error(`Invalid MRI_ARTIFACT_STORE_PROVIDER value: ${rawArtifactStoreProvider}`);
+  }
+
+  const artifactStoreProvider = rawArtifactStoreProvider as ArtifactStoreProvider;
+  const defaultArtifactStoreBasePath =
+    artifactStoreProvider === "s3-compatible" ? "case-artifacts" : resolve(dirname(caseStoreFile), "artifacts");
+  const artifactStoreBasePath = process.env.MRI_ARTIFACT_STORE_BASE_PATH?.trim() || defaultArtifactStoreBasePath;
+  const artifactStoreEndpoint = process.env.MRI_ARTIFACT_STORE_ENDPOINT?.trim() || undefined;
+  const artifactStoreBucket = process.env.MRI_ARTIFACT_STORE_BUCKET?.trim() || undefined;
+  const artifactStoreRegion =
+    process.env.MRI_ARTIFACT_STORE_REGION?.trim() ||
+    process.env.AWS_REGION?.trim() ||
+    process.env.AWS_DEFAULT_REGION?.trim() ||
+    "us-east-1";
+  const artifactStoreForcePathStyle = process.env.MRI_ARTIFACT_STORE_FORCE_PATH_STYLE?.trim()
+    ? parseBoolean(process.env.MRI_ARTIFACT_STORE_FORCE_PATH_STYLE, "MRI_ARTIFACT_STORE_FORCE_PATH_STYLE")
+    : Boolean(artifactStoreEndpoint);
+  const artifactStorePresignTtlSeconds = parsePositiveInteger(
+    process.env.MRI_ARTIFACT_STORE_PRESIGN_TTL_SECONDS ?? "900",
+    "MRI_ARTIFACT_STORE_PRESIGN_TTL_SECONDS",
+  );
   const archiveLookupBaseUrl = process.env.MRI_ARCHIVE_LOOKUP_BASE_URL?.trim() || undefined;
   const archiveLookupSource = process.env.MRI_ARCHIVE_LOOKUP_SOURCE?.trim() || undefined;
   const databaseUrl = process.env.DATABASE_URL?.trim() || undefined;
@@ -109,6 +154,14 @@ export function getConfig(): AppConfig {
     throw new Error("MRI_CASE_STORE_DATABASE_URL is required for postgres storage mode");
   }
 
+  if (artifactStoreBasePath.length === 0) {
+    throw new Error("MRI_ARTIFACT_STORE_BASE_PATH must not be empty");
+  }
+
+  if (artifactStoreProvider === "s3-compatible" && !artifactStoreBucket) {
+    throw new Error("MRI_ARTIFACT_STORE_BUCKET is required for s3-compatible artifact storage");
+  }
+
   if (reviewerIdentitySource !== "request-body") {
     throw new Error("MRI_REVIEWER_IDENTITY_SOURCE must be request-body");
   }
@@ -144,6 +197,13 @@ export function getConfig(): AppConfig {
     port,
     caseStoreFile,
     caseStoreMode,
+    artifactStoreProvider,
+    artifactStoreBasePath,
+    artifactStoreEndpoint,
+    artifactStoreBucket,
+    artifactStoreRegion,
+    artifactStoreForcePathStyle,
+    artifactStorePresignTtlSeconds,
     archiveLookupBaseUrl,
     archiveLookupSource,
     caseStoreDatabaseUrl,

@@ -20,9 +20,10 @@ import {
   createStudyContextRecord,
 } from "./case-imaging";
 import {
+  createArtifactStore,
   getDefaultArtifactStoreRoot,
-  persistArtifactPayloads,
-  readPersistedArtifact,
+  type ArtifactStore,
+  type ArtifactStoreProvider,
 } from "./case-artifact-storage";
 import {
   CASE_STATUSES,
@@ -52,6 +53,13 @@ export interface MemoryCaseServiceOptions {
   postgresPoolFactory?: PostgresPoolFactory;
   repository?: CaseRepository;
   artifactStoreRoot?: string;
+  artifactStore?: ArtifactStore;
+  artifactStoreProvider?: ArtifactStoreProvider;
+  artifactStoreBucket?: string;
+  artifactStoreEndpoint?: string;
+  artifactStoreRegion?: string;
+  artifactStoreForcePathStyle?: boolean;
+  artifactStorePresignTtlSeconds?: number;
 }
 
 function normalizeSequenceInventory(sequenceInventory: string[]) {
@@ -187,12 +195,23 @@ function isConcurrentStoreModificationError(error: unknown) {
 
 export class MemoryCaseService {
   private readonly repository: CaseRepository;
-  private readonly artifactStoreRoot: string;
+  private readonly artifactStore: ArtifactStore;
 
   constructor(private readonly options: MemoryCaseServiceOptions = {}) {
-    this.artifactStoreRoot =
-      options.artifactStoreRoot ??
-      getDefaultArtifactStoreRoot(options.caseStoreFilePath ?? options.snapshotFilePath);
+    this.artifactStore =
+      options.artifactStore ??
+      createArtifactStore({
+        provider: options.artifactStoreProvider,
+        caseStoreFilePath: options.caseStoreFilePath ?? options.snapshotFilePath,
+        basePath:
+          options.artifactStoreRoot ??
+          getDefaultArtifactStoreRoot(options.caseStoreFilePath ?? options.snapshotFilePath),
+        bucket: options.artifactStoreBucket,
+        endpoint: options.artifactStoreEndpoint,
+        region: options.artifactStoreRegion,
+        forcePathStyle: options.artifactStoreForcePathStyle,
+        presignTtlSeconds: options.artifactStorePresignTtlSeconds,
+      });
 
     if (options.repository) {
       this.repository = options.repository;
@@ -364,8 +383,7 @@ export class MemoryCaseService {
         issues: normalizedInput.issues,
         qcSummary: normalizedInput.qcSummary,
       });
-      const persistedArtifactPayloads = persistArtifactPayloads({
-        artifactStoreRoot: this.artifactStoreRoot,
+      const persistedArtifactPayloads = await this.artifactStore.persistArtifactPayloads({
         caseId: record.caseId,
         artifactPayloads: normalizedInput.artifactPayloads ?? [],
       });
@@ -939,10 +957,17 @@ export class MemoryCaseService {
       throw new WorkflowError(404, "Artifact is not available for this case", "ARTIFACT_NOT_FOUND");
     }
 
-    const persistedArtifact = readPersistedArtifact(artifact.storageUri);
+    const persistedArtifact = await this.artifactStore.resolveArtifactDownload(artifact.storageUri);
 
     if (!persistedArtifact) {
       throw new WorkflowError(404, "Artifact content is not available for this case", "ARTIFACT_NOT_AVAILABLE");
+    }
+
+    if (persistedArtifact.kind === "redirect") {
+      return {
+        artifact: cloneCase(artifact),
+        redirectUrl: persistedArtifact.url,
+      };
     }
 
     return {

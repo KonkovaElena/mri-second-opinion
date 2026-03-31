@@ -2,6 +2,7 @@ import express from "express";
 import helmet from "helmet";
 import { resolve } from "node:path";
 import { createArchiveLookupClient } from "./archive-lookup";
+import { createArtifactStore, type ArtifactStore } from "./case-artifact-storage";
 import { WorkflowError } from "./case-contracts";
 import type { AppConfig } from "./config";
 import type { PostgresPoolFactory } from "./case-postgres-repository";
@@ -38,6 +39,7 @@ import { createPublicApiRateLimiter, metricsMiddleware, writeMetricsResponse } f
 
 export interface CreateAppOptions {
   postgresPoolFactory?: PostgresPoolFactory;
+  artifactStore?: ArtifactStore;
 }
 
 export function createApp(config: AppConfig, options: CreateAppOptions = {}) {
@@ -75,12 +77,25 @@ export function createApp(config: AppConfig, options: CreateAppOptions = {}) {
     archiveLookupBaseUrl: config.archiveLookupBaseUrl,
     archiveLookupSource: config.archiveLookupSource,
   });
+  const artifactStore =
+    options.artifactStore ??
+    createArtifactStore({
+      provider: config.artifactStoreProvider,
+      caseStoreFilePath: config.caseStoreFile,
+      basePath: config.artifactStoreBasePath,
+      bucket: config.artifactStoreBucket,
+      endpoint: config.artifactStoreEndpoint,
+      region: config.artifactStoreRegion,
+      forcePathStyle: config.artifactStoreForcePathStyle,
+      presignTtlSeconds: config.artifactStorePresignTtlSeconds,
+    });
   const caseService = new MemoryCaseService({
     caseStoreFilePath: config.caseStoreFile,
     storageMode: config.caseStoreMode,
     caseStoreDatabaseUrl: config.caseStoreDatabaseUrl,
     caseStoreSchema: config.caseStoreSchema,
     postgresPoolFactory: options.postgresPoolFactory,
+    artifactStore,
   });
   const runtimeState: RuntimeState = { isShuttingDown: false };
   const workbenchRoot = resolve(__dirname, "..", "public", "workbench");
@@ -361,6 +376,12 @@ export function createApp(config: AppConfig, options: CreateAppOptions = {}) {
   app.get("/api/cases/:caseId/artifacts/:artifactId", async (req, res) => {
     try {
       const artifact = await caseService.getArtifact(req.params.caseId, req.params.artifactId);
+
+      if ("redirectUrl" in artifact && typeof artifact.redirectUrl === "string") {
+        res.redirect(302, artifact.redirectUrl);
+        return;
+      }
+
       res.setHeader("content-type", artifact.artifact.mimeType);
       res.setHeader("content-length", String(artifact.content.byteLength));
       res.send(artifact.content);

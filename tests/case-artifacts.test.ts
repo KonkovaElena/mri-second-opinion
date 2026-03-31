@@ -70,3 +70,17 @@ test("planned persistence targets stay on canonical object-store URIs", () => {
   assert.equal(targets[0].plannedStorageUri, "object-store://case-artifacts/case-artifacts-1/qc-summary.json");
   assert.equal(targets[1].plannedStorageUri, "object-store://case-artifacts/case-artifacts-1/overlay-preview.png");
 });
+
+test("object-store artifact descriptors expose stable API retrieval URLs", () => {
+  const descriptors = createDerivedArtifactDescriptors({
+    caseId: "case-artifacts-1",
+    studyUid: "2.25.case-artifacts.1",
+    artifactRefs: ["object-store://case-artifacts/case-artifacts-1/qc-summary.json"],
+    studyContext,
+    generatedAt: "2026-03-31T12:00:00.000Z",
+  });
+
+  assert.equal(descriptors.length, 1);
+  assert.equal(descriptors[0].storageUri, "object-store://case-artifacts/case-artifacts-1/qc-summary.json");
+  assert.equal(descriptors[0].retrievalUrl, "/api/cases/case-artifacts-1/artifacts/case-artifacts-1-artifact-1");
+});

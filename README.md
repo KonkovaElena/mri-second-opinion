@@ -243,7 +243,7 @@ npm ci
 # Build TypeScript
 npm run build
 
-# Run tests (136 tests)
+# Run tests
 npm test
 
 # Start the server (default port: 4010)
@@ -282,18 +282,18 @@ python worker/main.py
 
 ### Environment Variables
 
-See `.env.example` for all 22 configurable parameters covering:
+See `.env.example` for the current configurable parameters covering:
 - Server and database configuration
 - Internal and HMAC authentication
 - Rate limiting and payload limits
-- Artifact storage
+- Artifact storage (`local-file` and `s3-compatible` backends)
 - Archive lookup integration
 
 ---
 
 ## Testing
 
-The project has **142 tests** across 13 test files (~5,200 lines of test code):
+The project currently has 15 test files covering API lifecycle, persistence, runtime hardening, config parsing, and artifact routing (~7,100 lines of test code):
 
 ```bash
 npm test
@@ -308,11 +308,14 @@ npm test
 | `postgres-payload-roundtrip.test.ts` | PostgreSQL data preservation (Unicode, floats) |
 | `runtime-hardening.test.ts` | Metrics, rate limiting, timeout hardening |
 | `memory-case-service.test.ts` | State machine invariants, domain logic |
-| `case-artifacts.test.ts` | URI canonicalization (Windows, POSIX, UNC) |
+| `case-artifacts.test.ts` | URI canonicalization, stable API retrieval URLs, and object-store artifact descriptors |
 | `config.test.ts` | Configuration parsing and defaults |
+| `config-artifact-store.test.ts` | `s3-compatible` artifact-store configuration parsing |
 | `db-migrations.test.ts` | Database migration safety |
+| `object-store-artifact-routing.test.ts` | Stable artifact route redirects to pre-signed object-store downloads |
 | `postgres-bootstrap.test.ts` | PostgreSQL initialization |
 | `postgres-case-service.test.ts` | PostgreSQL persistence |
+| `postgres-integration.test.ts` | End-to-end PostgreSQL lifecycle and persistence flow |
 
 ---
 
@@ -327,7 +330,7 @@ mri-second-opinion/
 │   ├── case-contracts.ts         # All TypeScript interfaces and types
 │   ├── case-planning.ts          # Workflow planning engine
 │   ├── case-artifacts.ts         # Artifact URI canonicalization
-│   ├── case-artifact-storage.ts  # Artifact file persistence
+│   ├── case-artifact-storage.ts  # Artifact storage backends (local-file + s3-compatible)
 │   ├── case-exports.ts           # DICOM SR + FHIR R4 export builders
 │   ├── case-presentation.ts      # API response formatters
 │   ├── case-repository.ts        # Storage abstraction layer
@@ -346,7 +349,7 @@ mri-second-opinion/
 │   ├── main.py                   # Inference + delivery worker
 │   ├── requirements.txt          # stdlib only — no external deps
 │   └── README.md                 # Worker documentation
-├── tests/                        # Test suite (13 files, ~5,200 LOC)
+├── tests/                        # Test suite (15 files, ~7,100 LOC)
 ├── public/workbench/             # Built-in review UI
 ├── docs/                         # Documentation (90+ files)
 │   ├── academic/                 # Research and analysis
