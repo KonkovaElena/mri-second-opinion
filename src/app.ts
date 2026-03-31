@@ -191,6 +191,20 @@ export function createApp(config: AppConfig, options: CreateAppOptions = {}) {
       return;
     }
 
+    const message = error instanceof Error ? error.message : String(error);
+    const stack = error instanceof Error ? error.stack : undefined;
+
+    console.error(
+      JSON.stringify({
+        level: "error",
+        event: "unhandled_error",
+        requestId,
+        message,
+        ...(stack !== undefined ? { stack } : {}),
+        timestamp: new Date().toISOString(),
+      }),
+    );
+
     res.status(500).json({
       error: "Internal server error",
       code: "INTERNAL_ERROR",

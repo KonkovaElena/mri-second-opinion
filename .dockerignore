@@ -8,3 +8,17 @@ docs
 node_modules
 tests
 npm-debug.log*
+worker
+_*.txt
+_*.diff
+__pycache__
+*.pyc
+fundamental_analysis_report.md
+CONTRIBUTING.md
+CODE_OF_CONDUCT.md
+GOVERNANCE.md
+SUPPORT.md
+SECURITY.md
+LICENSE
+*.md
+!README.md

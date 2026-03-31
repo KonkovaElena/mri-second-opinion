@@ -296,3 +296,50 @@ test("server hardening applies configured timeout and keep-alive settings", () =
     void app.locals.caseService.close();
   }
 });
+
+test("unhandled errors produce structured JSON log with event and requestId", async () => {
+  const { tempDir, caseStoreFile } = createTestStoreFile();
+
+  try {
+    const { app, server, baseUrl } = await startServer(caseStoreFile);
+
+    try {
+      const captured: string[] = [];
+      const originalStderr = console.error;
+      console.error = (...args: unknown[]) => {
+        captured.push(String(args[0]));
+      };
+
+      try {
+        // Monkey-patch getCase to throw a raw Error (not WorkflowError)
+        // so the handleError 500 branch fires with structured logging
+        app.locals.caseService.getCase = () => {
+          throw new Error("simulated unexpected storage failure");
+        };
+
+        const response = await fetch(`${baseUrl}/api/cases/any-id`);
+        const body = await response.json();
+
+        assert.equal(response.status, 500);
+        assert.equal(body.code, "INTERNAL_ERROR");
+        assert.equal(typeof body.requestId, "string");
+
+        // Verify structured error log was emitted
+        assert.ok(captured.length >= 1, "expected at least one console.error call");
+        const logEntry = JSON.parse(captured[captured.length - 1]);
+        assert.equal(logEntry.level, "error");
+        assert.equal(logEntry.event, "unhandled_error");
+        assert.equal(typeof logEntry.requestId, "string");
+        assert.equal(logEntry.message, "simulated unexpected storage failure");
+        assert.equal(typeof logEntry.timestamp, "string");
+      } finally {
+        console.error = originalStderr;
+      }
+    } finally {
+      server.close();
+      await app.locals.caseService.close();
+    }
+  } finally {
+    rmSync(tempDir, { recursive: true, force: true });
+  }
+});

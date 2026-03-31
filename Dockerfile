@@ -23,4 +23,6 @@ COPY scripts/container-healthcheck.mjs ./scripts/container-healthcheck.mjs
 RUN mkdir -p /data && chown -R node:node /app /data
 USER node
 EXPOSE 4010
+HEALTHCHECK --interval=30s --timeout=5s --start-period=10s --retries=3 \
+  CMD ["node", "scripts/container-healthcheck.mjs"]
 CMD ["node", "dist/index.js"]
