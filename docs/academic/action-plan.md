@@ -28,8 +28,8 @@ evidence_sources: |
 | TypeScript API | 27 файлов, ~10 000 LOC |
 | Python worker | 1 файл, 853 LOC |
 | Тесты | 13 файлов, ~5 200 LOC |
-| Документация | 92 файла, ~380 КБ |
-| Маршруты API | 23 (11 public + 12 internal) |
+| Документация | 87 файлов (82 Markdown + 5 binary), ~2.7 МБ |
+| Маршруты API | 27 (16 public + 11 internal) |
 | Инфраструктура | Dockerfile, docker-compose, healthchecks |
 | Оценка | 10/10 (MVP), ~85/100 (Clinical-Ready) |
 

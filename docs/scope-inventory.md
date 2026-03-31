@@ -94,6 +94,9 @@ Use it when checking whether a route, document, test, or demo asset is inside th
 3. `docs/scope-inventory.md`
 4. `docs/api-scope.md`
 5. `docs/status-model.md`
+6. `docs/public-vocabulary.md`
+7. `docs/executive-summary-ru.md`
+8. `docs/fundamental_analysis_report.md`
 
 ### Architecture and target direction
 
@@ -106,34 +109,89 @@ Use it when checking whether a route, document, test, or demo asset is inside th
 
 ### Academic and claim-boundary docs
 
-1. `docs/academic/evidence-and-claims-policy.md`
-2. `docs/academic/formal-system-analysis.md`
+1. `docs/academic/action-plan.md`
+2. `docs/academic/evidence-and-claims-policy.md`
+3. `docs/academic/formal-system-analysis.md`
+4. `docs/academic/project-fundamentals.md`
+5. `docs/academic/bias-analysis-framework.md`
+6. `docs/academic/reader-study-protocol.md`
+7. `docs/academic/subgroup-analysis-plan.md`
+8. `docs/academic/pms-activation.md`
+9. `docs/academic/regulatory-positioning.md`
+10. `docs/academic/model-licensing-and-deployment-gates.md`
+11. `docs/academic/open-source-rationale.md`
+12. `docs/academic/competitive-analysis.md`
+13. `docs/academic/ecosystem-landscape-march-2026.md`
+14. `docs/academic/external-evidence-register-march-2026.md`
+
+### Regulatory governance
+
+1. `docs/regulatory/pccp-plan.md`
+2. `docs/regulatory/iec-62304-classification.md`
+3. `docs/regulatory/iso-14971-risk-baseline.md`
+4. `docs/regulatory/data-governance-policy.md`
+5. `docs/regulatory/pms-plan.md`
+
+### Security governance
+
+1. `docs/security/sbom-policy.md`
+2. `docs/security/threat-model.md`
+3. `docs/security/vulnerability-response-sop.md`
 
 ### Verification and release evidence
 
 1. `docs/launch-readiness-checklist.md`
 2. `docs/verification/launch-evidence-index.md`
 3. `docs/verification/runtime-baseline-verification.md`
-4. `docs/verification/standalone-gap-audit-2026-03-27.md`
-5. `docs/verification/archive-viewer-seam-audit-2026-03-27.md`
-6. `docs/verification/presentation-surface-audit-2026-03-27.md`
-7. `docs/verification/demo-flow-audit-2026-03-27.md`
-8. `docs/verification/workbench-frontend-audit-2026-03-27.md`
-9. `docs/verification/durable-delivery-queue-audit-2026-03-27.md`
-10. `docs/verification/inference-queue-lease-audit-2026-03-27.md`
-11. `docs/verification/postgres-bootstrap-audit-2026-03-27.md`
-12. `docs/verification/release-validation-packet.md`
-13. `docs/releases/v1-go-no-go.md`
+4. `docs/verification/release-validation-packet.md`
+5. `docs/verification/standalone-gap-audit-2026-03-27.md`
+6. `docs/verification/standalone-closure-audit-2026-03-27.md`
+7. `docs/verification/archive-viewer-seam-audit-2026-03-27.md`
+8. `docs/verification/presentation-surface-audit-2026-03-27.md`
+9. `docs/verification/demo-flow-audit-2026-03-27.md`
+10. `docs/verification/workbench-frontend-audit-2026-03-27.md`
+11. `docs/verification/durable-delivery-queue-audit-2026-03-27.md`
+12. `docs/verification/inference-queue-lease-audit-2026-03-27.md`
+13. `docs/verification/postgres-bootstrap-audit-2026-03-27.md`
+14. `docs/verification/wave-2b-bounded-compute-audit-2026-03-29.md`
+15. `docs/verification/publication-retrospective-audit-2026-03-27.md`
+16. `docs/verification/repository-audit-2026-03-25.md`
+17. `docs/verification/ai-auditor-handoff-2026-03-25.md`
+18. `docs/verification/architecture-and-publication-audit-2026-03-25.md`
+19. `docs/verification/documentation-honesty-review.md`
+20. `docs/verification/external-audit-report-2026-03-28.md`
+21. `docs/verification/hosted-evidence-capture-template.md`
+22. `docs/verification/hyperdeep-audit-2026-03-26.md`
+23. `docs/verification/operator-surface-verification.md`
+24. `docs/verification/public-repository-hygiene-review.md`
+25. `docs/verification/worker-artifact-contract-samples.md`
+
+### Release and publication
+
+1. `docs/releases/public-github-and-mvp-path.md`
+2. `docs/releases/v1-go-no-go.md`
+3. `docs/releases/pending-manual-github-actions.md`
+4. `docs/releases/github-go-live-checklist.md`
+5. `docs/releases/github-live-publication-sequence.md`
+6. `docs/releases/github-publication-playbook.md`
+7. `docs/releases/github-operator-packet.md`
+8. `docs/releases/github-settings-worksheet.md`
+9. `docs/releases/github-metadata-copy.md`
+10. `docs/releases/github-publication-copy-pack.md`
+11. `docs/releases/first-public-announcement-draft.md`
 
 ### Demo-facing materials
 
 1. `docs/demo/demo-script.md`
-2. `docs/demo/operator-transcript-2026-03-27.md`
-3. `docs/demo/social-preview-brief.md`
-4. `docs/screenshots/workbench-queue.png`
-5. `docs/screenshots/workbench-review.png`
-6. `docs/screenshots/workbench-report.png`
-7. `docs/screenshots/workbench-delivery.png`
+2. `docs/demo/demo-transcript.md`
+3. `docs/demo/operator-transcript-2026-03-27.md`
+4. `docs/demo/social-preview-brief.md`
+5. `docs/demo/social-preview.png`
+6. `docs/demo/synthetic-demo-input-provenance.md`
+7. `docs/screenshots/workbench-queue.png`
+8. `docs/screenshots/workbench-review.png`
+9. `docs/screenshots/workbench-report.png`
+10. `docs/screenshots/workbench-delivery.png`
 
 ## Active Verification Surfaces
 
