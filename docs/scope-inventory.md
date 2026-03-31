@@ -2,7 +2,7 @@
 title: "Scope Inventory"
 status: "active"
 version: "1.0.0"
-last_updated: "2026-03-30"
+last_updated: "2026-03-31"
 tags: [scope, inventory, reference, mri]
 ---
 
@@ -22,19 +22,29 @@ Use it when checking whether a route, document, test, or demo asset is inside th
 2. `src/app.ts`
 3. `src/config.ts`
 4. `src/cases.ts`
-5. `src/case-repository.ts`
-6. `src/case-storage.ts`
-7. `src/case-sqlite-storage.ts`
-8. `src/case-planning.ts`
-9. `src/case-common.ts`
-10. `src/case-exports.ts`
-11. `src/case-imaging.ts`
-12. `src/case-artifacts.ts`
-13. `src/case-presentation.ts`
-14. `src/archive-lookup.ts`
-15. `src/validation.ts`
-16. `src/case-postgres-repository.ts`
-17. `src/postgres-bootstrap.ts`
+5. `src/case-contracts.ts`
+6. `src/case-common.ts`
+7. `src/case-repository.ts`
+8. `src/case-storage.ts`
+9. `src/case-sqlite-storage.ts`
+10. `src/case-planning.ts`
+11. `src/case-exports.ts`
+12. `src/case-imaging.ts`
+13. `src/case-artifacts.ts`
+14. `src/case-artifact-storage.ts`
+15. `src/case-presentation.ts`
+16. `src/archive-lookup.ts`
+17. `src/validation.ts`
+18. `src/case-postgres-repository.ts`
+19. `src/postgres-bootstrap.ts`
+20. `src/health.ts`
+21. `src/hmac-auth.ts`
+22. `src/internal-auth.ts`
+23. `src/request-context.ts`
+24. `src/replay-store.ts`
+25. `src/db-migrations.ts`
+26. `src/workflow-packages.ts`
+27. `src/http-runtime.ts`
 
 ### Built-in frontend runtime
 
@@ -134,8 +144,14 @@ Use it when checking whether a route, document, test, or demo asset is inside th
 5. `tests/validation-limits.test.ts`
 6. `tests/archive-error-types.test.ts`
 7. `tests/postgres-payload-roundtrip.test.ts`
-8. `.github/workflows/ci.yml`
-9. `.github/workflows/docs-governance.yml`
+8. `tests/case-artifacts.test.ts`
+9. `tests/config.test.ts`
+10. `tests/db-migrations.test.ts`
+11. `tests/execution-contract.test.ts`
+12. `tests/postgres-integration.test.ts`
+13. `tests/runtime-hardening.test.ts`
+14. `.github/workflows/ci.yml`
+15. `.github/workflows/docs-governance.yml`
 
 ## Current Demo Asset Reality
 

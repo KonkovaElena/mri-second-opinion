@@ -1,6 +1,6 @@
 # Release-Linked Validation Packet
 
-Date: 2026-03-30
+Date: 2026-03-31
 
 ## Purpose
 
@@ -24,11 +24,11 @@ It satisfies Wave 5 exit gate 3: evidence ledger links runtime version, docs ver
 
 | Metric | Value |
 |--------|-------|
-| Total tests | 136 |
-| Passing | 135 |
+| Total tests | 145 |
+| Passing | 144 |
 | Failing | 0 |
 | Skipped | 1 |
-| Duration | ~3.4 s |
+| Duration | ~4.7 s |
 | Runner | `npm test` (`node --import tsx --test tests/**/*.test.ts`) |
 
 ### Test Coverage By Wave
@@ -45,6 +45,7 @@ It satisfies Wave 5 exit gate 3: evidence ledger links runtime version, docs ver
 | Post-Wave reconciliation | additional runtime, PostgreSQL, and workflow regression coverage | 114 |
 | Audit remediation | order-safe fingerprint, security headers, archive timeout, metrics error handling | 115 |
 | Post-publication hardening | semantic payload-size validation, archive-lookup degradation, and PostgreSQL round-trip preservation | 136 |
+| Hyper-deep audit + academic doc audit | structured error logging, Dockerfile HEALTHCHECK, Helmet/CSP, CI docs-governance, persistence normalization, and runtime-hardening coverage | 145 |
 
 ## TypeScript Compilation
 
@@ -106,7 +107,7 @@ Status: clean (`npm run build` -> `tsc -p tsconfig.json`)
 
 | Validation dimension | Artifact | Status |
 |---------------------|----------|--------|
-| Functional correctness | 136 tests, 135 pass, 0 fail, 1 skipped | Complete |
+| Functional correctness | 145 tests, 144 pass, 0 fail, 1 skipped | Complete |
 | Type safety | `npm run build` clean | Complete |
 | Interoperability | DICOM SR + FHIR R4 exports validated | Complete |
 | Regulatory readiness | 5-document governance pack | Complete |

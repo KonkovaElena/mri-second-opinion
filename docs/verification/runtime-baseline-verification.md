@@ -44,9 +44,9 @@ Confirmed locally from the standalone repository root.
 
 Confirmed locally.
 
-The current standalone suite passes via `npm test` (`node --import tsx --test tests/**/*.test.ts`) with `136` total tests, `135` passing, `0` failures, and `1` skipped.
+The current standalone suite passes via `npm test` (`node --import tsx --test tests/**/*.test.ts`) with `145` total tests, `144` passing, `0` failures, and `1` skipped.
 
-The latest hardening pass extends the baseline with semantic payload-size validation, archive lookup graceful-degradation coverage, and PostgreSQL payload round-trip preservation for Unicode content, multiline review comments, floating-point measurements, and large sequence inventories.
+The latest hardening pass extends the baseline with semantic payload-size validation, archive lookup graceful-degradation coverage, PostgreSQL payload round-trip preservation for Unicode content, multiline review comments, floating-point measurements, and large sequence inventories, plus hyper-deep audit (structured error logging, Dockerfile HEALTHCHECK, Helmet/CSP) and runtime-hardening coverage.
 
 The strongest current verification anchors are:
 
