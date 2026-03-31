@@ -6,7 +6,7 @@ import {
   type FinalizeCaseInput,
   type InferenceCallbackInput,
   type ReviewCaseInput,
-} from "./cases";
+} from "./case-contracts";
 import type { QcSummaryInput, StudyContextInput } from "./case-imaging";
 
 // ---------- Semantic size limits ----------
@@ -126,64 +126,45 @@ const optionalStringArrayField = (fieldName: string, maxItems = MAX_FINDINGS, ma
 const studySeriesSchema = z.object({
   seriesInstanceUid: optionalTrimmedString(MAX_ID),
   seriesDescription: optionalTrimmedString(MAX_SHORT),
+  description: optionalTrimmedString(MAX_SHORT),
   modality: optionalTrimmedString(MAX_SHORT),
   sequenceLabel: optionalTrimmedString(MAX_SHORT),
   instanceCount: optionalNumberField("studyContext.series[].instanceCount"),
   volumeDownloadUrl: optionalTrimmedString(MAX_REF),
-});
+}).strict().transform(({ description, seriesDescription, ...entry }) => ({
+  ...entry,
+  seriesDescription: seriesDescription ?? description,
+}));
 
-const studyContextSchema = z
-  .preprocess((value) => (typeof value === "undefined" ? undefined : value), jsonObjectSchema.optional())
-  .superRefine((value, ctx) => {
-    if (typeof value === "undefined") {
-      return;
-    }
-
-    const series = (value as Record<string, unknown>).series;
-    if (typeof series !== "undefined" && !Array.isArray(series)) {
-      ctx.addIssue({
-        code: z.ZodIssueCode.custom,
-        message: "studyContext.series must be an array",
-      });
-    }
-
-    if (Array.isArray(series) && series.length > MAX_SERIES) {
-      ctx.addIssue({
-        code: z.ZodIssueCode.custom,
-        message: `studyContext.series must have at most ${MAX_SERIES} entries`,
-      });
-    }
-  })
-  .transform((value) => {
-    if (typeof value === "undefined") {
-      return undefined;
-    }
-
-    const studyContext = value as Record<string, unknown>;
-    const parsedSeries = Array.isArray(studyContext.series)
-      ? studyContext.series.map((entry, index) => {
-          const result = studySeriesSchema.safeParse(entry);
-          if (!result.success) {
-            throw invalidInput("studyContext.series entries must be objects");
-          }
-
-          return {
-            ...result.data,
-            seriesInstanceUid: result.data.seriesInstanceUid ?? `series-${index + 1}`,
-          };
+const studyContextInputSchema = z.object({
+  studyInstanceUid: optionalTrimmedString(MAX_ID),
+  accessionNumber: optionalTrimmedString(MAX_ID),
+  studyDate: optionalTrimmedString(MAX_SHORT),
+  sourceArchive: optionalTrimmedString(MAX_SHORT),
+  dicomWebBaseUrl: optionalTrimmedString(MAX_REF),
+  metadataSummary: optionalStringArrayField("studyContext.metadataSummary", MAX_METADATA_SUMMARY, MAX_TEXT),
+  series: z
+    .preprocess(
+      (value) => (typeof value === "undefined" ? undefined : value),
+      z
+        .array(studySeriesSchema, {
+          invalid_type_error: "studyContext.series must be an array",
         })
-      : undefined;
+        .max(MAX_SERIES, `studyContext.series must have at most ${MAX_SERIES} entries`)
+        .transform((entries) =>
+          entries.map((entry, index) => ({
+            ...entry,
+            seriesInstanceUid: entry.seriesInstanceUid ?? `series-${index + 1}`,
+          })),
+        )
+        .optional(),
+    ),
+}).strict();
 
-    return {
-      studyInstanceUid: optionalTrimmedString(MAX_ID).parse(studyContext.studyInstanceUid),
-      accessionNumber: optionalTrimmedString(MAX_ID).parse(studyContext.accessionNumber),
-      studyDate: optionalTrimmedString(MAX_SHORT).parse(studyContext.studyDate),
-      sourceArchive: optionalTrimmedString(MAX_SHORT).parse(studyContext.sourceArchive),
-      dicomWebBaseUrl: optionalTrimmedString(MAX_REF).parse(studyContext.dicomWebBaseUrl),
-      metadataSummary: optionalStringArrayField("studyContext.metadataSummary", MAX_METADATA_SUMMARY, MAX_TEXT).parse(studyContext.metadataSummary),
-      series: parsedSeries,
-    };
-  });
+const studyContextSchema = z.preprocess(
+  (value) => (typeof value === "undefined" ? undefined : value),
+  studyContextInputSchema.optional(),
+);
 
 const createCaseInputSchema = z.object({
   patientAlias: requiredTrimmedString("patientAlias", MAX_ID),
@@ -195,19 +176,19 @@ const createCaseInputSchema = z.object({
   }),
   indication: optionalTrimmedString(MAX_TEXT),
   studyContext: studyContextSchema,
-});
+}).strict();
 
 const reviewCaseInputSchema = z.object({
   reviewerId: requiredTrimmedString("reviewerId", MAX_ID),
   reviewerRole: optionalTrimmedString(MAX_ID),
   comments: optionalTrimmedString(MAX_LONG_TEXT),
   finalImpression: optionalTrimmedString(MAX_LONG_TEXT),
-});
+}).strict();
 
 const finalizeCaseInputSchema = z.object({
   finalSummary: optionalTrimmedString(MAX_LONG_TEXT),
   deliveryOutcome: z.enum(["pending", "failed", "delivered"]).optional(),
-});
+}).strict();
 
 const qcCheckSchema = z.object({
   checkId: requiredTrimmedString("qcSummary.checks[].checkId", MAX_SHORT),
@@ -215,7 +196,7 @@ const qcCheckSchema = z.object({
     errorMap: () => ({ message: "qcSummary.checks[].status must be pass, warn, or reject" }),
   }),
   detail: requiredTrimmedString("qcSummary.checks[].detail", MAX_TEXT),
-});
+}).strict();
 
 const qcMetricSchema = z.object({
   name: requiredTrimmedString("qcSummary.metrics[].name", MAX_SHORT),
@@ -224,36 +205,26 @@ const qcMetricSchema = z.object({
     invalid_type_error: "qcSummary.metrics[].value must be a number",
   }),
   unit: optionalTrimmedString(MAX_SHORT),
-});
+}).strict();
 
-const qcSummarySchema = z
-  .preprocess((value) => (typeof value === "undefined" ? undefined : value), jsonObjectSchema.optional())
-  .transform((value) => {
-    if (typeof value === "undefined") {
-      return undefined;
-    }
-
-    const qcSummary = value as Record<string, unknown>;
-    return {
-      summary: optionalTrimmedString(MAX_LONG_TEXT).parse(qcSummary.summary),
-      checks: z
-        .preprocess(
-          (entry) => (typeof entry === "undefined" ? undefined : entry),
-          z.array(qcCheckSchema, {
-            invalid_type_error: "qcSummary.checks must be an array",
-          }).max(MAX_QC_CHECKS, `qcSummary.checks must have at most ${MAX_QC_CHECKS} entries`).optional(),
-        )
-        .parse(qcSummary.checks),
-      metrics: z
-        .preprocess(
-          (entry) => (typeof entry === "undefined" ? undefined : entry),
-          z.array(qcMetricSchema, {
-            invalid_type_error: "qcSummary.metrics must be an array",
-          }).max(MAX_QC_METRICS, `qcSummary.metrics must have at most ${MAX_QC_METRICS} entries`).optional(),
-        )
-        .parse(qcSummary.metrics),
-    };
-  });
+const qcSummarySchema = z.preprocess(
+  (value) => (typeof value === "undefined" ? undefined : value),
+  z.object({
+    summary: optionalTrimmedString(MAX_LONG_TEXT),
+    checks: z.preprocess(
+      (entry) => (typeof entry === "undefined" ? undefined : entry),
+      z.array(qcCheckSchema, {
+        invalid_type_error: "qcSummary.checks must be an array",
+      }).max(MAX_QC_CHECKS, `qcSummary.checks must have at most ${MAX_QC_CHECKS} entries`).optional(),
+    ),
+    metrics: z.preprocess(
+      (entry) => (typeof entry === "undefined" ? undefined : entry),
+      z.array(qcMetricSchema, {
+        invalid_type_error: "qcSummary.metrics must be an array",
+      }).max(MAX_QC_METRICS, `qcSummary.metrics must have at most ${MAX_QC_METRICS} entries`).optional(),
+    ),
+  }).strict().optional(),
+);
 
 const measurementSchema = z.object({
   label: requiredTrimmedString("measurement.label", MAX_SHORT),
@@ -262,7 +233,7 @@ const measurementSchema = z.object({
     invalid_type_error: "measurement.value is required",
   }),
   unit: optionalTrimmedString(MAX_SHORT),
-});
+}).strict();
 
 const base64ContentSchema = requiredTrimmedString("artifactPayloads[].contentBase64", MAX_BASE64).refine(
   (value) => /^(?:[A-Za-z0-9+/]{4})*(?:[A-Za-z0-9+/]{2}==|[A-Za-z0-9+/]{3}=)?$/u.test(value),
@@ -273,7 +244,7 @@ const artifactPayloadSchema = z.object({
   artifactRef: requiredTrimmedString("artifactPayloads[].artifactRef", MAX_REF),
   contentType: requiredTrimmedString("artifactPayloads[].contentType", MAX_SHORT),
   contentBase64: base64ContentSchema,
-});
+}).strict();
 
 const executionContextSchema = z
   .object({
@@ -287,6 +258,7 @@ const executionContextSchema = z
     fallbackDetail: optionalTrimmedString(MAX_TEXT),
     sourceSeriesInstanceUid: optionalTrimmedString(MAX_ID),
   })
+  .strict()
   .superRefine((value, ctx) => {
     if (value.computeMode === "voxel-backed" && (value.fallbackCode || value.fallbackDetail)) {
       ctx.addIssue({
@@ -298,6 +270,7 @@ const executionContextSchema = z
 
 const inferenceCallbackSchema = z.object({
   caseId: requiredTrimmedString("caseId", MAX_ID),
+  workerId: optionalTrimmedString(MAX_ID),
   qcDisposition: z.enum(["pass", "warn", "reject"], {
     errorMap: () => ({ message: "qcDisposition must be pass, warn, or reject" }),
   }),
@@ -322,7 +295,7 @@ const inferenceCallbackSchema = z.object({
   issues: optionalStringArrayField("issues", MAX_ISSUES, MAX_TEXT),
   generatedSummary: optionalTrimmedString(MAX_LONG_TEXT),
   qcSummary: qcSummarySchema,
-}).superRefine((value, ctx) => {
+}).strict().superRefine((value, ctx) => {
   const artifactRefs = new Set(value.artifacts);
   const artifactPayloadRefs = new Set<string>();
 
@@ -351,19 +324,20 @@ const inferenceCallbackSchema = z.object({
 
 const claimJobInputSchema = z.object({
   workerId: optionalTrimmedString(MAX_ID),
-});
+}).strict();
 
 const requeueExpiredInferenceJobsSchema = z.object({
   maxClaimAgeMs: optionalNumberField("maxClaimAgeMs"),
-});
+}).strict();
 
 const deliveryCallbackSchema = z.object({
   caseId: requiredTrimmedString("caseId", MAX_ID),
+  workerId: optionalTrimmedString(MAX_ID),
   deliveryStatus: z.enum(["delivered", "failed"], {
     errorMap: () => ({ message: "deliveryStatus must be delivered or failed" }),
   }),
   detail: optionalTrimmedString(MAX_TEXT),
-});
+}).strict();
 
 export function parseCreateCaseInput(body: unknown): CreateCaseInput {
   const parsed = parseWithSchema(body, createCaseInputSchema);
@@ -469,13 +443,19 @@ export function parseDeliveryCallbackInput(body: unknown): {
 
 const dispatchClaimSchema = z.object({
   workerId: optionalTrimmedString(MAX_ID),
+  stage: optionalTrimmedString(MAX_SHORT),
+  leaseSeconds: optionalNumberField("leaseSeconds"),
   capabilities: optionalStringArrayField("capabilities", MAX_CAPABILITIES, MAX_SHORT),
-});
+}).strict();
 
 const dispatchHeartbeatSchema = z.object({
+  caseId: optionalTrimmedString(MAX_ID),
   leaseId: requiredTrimmedString("leaseId", MAX_ID),
+  workerId: optionalTrimmedString(MAX_ID),
+  stage: optionalTrimmedString(MAX_SHORT),
+  leaseSeconds: optionalNumberField("leaseSeconds"),
   progress: optionalTrimmedString(MAX_TEXT),
-});
+}).strict();
 
 const dispatchFailSchema = z.object({
   caseId: requiredTrimmedString("caseId", MAX_ID),
@@ -486,7 +466,7 @@ const dispatchFailSchema = z.object({
   }),
   errorCode: requiredTrimmedString("errorCode", MAX_SHORT),
   detail: optionalTrimmedString(MAX_TEXT),
-});
+}).strict();
 
 export function parseDispatchClaimInput(body: unknown): {
   workerId?: string;

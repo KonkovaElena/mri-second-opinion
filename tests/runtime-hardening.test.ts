@@ -94,6 +94,38 @@ test("metrics endpoint exposes Prometheus-formatted registry output", async () =
   }
 });
 
+test("readyz reports not-ready during shutdown while healthz stays live", async () => {
+  const { tempDir, caseStoreFile } = createTestStoreFile();
+
+  try {
+    const { app, server, baseUrl } = await startServer(caseStoreFile);
+
+    try {
+      const readyBefore = await fetch(`${baseUrl}/readyz`);
+      assert.equal(readyBefore.status, 200);
+
+      app.locals.runtimeState.isShuttingDown = true;
+
+      const readyDuring = await fetch(`${baseUrl}/readyz`);
+      const readyDuringBody = await readyDuring.json();
+      const healthDuring = await fetch(`${baseUrl}/healthz`);
+      const healthDuringBody = await healthDuring.json();
+
+      assert.equal(readyDuring.status, 503);
+      assert.equal(readyDuringBody.status, "not-ready");
+      assert.equal(readyDuringBody.reason, "shutdown-in-progress");
+      assert.equal(healthDuring.status, 200);
+      assert.equal(healthDuringBody.status, "ok");
+    } finally {
+      await stopServer(server, async () => {
+        await app.locals.caseService.close();
+      });
+    }
+  } finally {
+    rmSync(tempDir, { recursive: true, force: true });
+  }
+});
+
 test("public API rate limiting returns 429 while internal routes stay exempt", async () => {
   const { tempDir, caseStoreFile } = createTestStoreFile();
 
@@ -129,6 +161,59 @@ test("public API rate limiting returns 429 while internal routes stay exempt", a
       {
         publicApiRateLimitMaxRequests: 1,
         publicApiRateLimitWindowMs: 60_000,
+      },
+    );
+  } finally {
+    rmSync(tempDir, { recursive: true, force: true });
+  }
+});
+
+test("workbench document responses include CSP and document security headers", async () => {
+  const { tempDir, caseStoreFile } = createTestStoreFile();
+
+  try {
+    await withServer(caseStoreFile, async ({ baseUrl }) => {
+      const response = await fetch(`${baseUrl}/workbench`);
+      const contentSecurityPolicy = response.headers.get("content-security-policy") ?? "";
+
+      assert.equal(response.status, 200);
+      assert.match(contentSecurityPolicy, /default-src 'self'/);
+      assert.match(contentSecurityPolicy, /script-src 'self'/);
+      assert.match(contentSecurityPolicy, /style-src 'self'/);
+      assert.match(contentSecurityPolicy, /img-src 'self' data: blob:/);
+      assert.match(contentSecurityPolicy, /connect-src 'self'/);
+      assert.match(contentSecurityPolicy, /font-src 'self'/);
+      assert.match(contentSecurityPolicy, /object-src 'none'/);
+      assert.match(contentSecurityPolicy, /base-uri 'self'/);
+      assert.match(contentSecurityPolicy, /form-action 'self'/);
+      assert.match(contentSecurityPolicy, /frame-ancestors 'none'/);
+      assert.equal(response.headers.get("cross-origin-embedder-policy"), null);
+      assert.equal(response.headers.get("cross-origin-opener-policy"), "same-origin");
+      assert.equal(response.headers.get("cross-origin-resource-policy"), "same-origin");
+      assert.equal(response.headers.get("x-content-type-options"), "nosniff");
+      assert.equal(response.headers.get("x-frame-options"), "DENY");
+      assert.equal(response.headers.get("referrer-policy"), "strict-origin-when-cross-origin");
+      assert.equal(response.headers.get("x-permitted-cross-domain-policies"), "none");
+    });
+  } finally {
+    rmSync(tempDir, { recursive: true, force: true });
+  }
+});
+
+test("production responses include strict transport security", async () => {
+  const { tempDir, caseStoreFile } = createTestStoreFile();
+
+  try {
+    await withServer(
+      caseStoreFile,
+      async ({ baseUrl }) => {
+        const response = await fetch(`${baseUrl}/healthz`);
+
+        assert.equal(response.status, 200);
+        assert.match(response.headers.get("strict-transport-security") ?? "", /max-age=/);
+      },
+      {
+        nodeEnv: "production",
       },
     );
   } finally {

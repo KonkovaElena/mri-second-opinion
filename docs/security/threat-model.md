@@ -66,7 +66,7 @@ The repository already has meaningful baseline mitigations.
 5. `npm run sbom` plus CI artifact upload now provide a repeatable dependency inventory seam
 6. `MRI_INTERNAL_API_TOKEN` can gate the full `/api/internal/*` namespace with bearer authentication
 7. HMAC-SHA256 nonce replay store is wired into the live dispatch middleware with configurable TTL and max-entries bounds
-8. security response headers (`X-Content-Type-Options`, `X-Frame-Options`, `Referrer-Policy`, `X-Permitted-Cross-Domain-Policies`) are set on every response and `X-Powered-By` is suppressed
+8. Helmet manages the document response header baseline: strict Content-Security-Policy, `X-Content-Type-Options`, `X-Frame-Options`, `Referrer-Policy`, `X-Permitted-Cross-Domain-Policies`, same-origin COOP/CORP, production HSTS, and `X-Powered-By` remains suppressed
 9. archive-lookup HTTP client enforces a 10-second `AbortSignal.timeout` to bound external-service latency
 
 ## Open Gaps

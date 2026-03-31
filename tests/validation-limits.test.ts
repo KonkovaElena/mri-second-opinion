@@ -98,6 +98,72 @@ function validCreateCase() {
   };
 }
 
+test("rejects unknown top-level fields on create case input", async () => {
+  const storeFile = createTestStoreFile();
+  await withServer(storeFile, async ({ jsonRequest }) => {
+    const payload = { ...validCreateCase(), unexpectedField: "surplus" };
+    const { response, body } = await jsonRequest("/api/cases", {
+      method: "POST",
+      body: JSON.stringify(payload),
+    });
+
+    assert.equal(response.status, 400);
+    assert.equal(body.code, "INVALID_INPUT");
+    assert.match(body.error, /unrecognized key/i);
+  });
+});
+
+test("rejects unknown nested studyContext fields", async () => {
+  const storeFile = createTestStoreFile();
+  await withServer(storeFile, async ({ jsonRequest }) => {
+    const payload = {
+      ...validCreateCase(),
+      studyContext: {
+        studyInstanceUid: "1.2.840.0.study.context.1",
+        unexpectedField: "surplus",
+      },
+    };
+    const { response, body } = await jsonRequest("/api/cases", {
+      method: "POST",
+      body: JSON.stringify(payload),
+    });
+
+    assert.equal(response.status, 400);
+    assert.equal(body.code, "INVALID_INPUT");
+    assert.match(body.error, /unrecognized key/i);
+  });
+});
+
+test("rejects unknown executionContext fields in inference callbacks", async () => {
+  const storeFile = createTestStoreFile();
+  await withServer(storeFile, async ({ jsonRequest }) => {
+    const createRes = await jsonRequest("/api/cases", {
+      method: "POST",
+      body: JSON.stringify(validCreateCase()),
+    });
+    assert.equal(createRes.response.status, 201);
+
+    const { response, body } = await jsonRequest("/api/internal/inference-callback", {
+      method: "POST",
+      body: JSON.stringify({
+        caseId: createRes.body.case.caseId,
+        qcDisposition: "pass",
+        findings: [],
+        measurements: [],
+        artifacts: [],
+        executionContext: {
+          computeMode: "metadata-fallback",
+          unexpectedField: "surplus",
+        },
+      }),
+    });
+
+    assert.equal(response.status, 400);
+    assert.equal(body.code, "INVALID_INPUT");
+    assert.match(body.error, /unrecognized key/i);
+  });
+});
+
 // ---------- Phase 1 — Semantic payload-size limit tests ----------
 
 test("rejects patientAlias exceeding MAX_ID (128)", async () => {

@@ -10,7 +10,7 @@ import {
 } from "node:fs";
 import { dirname } from "node:path";
 import { randomUUID } from "node:crypto";
-import type { CaseRecord, DeliveryJobRecord, InferenceJobRecord, PersistedCaseSnapshot } from "./cases";
+import type { CaseRecord, DeliveryJobRecord, InferenceJobRecord, PersistedCaseSnapshot } from "./case-contracts";
 import { normalizeStoredCaseRecord } from "./case-sqlite-storage";
 
 function cloneCase<T>(value: T): T {

@@ -1,6 +1,10 @@
 import type { MemoryCaseService } from "./cases";
 import type { AppConfig } from "./config";
 
+export interface RuntimeState {
+  isShuttingDown: boolean;
+}
+
 function resolvePersistenceMode(config: AppConfig) {
   if (config.persistenceMode === "postgres" || config.persistenceMode === "snapshot") {
     return config.persistenceMode;
@@ -30,7 +34,29 @@ export function buildHealthSnapshot(config: AppConfig, requestId: string) {
   };
 }
 
-export async function buildReadinessSnapshot(config: AppConfig, caseService: MemoryCaseService, requestId: string) {
+export async function buildReadinessSnapshot(
+  config: AppConfig,
+  caseService: MemoryCaseService,
+  requestId: string,
+  runtimeState?: RuntimeState,
+) {
+  if (runtimeState?.isShuttingDown) {
+    return {
+      statusCode: 503,
+      body: {
+        status: "not-ready",
+        service: "mri-second-opinion",
+        mode: "wave1-api",
+        requestId,
+        storage: buildStorageSnapshot(config),
+        checks: {
+          caseStore: "shutdown-pending",
+        },
+        reason: "shutdown-in-progress",
+      },
+    };
+  }
+
   try {
     const [cases, deliveryJobs, inferenceJobs] = await Promise.all([
       caseService.listCases(),

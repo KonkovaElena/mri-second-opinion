@@ -1,9 +1,11 @@
 import express from "express";
+import helmet from "helmet";
 import { resolve } from "node:path";
 import { createArchiveLookupClient } from "./archive-lookup";
+import { WorkflowError } from "./case-contracts";
 import type { AppConfig } from "./config";
 import type { PostgresPoolFactory } from "./case-postgres-repository";
-import { MemoryCaseService, WorkflowError } from "./cases";
+import { MemoryCaseService } from "./cases";
 import {
   presentCaseDetail,
   presentDeliveryJob,
@@ -13,7 +15,7 @@ import {
   presentOperationsSummary,
   presentReport,
 } from "./case-presentation";
-import { buildHealthSnapshot, buildReadinessSnapshot } from "./health";
+import { buildHealthSnapshot, buildReadinessSnapshot, type RuntimeState } from "./health";
 import { buildDicomSrExport, buildFhirDiagnosticReport } from "./case-exports";
 import { createInternalAuthMiddleware } from "./internal-auth";
 import { createHmacAuthMiddleware } from "./hmac-auth";
@@ -41,6 +43,34 @@ export interface CreateAppOptions {
 export function createApp(config: AppConfig, options: CreateAppOptions = {}) {
   const app = express();
   const publicApiRateLimiter = createPublicApiRateLimiter(config);
+  const securityHeaders = helmet({
+    contentSecurityPolicy: {
+      useDefaults: false,
+      directives: {
+        "default-src": ["'self'"],
+        "script-src": ["'self'"],
+        "style-src": ["'self'"],
+        "img-src": ["'self'", "data:", "blob:"],
+        "font-src": ["'self'"],
+        "connect-src": ["'self'"],
+        "object-src": ["'none'"],
+        "base-uri": ["'self'"],
+        "form-action": ["'self'"],
+        "frame-ancestors": ["'none'"],
+      },
+    },
+    crossOriginEmbedderPolicy: false,
+    crossOriginOpenerPolicy: { policy: "same-origin" },
+    crossOriginResourcePolicy: { policy: "same-origin" },
+    originAgentCluster: true,
+    referrerPolicy: { policy: "strict-origin-when-cross-origin" },
+    strictTransportSecurity:
+      config.nodeEnv === "production"
+        ? { maxAge: 31536000, includeSubDomains: true, preload: true }
+        : false,
+    xFrameOptions: { action: "deny" },
+    xPermittedCrossDomainPolicies: { permittedPolicies: "none" },
+  });
   const archiveLookupClient = createArchiveLookupClient({
     archiveLookupBaseUrl: config.archiveLookupBaseUrl,
     archiveLookupSource: config.archiveLookupSource,
@@ -52,18 +82,14 @@ export function createApp(config: AppConfig, options: CreateAppOptions = {}) {
     caseStoreSchema: config.caseStoreSchema,
     postgresPoolFactory: options.postgresPoolFactory,
   });
+  const runtimeState: RuntimeState = { isShuttingDown: false };
   const workbenchRoot = resolve(__dirname, "..", "public", "workbench");
   app.locals.caseService = caseService;
+  app.locals.runtimeState = runtimeState;
 
   app.disable("x-powered-by");
 
-  app.use((_req, res, next) => {
-    res.setHeader("X-Content-Type-Options", "nosniff");
-    res.setHeader("X-Frame-Options", "DENY");
-    res.setHeader("Referrer-Policy", "strict-origin-when-cross-origin");
-    res.setHeader("X-Permitted-Cross-Domain-Policies", "none");
-    next();
-  });
+  app.use(securityHeaders);
 
   app.use(requestContextMiddleware);
   app.use(metricsMiddleware);
@@ -228,16 +254,18 @@ export function createApp(config: AppConfig, options: CreateAppOptions = {}) {
   });
 
   app.get("/readyz", async (_req, res) => {
-    const snapshot = await buildReadinessSnapshot(config, caseService, getRequestId(res));
+    const snapshot = await buildReadinessSnapshot(config, caseService, getRequestId(res), runtimeState);
     res.status(snapshot.statusCode).json(snapshot.body);
   });
 
-  app.get("/metrics", (_req, res) => {
-    writeMetricsResponse(res).catch(() => {
+  app.get("/metrics", async (_req, res) => {
+    try {
+      await writeMetricsResponse(res);
+    } catch {
       if (!res.headersSent) {
-        res.status(500).json({ error: "Failed to collect metrics" });
+        res.status(500).json({ error: "Failed to collect metrics", requestId: getRequestId(res) });
       }
-    });
+    }
   });
 
   app.post("/api/cases", async (req, res) => {

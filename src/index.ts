@@ -17,6 +17,7 @@ async function handleShutdown(signal: NodeJS.Signals) {
   }
 
   shuttingDown = true;
+  app.locals.runtimeState.isShuttingDown = true;
   process.stdout.write(`[mri-second-opinion] received ${signal}, starting graceful shutdown\n`);
 
   try {

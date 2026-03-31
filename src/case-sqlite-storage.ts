@@ -1,7 +1,7 @@
 import { mkdirSync } from "node:fs";
 import { dirname } from "node:path";
 import { DatabaseSync } from "node:sqlite";
-import type { CaseRecord, DeliveryJobRecord, InferenceJobRecord } from "./cases";
+import type { CaseRecord, DeliveryJobRecord, InferenceJobRecord } from "./case-contracts";
 import {
   backfillStructuralExecutionEnvelope,
   createDefaultStructuralExecutionContext,
@@ -137,8 +137,18 @@ export function normalizeStoredCaseRecord(parsed: CaseRecord): CaseRecord {
       parsed.studyContext.dicomStudyInstanceUid ??
       parsed.studyContext.studyInstanceUid ??
       parsed.studyUid,
+    accessionNumber: parsed.studyContext.accessionNumber ?? null,
+    studyDate: parsed.studyContext.studyDate ?? null,
+    sourceArchive: parsed.studyContext.sourceArchive ?? null,
+    dicomWebBaseUrl: parsed.studyContext.dicomWebBaseUrl ?? null,
     series: parsed.studyContext.series ?? [],
     metadataSummary: parsed.studyContext.metadataSummary ?? [],
+  };
+  const review = {
+    reviewerId: typeof parsed.review?.reviewerId === "string" ? parsed.review.reviewerId : "",
+    reviewerRole: parsed.review?.reviewerRole ?? null,
+    comments: parsed.review?.comments ?? null,
+    reviewedAt: parsed.review?.reviewedAt ?? null,
   };
   const artifactManifest =
     parsed.artifactManifest ??
@@ -214,6 +224,7 @@ export function normalizeStoredCaseRecord(parsed: CaseRecord): CaseRecord {
     artifactManifest: normalizedArtifactManifest,
     report,
     lastInferenceFingerprint: parsed.lastInferenceFingerprint ?? null,
+    review,
   };
 }
 

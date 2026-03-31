@@ -1,5 +1,5 @@
 import { Pool } from "pg";
-import type { CaseRecord, DeliveryJobRecord, InferenceJobRecord } from "./cases";
+import type { CaseRecord, DeliveryJobRecord, InferenceJobRecord } from "./case-contracts";
 import { getRetryBackoffSeconds } from "./case-common";
 import {
   buildPostgresBootstrapStatements,

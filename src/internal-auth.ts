@@ -1,6 +1,6 @@
 import { timingSafeEqual } from "node:crypto";
 import type express from "express";
-import { WorkflowError } from "./cases";
+import { WorkflowError } from "./case-contracts";
 import type { AppConfig } from "./config";
 
 const AUTHORIZATION_SCHEME = "bearer";

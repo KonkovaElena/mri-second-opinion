@@ -2,7 +2,7 @@ import {
   createPlannedArtifactPersistenceTargets,
   type DerivedArtifactDescriptor,
 } from "./case-artifacts";
-import type { CaseRecord, DeliveryJobRecord, InferenceJobRecord, ReportPayload } from "./cases";
+import type { CaseRecord, DeliveryJobRecord, InferenceJobRecord, ReportPayload } from "./case-contracts";
 import { getWorkflowPackageManifest } from "./workflow-packages";
 
 type OperationsSummary = Awaited<

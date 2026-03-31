@@ -1,4 +1,4 @@
-import type { CaseRecord, DeliveryJobRecord, InferenceJobRecord } from "./cases";
+import type { CaseRecord, DeliveryJobRecord, InferenceJobRecord } from "./case-contracts";
 import {
   loadPersistedCaseSnapshot,
   savePersistedCaseSnapshot,

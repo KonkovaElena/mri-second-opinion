@@ -1,6 +1,6 @@
 import { createHmac, createHash, timingSafeEqual } from "node:crypto";
 import type express from "express";
-import { WorkflowError } from "./cases";
+import { WorkflowError } from "./case-contracts";
 import type { AppConfig } from "./config";
 import type { ReplayStore } from "./replay-store";
 

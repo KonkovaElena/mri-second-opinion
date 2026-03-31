@@ -6,7 +6,7 @@
  * representations suitable for downstream integration or further transformation.
  */
 
-import type { ReportPayload } from "./cases";
+import type { ReportPayload } from "./case-contracts";
 
 // ---------------------------------------------------------------------------
 // DICOM SR (Comprehensive Structured Report)

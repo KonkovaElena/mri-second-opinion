@@ -154,6 +154,24 @@ function validCreatePayload(studyUid: string) {
   };
 }
 
+async function withCapturedWarnings<T>(run: (warnings: string[]) => Promise<T>) {
+  const originalWarn = console.warn;
+  const warnings: string[] = [];
+
+  console.warn = ((message?: unknown, ...rest: unknown[]) => {
+    const parts = [message, ...rest]
+      .filter((value) => typeof value !== "undefined")
+      .map((value) => (typeof value === "string" ? value : JSON.stringify(value)));
+    warnings.push(parts.join(" "));
+  }) as typeof console.warn;
+
+  try {
+    return await run(warnings);
+  } finally {
+    console.warn = originalWarn;
+  }
+}
+
 // ---------- Phase 2: Archive error type distinction tests ----------
 
 test("archive lookup: 200 with valid payload → study context merged", async () => {
@@ -239,36 +257,99 @@ test("archive lookup: 500 → case created without enrichment, graceful degradat
   const { tempDir, caseStoreFile } = createTestStoreFile();
 
   try {
-    await withArchiveMock(
-      {
-        "1.2.test.servererror": {
-          statusCode: 500,
-          body: { error: "internal-server-error" },
-        },
-      },
-      async (archiveBaseUrl) => {
-        await withServer(
-          caseStoreFile,
-          async ({ jsonRequest }) => {
-            const { response, body } = await jsonRequest("/api/cases", {
-              method: "POST",
-              body: JSON.stringify(validCreatePayload("1.2.test.servererror")),
-            });
-
-            // Graceful degradation: case created despite archive 500
-            assert.equal(response.status, 201);
-            const caseId = body.case.caseId as string;
-            const detail = await jsonRequest(`/api/cases/${caseId}`);
-            assert.equal(detail.response.status, 200);
-            // 500 → error path → no enrichment
-            assert.equal(detail.body.case.studyContext.sourceArchive, null);
-            assert.deepEqual(detail.body.case.studyContext.series, []);
+    await withCapturedWarnings(async (warnings) => {
+      await withArchiveMock(
+        {
+          "1.2.test.servererror": {
+            statusCode: 500,
+            body: { error: "internal-server-error" },
           },
-          { archiveLookupBaseUrl: archiveBaseUrl },
-        );
-      },
-    );
+        },
+        async (archiveBaseUrl) => {
+          await withServer(
+            caseStoreFile,
+            async ({ jsonRequest }) => {
+              const { response, body } = await jsonRequest("/api/cases", {
+                method: "POST",
+                body: JSON.stringify(validCreatePayload("1.2.test.servererror")),
+              });
+
+              // Graceful degradation: case created despite archive 500
+              assert.equal(response.status, 201);
+              const caseId = body.case.caseId as string;
+              const detail = await jsonRequest(`/api/cases/${caseId}`);
+              assert.equal(detail.response.status, 200);
+              // 500 → error path → no enrichment
+              assert.equal(detail.body.case.studyContext.sourceArchive, null);
+              assert.deepEqual(detail.body.case.studyContext.series, []);
+            },
+            { archiveLookupBaseUrl: archiveBaseUrl },
+          );
+        },
+      );
+
+      assert.equal(warnings.length, 1);
+      assert.deepEqual(JSON.parse(warnings[0] ?? "{}"), {
+        event: "archive_lookup_error",
+        studyUid: "1.2.test.servererror",
+        reason: "server-error",
+        httpStatus: 500,
+      });
+    });
   } finally {
+    rmSync(tempDir, { recursive: true, force: true });
+  }
+});
+
+test("archive lookup: timeout → case created without enrichment and warning emitted", async () => {
+  const { tempDir, caseStoreFile } = createTestStoreFile();
+  const originalFetch = globalThis.fetch;
+  const archiveLookupBaseUrl = "http://archive-timeout.test";
+
+  globalThis.fetch = (async (input: string | URL | Request, init?: RequestInit) => {
+    const requestUrl =
+      typeof input === "string"
+        ? input
+        : input instanceof URL
+          ? input.toString()
+          : input.url;
+
+    if (requestUrl.startsWith(`${archiveLookupBaseUrl}/studies/`)) {
+      throw new DOMException("archive lookup timed out", "TimeoutError");
+    }
+
+    return originalFetch(input, init);
+  }) as typeof fetch;
+
+  try {
+    await withCapturedWarnings(async (warnings) => {
+      await withServer(
+        caseStoreFile,
+        async ({ jsonRequest }) => {
+          const { response, body } = await jsonRequest("/api/cases", {
+            method: "POST",
+            body: JSON.stringify(validCreatePayload("1.2.test.timeout")),
+          });
+
+          assert.equal(response.status, 201);
+          const caseId = body.case.caseId as string;
+          const detail = await jsonRequest(`/api/cases/${caseId}`);
+          assert.equal(detail.response.status, 200);
+          assert.equal(detail.body.case.studyContext.sourceArchive, null);
+          assert.deepEqual(detail.body.case.studyContext.series, []);
+        },
+        { archiveLookupBaseUrl },
+      );
+
+      assert.equal(warnings.length, 1);
+      assert.deepEqual(JSON.parse(warnings[0] ?? "{}"), {
+        event: "archive_lookup_error",
+        studyUid: "1.2.test.timeout",
+        reason: "timeout",
+      });
+    });
+  } finally {
+    globalThis.fetch = originalFetch;
     rmSync(tempDir, { recursive: true, force: true });
   }
 });

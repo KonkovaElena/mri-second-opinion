@@ -169,3 +169,69 @@ test("postgres round-trip preserves large sequenceInventory arrays", async () =>
     await service.close();
   }
 });
+
+test("postgres round-trip preserves operation transcript, retry history, and null-or-empty optional shapes", async () => {
+  const createService = createPostgresServiceFactory();
+  const first = createService();
+  let caseId = "";
+
+  try {
+    const created = await first.createCase({
+      patientAlias: "postgres-ops-roundtrip",
+      studyUid: "1.2.3.postgres.ops.roundtrip",
+      sequenceInventory: ["T1w", "FLAIR"],
+    });
+    caseId = created.caseId;
+
+    await first.completeInference(created.caseId, {
+      qcDisposition: "warn",
+      findings: ["Stable chronic change."],
+      measurements: [{ label: "brain_volume_ml", value: 1098 }],
+      artifacts: ["artifact://qc", "artifact://report"],
+    });
+    await first.reviewCase(created.caseId, {
+      reviewerId: "postgres-roundtrip-reviewer",
+    });
+    await first.finalizeCase(created.caseId, {
+      deliveryOutcome: "failed",
+    });
+    await first.retryDelivery(created.caseId);
+  } finally {
+    await first.close();
+  }
+
+  const second = createService();
+
+  try {
+    const reloaded = await second.getCase(caseId);
+    const summary = await second.getOperationsSummary();
+
+    assert.equal(reloaded.status, "DELIVERY_PENDING");
+    assert.equal(reloaded.studyContext.sourceArchive, null);
+    assert.deepEqual(reloaded.studyContext.metadataSummary, []);
+    assert.deepEqual(reloaded.studyContext.series, []);
+    assert.equal(reloaded.review.reviewerRole, null);
+    assert.equal(reloaded.review.comments, null);
+    assert.notEqual(reloaded.review.reviewedAt, null);
+    assert.equal(Object.prototype.hasOwnProperty.call(reloaded.report ?? {}, "finalImpression"), false);
+    assert.deepEqual(reloaded.qcSummary.checks, []);
+    assert.deepEqual(reloaded.qcSummary.metrics, []);
+    assert.deepEqual(reloaded.qcSummary.issues, []);
+    assert.equal(reloaded.operationLog.some((entry) => entry.operationType === "case-created"), true);
+    assert.equal(
+      reloaded.operationLog.some((entry) => entry.operationType === "delivery-retry-requested"),
+      true,
+    );
+    assert.equal(summary.retryHistory.length, 1);
+    assert.equal(summary.retryHistory[0].caseId, caseId);
+    assert.equal(summary.retryHistory[0].operationType, "delivery-retry-requested");
+    assert.equal(
+      summary.recentOperations.some(
+        (entry) => entry.caseId === caseId && entry.operationType === "delivery-retry-requested",
+      ),
+      true,
+    );
+  } finally {
+    await second.close();
+  }
+});

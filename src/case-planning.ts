@@ -9,7 +9,7 @@ import type {
   ReportPayload,
   StructuralExecutionContext,
   StructuralExecutionEnvelope,
-} from "./cases";
+} from "./case-contracts";
 import type { ArtifactStorageOverride } from "./case-artifacts";
 import type { StudyContextRecord } from "./case-imaging";
 import { createDerivedArtifactDescriptors } from "./case-artifacts";
