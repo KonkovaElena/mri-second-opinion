@@ -5,6 +5,8 @@
 A standalone TypeScript API that orchestrates the full lifecycle of an MRI second-opinion case — from intake and quality checks through AI-assisted draft generation to mandatory clinician review, finalization, and delivery.
 
 > **⚠️ Research Use Only.** This system is not a medical device. It must not be used for clinical decision-making without proper regulatory clearance. Every output requires review by a qualified clinician.
+>
+> This repository is not an autonomous diagnostic system. It is a clinician-in-the-loop workflow layer that enforces human review before finalization or delivery.
 
 ---
 
@@ -425,6 +427,22 @@ See `docs/academic/action-plan.md` for the detailed technical roadmap.
 | `docs/verification/launch-evidence-index.md` | All evidence artifacts |
 | `docs/verification/runtime-baseline-verification.md` | What is verified today |
 | `docs/verification/release-validation-packet.md` | Release validation |
+| `docs/verification/hosted-evidence-capture-template.md` | Template for hosted verification evidence capture |
+
+### Demo and Launch Operations
+
+| Document | Purpose |
+|---|---|
+| `docs/demo/demo-script.md` | Operator-facing demo flow from intake through delivery |
+| `docs/demo/social-preview-brief.md` | Screenshot and social preview brief for public publication |
+| `docs/releases/v1-go-no-go.md` | Current launch verdict and blocking conditions |
+| `docs/releases/github-publication-playbook.md` | End-to-end GitHub publication sequence |
+| `docs/releases/github-go-live-checklist.md` | Go-live gate checklist for the public repository |
+| `docs/releases/github-metadata-copy.md` | Repository description, topics, and profile copy |
+| `docs/releases/github-settings-worksheet.md` | Required repository settings and permissions worksheet |
+| `docs/releases/github-live-publication-sequence.md` | Ordered publication runbook for launch day |
+| `docs/releases/first-public-announcement-draft.md` | First public announcement draft |
+| `docs/releases/github-operator-packet.md` | Operator packet for public launch rehearsal |
 
 ---
 
