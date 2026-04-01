@@ -12,7 +12,7 @@ The image should help identify the repository on social platforms without implyi
 
 1. MRI-only
 2. clinician-in-the-loop
-3. workflow baseline
+3. workflow system
 4. not launch-ready
 
 ## Recommended copy
@@ -23,11 +23,11 @@ MRI Second Opinion
 
 ### Secondary line
 
-Clinician-in-the-loop workflow baseline
+Clinician-in-the-loop MRI workflow
 
 ### Footer ribbon
 
-MRI-only | TypeScript API | Not launch-ready
+Human review | RUO | Not launch-ready
 
 ## Visual rules
 
@@ -51,6 +51,6 @@ Reject the asset if it suggests:
 1. a complete frontend that does not exist
 2. a clinically validated product
 3. autonomous diagnosis
-4. a polished production deployment beyond the verified baseline
+4. a polished production deployment beyond current verified repo truth
 5. real patient data or real clinical output
 6. a non-synthetic demo surface that the repository cannot currently evidence

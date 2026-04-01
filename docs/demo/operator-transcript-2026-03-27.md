@@ -1,4 +1,4 @@
-# MRI Standalone Operator Transcript 2026-03-27
+# MRI Second Opinion Operator Transcript 2026-03-27
 
 ## Purpose
 

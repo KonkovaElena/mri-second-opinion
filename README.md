@@ -2,7 +2,7 @@
 
 **Clinician-in-the-loop MRI second-opinion workflow system.**
 
-A standalone TypeScript API that orchestrates the full lifecycle of an MRI second-opinion case — from intake and quality checks through AI-assisted draft generation to mandatory clinician review, finalization, and delivery.
+A standalone TypeScript API plus Python worker that orchestrate the full lifecycle of an MRI second-opinion case — from intake and quality checks through AI-assisted draft generation to mandatory clinician review, finalization, and delivery.
 
 > **⚠️ Research Use Only.** This system is not a medical device. It must not be used for clinical decision-making without proper regulatory clearance. Every output requires review by a qualified clinician.
 >
@@ -14,6 +14,7 @@ A standalone TypeScript API that orchestrates the full lifecycle of an MRI secon
 
 - [What This Project Does](#what-this-project-does)
 - [How It Works](#how-it-works)
+- [Current Baseline](#current-baseline)
 - [Architecture](#architecture)
 - [Technology Stack](#technology-stack)
 - [API Surface](#api-surface)
@@ -90,6 +91,28 @@ Finalized reports can be exported as:
 - **DICOM SR** — Comprehensive Structured Report (SOP Class 1.2.840.10008.5.1.4.1.1.88.33)
 - **FHIR R4 DiagnosticReport** — with LOINC coding, contained Observations, and RUO disclaimer extension
 
+## Current Baseline
+
+What is already implemented in this repository:
+
+1. Public workflow API for case intake, review, finalization, report retrieval, artifact access, operations summary, and delivery retry
+2. Internal inference and delivery rails with claim, heartbeat, callback, failure, and retry paths
+3. A built-in review workbench at `/workbench` for queue and report handling
+4. A Python worker for inference and delivery stages
+5. Local durable workflow state via SQLite, with PostgreSQL bootstrap and persistence seams
+6. Artifact storage via stable download routes backed by `local-file` and `s3-compatible` providers
+7. Interoperable report exports for DICOM SR and FHIR R4 DiagnosticReport
+8. Evidence and claim-boundary docs that separate implemented runtime truth from target architecture
+
+What remains next-wave direction rather than current runtime proof:
+
+1. Full OHIF-backed viewer truth
+2. Full Orthanc or DICOMweb archive closure
+3. Binary DICOM Part-10 export closure
+4. Hosted or distributed worker deployment proof
+5. Artifact-store hardening: retention, multipart upload, and MinIO verification
+6. Clinical validation and launch-ready evidence
+
 ---
 
 ## Architecture
@@ -97,7 +120,7 @@ Finalized reports can be exported as:
 ```
 ┌──────────────────────────────────────────────┐
 │                  Clinician                    │
-│         (Review Workbench / OHIF)             │
+│         (Built-in Review Workbench)           │
 └──────────────┬───────────────────────────────┘
                │ review / finalize
 ┌──────────────▼───────────────────────────────┐
@@ -473,7 +496,7 @@ This project is licensed under the MIT License. See [LICENSE](LICENSE) for detai
 
 **Система рабочего процесса для получения второго мнения по МРТ с обязательным участием врача.**
 
-Автономный TypeScript API, который управляет полным жизненным циклом кейса МРТ — от приёма и проверки качества через генерацию ИИ-черновика до обязательного врачебного рецензирования, финализации и доставки результата.
+Автономный TypeScript API и Python-воркер, которые управляют полным жизненным циклом кейса МРТ — от приёма и проверки качества через генерацию ИИ-черновика до обязательного врачебного рецензирования, финализации и доставки результата.
 
 > **⚠️ Только для исследовательского использования.** Эта система не является медицинским изделием. Она не может использоваться для принятия клинических решений без соответствующей регуляторной сертификации. Каждый результат требует рецензии квалифицированного врача.
 
@@ -483,6 +506,7 @@ This project is licensed under the MIT License. See [LICENSE](LICENSE) for detai
 
 - [Что делает проект](#что-делает-проект)
 - [Как это работает](#как-это-работает)
+- [Текущий baseline](#текущий-baseline)
 - [Архитектура](#архитектура)
 - [Технологический стек](#технологический-стек)
 - [API проекта](#api-проекта)
@@ -555,6 +579,26 @@ Python-воркер (`worker/main.py`) работает по принципу pu
 - **DICOM SR** — Структурированный отчёт (SOP Class 1.2.840.10008.5.1.4.1.1.88.33)
 - **FHIR R4 DiagnosticReport** — с кодированием LOINC, встроенными Observation и расширением-дисклеймером RUO
 
+## Текущий baseline
+
+Что уже реализовано в текущем репозитории:
+
+1. Публичный workflow API для intake, review, finalization, выдачи отчёта, доступа к артефактам, operations summary и retry доставки
+2. Внутренние inference и delivery rails с claim, heartbeat, callback, fail и retry path
+3. Встроенный review workbench по адресу `/workbench`
+4. Python-воркер для inference и delivery stage
+5. Локально устойчивое workflow state через SQLite с PostgreSQL bootstrap и persistence seam
+6. Интероперабельные экспорты в DICOM SR и FHIR R4 DiagnosticReport
+7. Набор evidence и claim-boundary документов, который отделяет runtime truth от target architecture
+
+Что остаётся следующей волной, а не текущим runtime-proof:
+
+1. Полноценный OHIF-backed viewer
+2. Полноценная Orthanc или DICOMweb archive closure
+3. Binary DICOM Part-10 export closure
+4. Hosted или distributed worker deployment proof
+5. Clinical validation и launch-ready evidence
+
 ---
 
 ## Архитектура
@@ -562,7 +606,7 @@ Python-воркер (`worker/main.py`) работает по принципу pu
 ```
 ┌──────────────────────────────────────────────┐
 │                    Врач                       │
-│        (Рецензионный интерфейс / OHIF)        │
+│         (Built-in Review Workbench)           │
 └──────────────┬───────────────────────────────┘
                │ рецензия / финализация
 ┌──────────────▼───────────────────────────────┐

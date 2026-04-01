@@ -115,7 +115,7 @@ jobs:
 
           package = json.loads(Path('package.json').read_text(encoding='utf-8'))
 
-          expected_description = 'Clinician-in-the-loop MRI second-opinion workflow baseline with a standalone TypeScript API and restart-safe local persistence'
+          expected_description = 'Clinician-in-the-loop MRI second-opinion workflow: intake, QC, AI-assisted draft, mandatory review, finalization, delivery, and interoperable exports.'
           expected_repository = 'https://github.com/KonkovaElena/mri-second-opinion.git'
           expected_bugs = 'https://github.com/KonkovaElena/mri-second-opinion/issues'
           expected_keywords = {
@@ -123,12 +123,14 @@ jobs:
               'medical-imaging',
               'radiology',
               'second-opinion',
-              'clinical-review',
-              'typescript',
-              'nodejs',
-              'express',
-              'workflow-orchestration',
-              'research-use-only',
+                'clinical-review',
+                'dicom',
+                'fhir',
+                'typescript',
+                'nodejs',
+                'python',
+                'workflow-orchestration',
+                'research-use-only',
           }
 
           actual_description = package.get('description')

@@ -1,4 +1,4 @@
-# MRI Standalone v1 Launch Readiness Checklist
+# MRI Second Opinion v1 Launch Readiness Checklist
 
 Status values:
 
@@ -6,7 +6,7 @@ Status values:
 - `[-]` in progress
 - `[x]` complete
 
-This checklist is the operator view of the MRI Standalone launch gate.
+This checklist is the operator view of the MRI Second Opinion launch gate.
 
 The repository must not be described as public-launch-ready until every required item below is complete and backed by evidence.
 

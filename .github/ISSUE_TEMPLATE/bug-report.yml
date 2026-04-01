@@ -1,5 +1,5 @@
 name: Bug report
-description: Report a reproducible runtime, verification, or documentation defect in MRI Standalone
+description: Report a reproducible runtime, verification, or documentation defect in MRI Second Opinion
 title: "[Bug]: "
 labels:
   - bug
@@ -7,7 +7,7 @@ body:
   - type: markdown
     attributes:
       value: |
-        Use this form for reproducible defects in MRI Standalone.
+        Use this form for reproducible defects in MRI Second Opinion.
 
         Do not report active security vulnerabilities here. Follow `SECURITY.md` instead.
   - type: textarea

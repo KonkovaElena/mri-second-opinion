@@ -1,5 +1,5 @@
 name: Feature request
-description: Propose a scoped improvement that stays within the MRI standalone boundary.
+description: Propose a scoped improvement that stays within the MRI Second Opinion boundary.
 title: "[Feature]: "
 labels:
   - enhancement

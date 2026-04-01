@@ -1,8 +1,8 @@
 ---
 title: "GitHub Publication Copy Pack"
 status: active
-version: "1.0.0"
-last_updated: "2026-03-26"
+version: "1.1.0"
+last_updated: "2026-04-01"
 tags: [mri, github, publication, copy, release]
 ---
 
@@ -35,25 +35,27 @@ No short-form copy may imply:
 1. clinical validation
 2. launch-ready deployment
 3. autonomous diagnosis
-4. already-implemented frontend, worker, queue, or database closure
+4. full PACS or DICOMweb closure
+5. hosted or distributed worker deployment proof
+6. archive-native viewer truth beyond the built-in review workbench
 
 ## Canonical One-Line Description
 
-Clinician-in-the-loop MRI second-opinion workflow baseline with a standalone TypeScript API and restart-safe local persistence.
+Clinician-in-the-loop MRI second-opinion workflow: intake, QC, AI-assisted draft, mandatory review, finalization, delivery, and interoperable exports.
 
 ## Caution Line
 
-For research-oriented and external review use only. Not validated for clinical decision-making.
+For research-oriented and external review use only. Not clinically validated for patient-care decision-making.
 
 ## Short Repository Card
 
-MRI Standalone is an open-source MRI-only second-opinion workflow baseline. It currently provides a standalone TypeScript API and restart-safe local persistence, but it is not a launch-ready clinical system.
+MRI Second Opinion is an open-source clinician-in-the-loop workflow system around AI. Current repo truth already includes a standalone TypeScript API, a built-in review workbench, a Python worker, explicit workflow states, local durable queues and persistence seams, and interoperable report exports, but it remains RUO-first and not launch-ready clinical software.
 
 ## About Panel
 
 ### Description
 
-Clinician-in-the-loop MRI second-opinion workflow baseline with a standalone TypeScript API and restart-safe local persistence.
+Clinician-in-the-loop MRI second-opinion workflow: intake, QC, AI-assisted draft, mandatory review, finalization, delivery, and interoperable exports.
 
 ### Website
 
@@ -66,11 +68,13 @@ Leave blank until a real public documentation site, GitHub Pages site, or produc
 3. `radiology`
 4. `second-opinion`
 5. `clinical-review`
-6. `typescript`
-7. `nodejs`
-8. `express`
-9. `workflow-orchestration`
-10. `research-use-only`
+6. `dicom`
+7. `fhir`
+8. `typescript`
+9. `nodejs`
+10. `python`
+11. `workflow-orchestration`
+12. `research-use-only`
 
 GitHub topic constraints confirmed from official docs:
 
@@ -80,11 +84,11 @@ GitHub topic constraints confirmed from official docs:
 
 ## Pinned Discussion Or Repository Overview Copy
 
-MRI Standalone is a public MRI-only, clinician-in-the-loop second-opinion workflow baseline.
+MRI Second Opinion is a public clinician-in-the-loop MRI workflow system around AI rather than an autonomous MRI-reading product.
 
-Current repository truth is deliberately narrow: a standalone TypeScript API, restart-safe local persistence, explicit workflow states, and conservative readiness gates. The repository is intended to be inspectable and contribution-ready without overstating maturity.
+Current repository truth is concrete and inspectable: a standalone TypeScript API, built-in review workbench, Python worker, explicit workflow states, local durable workflow rails, DICOM SR and FHIR export surfaces, and conservative readiness gates. The repository is intended to be contribution-ready without overstating maturity.
 
-Not implemented yet: archive-native viewer truth, DICOM-derived or package-grade compute, distributed worker orchestration, clinician review UI, and higher-maturity launch evidence.
+Not implemented yet: full archive-native viewer truth, full Orthanc or DICOMweb closure, hosted or distributed worker deployment proof, binary DICOM Part-10 export closure, and higher-maturity clinical validation evidence.
 
 Start here:
 
@@ -97,13 +101,13 @@ Start here:
 
 ### Short
 
-Public release of MRI Standalone as a conservative MRI-only workflow baseline. Current repository truth is a standalone TypeScript API with restart-safe local persistence and explicit readiness discipline, not a complete clinical or production deployment.
+Public release of MRI Second Opinion as a conservative clinician-in-the-loop MRI workflow system. Current repository truth includes a standalone TypeScript API, built-in review workbench, Python worker, local durable workflow rails, and explicit readiness discipline, not a complete clinical or production deployment.
 
 ### Long
 
-MRI Standalone is now publicly available as a focused MRI-only, clinician-in-the-loop second-opinion workflow baseline. The repository currently proves a standalone TypeScript API, local durable persistence evidence, documented workflow state and queue semantics, and an explicitly conservative publication posture. The current repository-content verdict is `PUBLIC_GITHUB_READY`, while launch-ready, clinical-ready, and production-ready claims remain closed.
+MRI Second Opinion is now publicly available as a focused clinician-in-the-loop MRI workflow system. The repository currently proves a standalone TypeScript API, a built-in review workbench, a Python worker, local durable workflow rails, DICOM SR and FHIR export surfaces, and an explicitly conservative publication posture. The current repository-content verdict is `PUBLIC_GITHUB_READY`, while launch-ready, clinical-ready, and production-ready claims remain closed.
 
-This release should be read as an inspectable and contribution-ready engineering baseline, not as a production-ready clinical system, a complete frontend-plus-worker stack, or an autonomous diagnostic product.
+This release should be read as an inspectable and contribution-ready engineering baseline, not as a production-ready clinical system, a fully integrated PACS viewer stack, or an autonomous diagnostic product.
 
 ## Social Preview Text
 
@@ -113,11 +117,11 @@ MRI Second Opinion
 
 ### Subtitle
 
-Clinician-in-the-loop workflow baseline
+Clinician-in-the-loop MRI workflow
 
 ### Footer
 
-MRI-only | TypeScript API | Not launch-ready
+Human review | RUO | Not launch-ready
 
 Official GitHub social preview constraints confirmed from GitHub Docs:
 
@@ -131,15 +135,15 @@ Official GitHub social preview constraints confirmed from GitHub Docs:
 
 ### Investor or strategic one-liner
 
-MRI Standalone is a transparent, clinician-in-the-loop MRI workflow baseline that separates workflow control, evidence, and review gates from heavy imaging compute.
+MRI Second Opinion is a transparent clinician-in-the-loop MRI workflow system that separates workflow control, evidence, and review gates from heavy imaging compute.
 
 ### OSS community one-liner
 
-Open-source MRI-only second-opinion workflow baseline with a real TypeScript API, restart-safe local persistence, and explicit claim-discipline docs.
+Open-source MRI workflow with a real TypeScript API, built-in review workbench, Python worker, interoperable exports, and explicit claim-discipline docs.
 
 ### Research-facing one-liner
 
-RUO-first MRI workflow baseline that combines a runnable local API with explicit evidence boundaries between implemented runtime, target architecture, and research-informed design.
+RUO-first MRI workflow system that combines a runnable local API and worker loop with explicit evidence boundaries between implemented runtime, target architecture, and research-informed design.
 
 ## Do Not Use
 
@@ -148,6 +152,6 @@ Do not publish copy that says or implies:
 1. clinical readiness
 2. validated diagnostic performance
 3. autonomous interpretation
-4. shipped review UI
-5. deployed worker or queue stack
-6. hospital-ready operational maturity
+4. full PACS or DICOMweb integration
+5. hospital-ready operational maturity
+6. completed clinical validation or regulatory clearance

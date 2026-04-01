@@ -1,8 +1,8 @@
-# MRI Standalone Architecture Overview
+# MRI Second Opinion Architecture Overview
 
 ## Product Role
 
-MRI Standalone is a workflow orchestrator for clinician-in-the-loop MRI second-opinion processing.
+MRI Second Opinion is a workflow orchestrator for clinician-in-the-loop MRI second-opinion processing.
 
 It is not a PACS replacement, not a custom imaging viewer, and not an autonomous diagnostic product.
 

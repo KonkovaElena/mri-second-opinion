@@ -4,7 +4,7 @@ Date: 2026-03-27
 
 ## Purpose
 
-This document turns the repository's current threat snapshot into a maintained design-control surface for the standalone MRI second-opinion baseline.
+This document turns the repository's current threat snapshot into a maintained design-control surface for the MRI Second Opinion workflow system.
 
 It is meant to describe the current security and integrity posture.
 
@@ -19,9 +19,9 @@ That means:
 1. a Node.js and TypeScript workflow API
 2. local SQLite-backed default persistence plus a locally verified PostgreSQL path
 3. built-in workbench review surface
-4. internal callback and queue-claim routes used by the bounded workflow baseline
+4. internal callback, dispatch-auth, and queue-claim routes used by the bounded workflow system
 
-It does not yet describe a production deployment perimeter with external identity, signed callbacks, DICOM infrastructure, or Python inference workers.
+It does not yet describe a production deployment perimeter with external identity, hosted DICOM infrastructure, or a hosted or distributed Python inference fleet.
 
 ## Trust Boundaries
 
@@ -34,7 +34,7 @@ The most important current trust boundaries are:
 
 ## Protected Assets
 
-The current baseline should protect:
+The current workflow system should protect:
 
 1. case-state integrity
 2. clinician-review and finalization gating

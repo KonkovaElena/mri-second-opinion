@@ -21,8 +21,8 @@ Its purpose is to establish the evaluation discipline early so that a future reg
 The implemented product slice consists of:
 
 1. a brain volumetry workflow for structural MRI
-2. a 7-state case lifecycle from submission through clinician-reviewed delivery
-3. HMAC-authenticated inference callbacks with QC gating
+2. a 9-state case lifecycle overall, with 7 post-intake states from submission through clinician-reviewed delivery
+3. bearer-protected internal inference callbacks plus HMAC-authenticated dispatch rails with QC gating
 4. clinician-in-the-loop review with mandatory sign-off before finalization
 5. DICOM SR and FHIR R4 DiagnosticReport structured export seams
 6. SQLite and PostgreSQL persistence backends

@@ -4,7 +4,7 @@ Date: 2026-03-25
 
 ## Purpose
 
-This is the exact execution order for the first live publication of MRI Standalone on GitHub.
+This is the exact execution order for the first live publication of MRI Second Opinion on GitHub.
 
 It complements the go-live checklist by making the operator order explicit.
 
@@ -73,7 +73,7 @@ Stop and correct the repository before broader announcement if any of these are 
 2. the issue chooser is missing a required form
 3. the social preview or About text overstates maturity
 4. the Security policy is inaccurate in the live repository
-5. public docs no longer match the verified baseline
+5. public docs no longer match current verified repo truth
 
 ## Completion rule
 

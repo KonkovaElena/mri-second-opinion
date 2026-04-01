@@ -15,7 +15,7 @@ It satisfies Wave 5 exit gate 3: evidence ledger links runtime version, docs ver
 | Repository | mri-second-opinion |
 | Repository base head | `3d0df4f74010e6acc27164e2c0a581b145a11572` |
 | Latest hosted-validated head | `04cb0a57d1e64f8a5cf03a22b4a5c60d37dffc3a` |
-| Local validation scope | finalized-only export gating, release-doc reconciliation, audit remediation, and later validation plus persistence hardening (semantic payload-size limits, archive lookup graceful degradation, PostgreSQL payload round-trip preservation) on the working tree above the base head |
+| Local validation scope | finalized-only export gating, release-doc reconciliation, audit remediation, later validation plus persistence hardening (semantic payload-size limits, archive lookup graceful degradation, PostgreSQL payload round-trip preservation), and the `s3-compatible` artifact backend plus post-A2 documentation reconciliation on the working tree above the base head |
 | Node.js target | 22+ |
 | TypeScript target | ES2022 |
 | Test runner | `npm test` (`node --import tsx --test tests/**/*.test.ts`) |
@@ -24,8 +24,8 @@ It satisfies Wave 5 exit gate 3: evidence ledger links runtime version, docs ver
 
 | Metric | Value |
 |--------|-------|
-| Total tests | 145 |
-| Passing | 144 |
+| Total tests | 148 |
+| Passing | 147 |
 | Failing | 0 |
 | Skipped | 1 |
 | Duration | ~4.7 s |
@@ -46,6 +46,7 @@ It satisfies Wave 5 exit gate 3: evidence ledger links runtime version, docs ver
 | Audit remediation | order-safe fingerprint, security headers, archive timeout, metrics error handling | 115 |
 | Post-publication hardening | semantic payload-size validation, archive-lookup degradation, and PostgreSQL round-trip preservation | 136 |
 | Hyper-deep audit + academic doc audit | structured error logging, Dockerfile HEALTHCHECK, Helmet/CSP, CI docs-governance, persistence normalization, and runtime-hardening coverage | 145 |
+| A2 artifact backend + documentation reconciliation | `s3-compatible` artifact storage, object-store routing, config coverage, and authority-doc alignment | 148 |
 
 ## TypeScript Compilation
 
@@ -107,7 +108,7 @@ Status: clean (`npm run build` -> `tsc -p tsconfig.json`)
 
 | Validation dimension | Artifact | Status |
 |---------------------|----------|--------|
-| Functional correctness | 145 tests, 144 pass, 0 fail, 1 skipped | Complete |
+| Functional correctness | 148 tests, 147 pass, 0 fail, 1 skipped | Complete |
 | Type safety | `npm run build` clean | Complete |
 | Interoperability | DICOM SR + FHIR R4 exports validated | Complete |
 | Regulatory readiness | 5-document governance pack | Complete |
@@ -125,6 +126,7 @@ Status: clean (`npm run build` -> `tsc -p tsconfig.json`)
 4. Hosted GitHub Actions evidence is not yet refreshed for the current local validation snapshot that includes the later validation and persistence hardening; the latest paired hosted-validated head remains `04cb0a57d1e64f8a5cf03a22b4a5c60d37dffc3a` in `docs/verification/launch-evidence-index.md`
 5. No automated SBOM generation in release workflow
 6. Skip count is 1 (one test intentionally skipped)
+7. Object-store hardening is still incomplete at production-grade level: retention, multipart upload, and MinIO verification remain follow-on work
 
 ## Interpretation
 

@@ -1,4 +1,4 @@
-# Contributing To MRI Standalone
+# Contributing To MRI Second Opinion
 
 ## Contribution Scope
 

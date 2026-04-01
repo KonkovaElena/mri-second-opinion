@@ -1,10 +1,10 @@
 # First Public Announcement Draft
 
-Date: 2026-03-25
+Date: 2026-04-01
 
 ## Purpose
 
-This draft is the starting point for the first public announcement of MRI Standalone.
+This draft is the starting point for the first public announcement of MRI Second Opinion.
 
 It is intentionally conservative.
 
@@ -12,29 +12,31 @@ Use it only after the repository is publicly reachable and the hosted workflows 
 
 ## Suggested short announcement
 
-MRI Standalone is now publicly available on GitHub.
+MRI Second Opinion is now publicly available on GitHub.
 
-This repository is an open-source, clinician-in-the-loop MRI second-opinion workflow baseline with a standalone TypeScript API and restart-safe local persistence.
+This repository is an open-source, clinician-in-the-loop MRI workflow system: intake, QC, AI-assisted draft generation, mandatory clinician review, finalization, delivery, and interoperable reporting.
 
-It is intended as a focused MRI-only workflow foundation, not as a launch-ready clinical system, a complete frontend product, or an autonomous diagnostic platform.
+Current public baseline includes a standalone TypeScript API, a built-in review workbench, a Python worker, local durable workflow rails, and explicit evidence and claim-boundary docs.
 
-It should not be used for clinical decision-making or patient-care deployment.
+It is still research-use-only, not clinically validated, not launch-ready for patient care, and not an autonomous diagnostic platform.
 
 Current public baseline includes:
 
 1. standalone install, build, and local test path
-2. workflow API for case intake, review, finalize, report retrieval, and delivery retry
-3. restart-safe local snapshot, SQLite, and PostgreSQL bootstrap persistence evidence
-4. internal inference and delivery queue rails for local durable execution
-5. explicit readiness and evidence docs
+2. workflow API for case intake, review, finalization, report retrieval, artifact access, operations summary, and delivery retry
+3. built-in review workbench for queue and report handling
+4. Python worker with inference and delivery stages plus HMAC-protected dispatch, heartbeat, callback, and failure paths
+5. local durable workflow state via SQLite plus PostgreSQL bootstrap and persistence seams
+6. interoperable report exports for DICOM SR and FHIR R4 DiagnosticReport
+7. explicit readiness, evidence, and claim-boundary docs
 
 What is not included yet:
 
-1. broader production-grade PostgreSQL-backed workflow durability
-2. external or distributed worker execution path
-3. object-store artifact durability
-4. OHIF-backed or production-grade imaging review UI
-5. launch-ready evidence
+1. full Orthanc, DICOMweb, or PACS integration
+2. full OHIF-backed viewer truth beyond the built-in review workbench
+3. hosted or distributed worker deployment proof
+4. binary DICOM Part-10 export closure
+5. clinical validation and launch-ready operational evidence
 
 If you want to evaluate or contribute, start with:
 
@@ -45,11 +47,11 @@ If you want to evaluate or contribute, start with:
 
 ## Suggested longer announcement
 
-MRI Standalone is now public as a focused MRI-only open-source repository.
+MRI Second Opinion is now public as a focused open-source MRI workflow repository.
 
-The project is being published conservatively: it exposes a verified workflow API baseline, local durable persistence evidence, and documented internal queue rails, while keeping launch-ready, clinical-ready, and production-ready claims closed. The current repository-content verdict is `PUBLIC_GITHUB_READY`.
+The project is being published conservatively: it exposes a verified workflow API, a built-in review workbench, a Python worker, local durable workflow rails, interoperable reporting surfaces, and governed evidence docs, while keeping launch-ready, clinical-ready, and production-ready claims closed. The current repository-content verdict is `PUBLIC_GITHUB_READY`.
 
-The intent of this public release is to make the current baseline inspectable, testable, and discussable without overstating maturity. The repository should be read as a clinician-in-the-loop workflow foundation, not as a production-ready clinical deployment.
+The intent of this public release is to make the current baseline inspectable, testable, and discussable without overstating maturity. The repository should be read as a clinician-in-the-loop workflow system around AI, not as a production-ready clinical deployment or an autonomous MRI-reading product.
 
 Research-informed architectural direction should not be confused with implemented runtime completeness.
 
@@ -67,9 +69,9 @@ Use the longer announcement and include the "what is not included yet" list.
 
 ### For social posts
 
-Do not claim launch readiness, production deployment, or diagnostic capability.
+Do not claim launch readiness, clinical validation, or autonomous diagnostic capability.
 
-Do not imply that a clinician review UI, worker plane, or database-backed production stack already exists.
+Do not imply that full PACS or DICOMweb integration, a production imaging viewer stack, or hospital-ready operations already exist.
 
 ## Do not publish this draft unchanged if any of these are false
 

@@ -12,7 +12,7 @@ tags: [scope, inventory, reference, mri]
 
 This file is the concrete inventory for the current standalone repository surface.
 
-Use it when checking whether a route, document, test, or demo asset is inside the active MRI standalone boundary.
+Use it when checking whether a route, document, test, or demo asset is inside the active MRI Second Opinion boundary.
 
 ## Active Runtime Surfaces
 

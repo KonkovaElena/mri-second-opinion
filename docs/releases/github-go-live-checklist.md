@@ -4,7 +4,7 @@ Date: 2026-03-29
 
 ## Purpose
 
-This checklist is the operator rail for making MRI Standalone public on GitHub without introducing misleading metadata, missing repo settings, or unverifiable readiness claims.
+This checklist is the operator rail for making MRI Second Opinion public on GitHub without introducing misleading metadata, missing repo settings, or unverifiable readiness claims.
 
 Use it in two passes:
 
@@ -67,7 +67,7 @@ Wave 1.5 hosted evidence closure is now satisfied on `04cb0a57d1e64f8a5cf03a22b4
 
 ## Phase 4. Publication safety review
 
-- [x] no GitHub About text implies production readiness (description: "Clinician-in-the-loop MRI second-opinion workflow baseline")
+- [x] no GitHub About text implies production readiness (description: "Clinician-in-the-loop MRI second-opinion workflow: intake, QC, AI-assisted draft, mandatory review, finalization, delivery, and interoperable exports.")
 - [x] no topic suggests unimplemented worker, frontend, or deployment completeness (topics currently empty; recommended list in metadata-copy.md is scope-safe)
 - [x] no screenshot or social-preview asset looks like a fake shipping UI (none uploaded)
 - [x] no public doc uses autonomous-diagnosis language (verified in documentation-honesty-review)

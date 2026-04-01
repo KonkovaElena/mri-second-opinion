@@ -1,8 +1,8 @@
-# MRI Standalone Demo Script
+# MRI Second Opinion Demo Script
 
 Status: active
 
-This script defines the minimum truthful demo for MRI Standalone v1.
+This script defines the minimum truthful demo for MRI Second Opinion v1.
 
 Do not present steps that are not yet implemented in the standalone repository.
 

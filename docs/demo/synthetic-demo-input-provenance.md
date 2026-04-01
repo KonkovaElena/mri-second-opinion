@@ -1,16 +1,16 @@
 ---
-title: "MRI Standalone Synthetic Demo Input Provenance"
+title: "MRI Second Opinion Synthetic Demo Input Provenance"
 status: "active"
 version: "1.0.0"
 last_updated: "2026-03-26"
 tags: [mri, demo, evidence, synthetic]
 ---
 
-# MRI Standalone Synthetic Demo Input Provenance
+# MRI Second Opinion Synthetic Demo Input Provenance
 
 ## Purpose
 
-Define the current synthetic-safe input packet that may be used for a bounded local demo of the MRI standalone workflow.
+Define the current synthetic-safe input packet that may be used for a bounded local demo of the MRI Second Opinion workflow.
 
 ## Governing Rule
 

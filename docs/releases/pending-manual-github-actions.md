@@ -7,11 +7,12 @@ Status: **open** — these items require GitHub UI access and cannot be automate
 
 **Where**: GitHub > Settings (or repo main page, click gear icon next to About)
 
-Add these 10 topics (from `docs/releases/github-metadata-copy.md`):
+Add these 12 topics (from `docs/releases/github-metadata-copy.md`):
 
 ```
 mri, medical-imaging, radiology, second-opinion, clinical-review,
-typescript, nodejs, express, workflow-orchestration, research-use-only
+dicom, fhir, typescript, nodejs, python,
+workflow-orchestration, research-use-only
 ```
 
 **Do not add** topics implying shipped frontend, production deployment, or autonomous AI.
@@ -28,8 +29,8 @@ Enable the toggle. `SECURITY.md` already references this as the primary reportin
 
 Requirements (from `docs/demo/social-preview-brief.md`):
 - Title: "MRI Second Opinion"
-- Subtitle: "Clinician-in-the-loop workflow baseline"
-- Footer: "MRI-only | TypeScript API | Not launch-ready"
+- Subtitle: "Clinician-in-the-loop MRI workflow"
+- Footer: "Human review | RUO | Not launch-ready"
 - PNG, JPG, or GIF; under 1 MB; at least 640×320, with 1280×640 preferred
 - No fake dashboard, no diagnostic wording, no patient imagery
 

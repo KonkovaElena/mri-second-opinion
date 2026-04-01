@@ -2,7 +2,7 @@
 
 ## Purpose
 
-This document turns the standalone MRI second-opinion target stack into a phased engineering plan with explicit validation expectations.
+This document turns the MRI Second Opinion target stack into a phased engineering plan with explicit validation expectations.
 
 It describes the intended path.
 
@@ -10,7 +10,7 @@ It does not claim that the current repository already satisfies later phases.
 
 ## Delivery Principle
 
-The project should grow from a narrow, verifiable MRI workflow baseline rather than from an over-broad imaging platform promise.
+The project should grow from a narrow, verifiable MRI workflow system rather than from an over-broad imaging platform promise.
 
 Each phase should add one clinically meaningful capability family and the validation surface needed to keep claims honest.
 
@@ -34,9 +34,15 @@ The March 2026 planning baseline assumes a roughly two-year maturation path from
 
 That timeline should be treated as a sequencing aid, not a launch promise.
 
-## Final Wave Closure: All Waves Complete
+## Repository-Local Wave Closure: Conservative Baseline Complete
 
 The repository has locally closed all five wave gates:
+
+This section records conservative repository-local closure only.
+
+It means the current built-in workbench baseline, typed export seams, and governance/evidence pack are locally closed enough for honest repository documentation and release evidence.
+
+It does not mean the full 100/100 target in `docs/academic/action-plan.md` is complete, and it does not claim OHIF deployment, Orthanc-managed runtime, binary DICOM Part-10 export, real ML pipeline closure, hosted distributed worker proof, or an executed reader study.
 
 - Wave 1 + 1.5: API and durability baseline, hosted-validated on `04cb0a57d1e64f8a5cf03a22b4a5c60d37dffc3a`
 - Wave 2A + 2B: QC, artifacts, governance pack, bounded compute seam
@@ -66,6 +72,16 @@ The repository has locally closed all five wave gates:
 2. 5 regulatory governance documents with honest-claim discipline (Wave 4)
 3. 4 clinical evidence documents with explicit execution-pending gaps (Wave 5)
 4. `docs/verification/release-validation-packet.md` — completeness matrix and known gaps
+
+### Remaining follow-on gaps after local wave closure
+
+The next real gaps are no longer missing baseline surfaces. They are deeper hardening or production-grade follow-up:
+
+1. artifact-store hardening: retention, multipart upload, and MinIO/object-store verification
+2. real ML compute closure: FastSurfer/nnU-Net and richer DICOM QC path
+3. production-grade viewer/archive runtime: OHIF plus Orthanc/DICOMweb deployment proof
+4. stronger export packaging: binary DICOM Part-10 and fuller FHIR bundle surface
+5. hosted evidence capture and executed clinical-validation program
 
 ### Post-Publication Sequencing
 

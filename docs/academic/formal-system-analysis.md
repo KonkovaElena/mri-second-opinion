@@ -6,11 +6,11 @@ last_updated: "2026-03-27"
 tags: [academic, formal-analysis, workflow, mri]
 ---
 
-# MRI Standalone Formal System Analysis
+# MRI Second Opinion Formal System Analysis
 
 ## Purpose
 
-This document gives a repository-backed formal reading of the current standalone MRI workflow baseline.
+This document gives a repository-backed formal reading of the current MRI Second Opinion workflow system.
 
 It treats the repository as a workflow system with explicit states, guarded transitions, companion delivery-job state, and checkable safety, liveness, and auditability properties.
 
@@ -37,7 +37,7 @@ The following remain target seams or open gaps, not implemented standalone truth
 2. inference-worker lease, heartbeat, and expiry-driven requeue scheduler
 3. production PostgreSQL durability
 4. distributed or externally brokered workers
-5. Python compute-plane closure
+5. production-grade Python compute-plane closure
 6. OHIF-backed review workspace
 7. artifact checksum verification and full compute reproducibility envelope
 
@@ -228,7 +228,7 @@ $$
 \texttt{SUBMITTED} \xrightarrow{\texttt{inference-callback}} \{\texttt{AWAITING\_REVIEW},\ \texttt{QC\_REJECTED}\}
 $$
 
-The standalone repo does not currently implement a separate inference claim, lease, or heartbeat protocol.
+The current standalone repo already implements bounded dispatch claim and heartbeat rails, but it does not yet prove a hosted or distributed lease-recovery control plane.
 
 ### 5.3. Review And Finalize
 
@@ -364,7 +364,7 @@ The strongest open seams are:
 
 ## 10. Current Formal Verdict
 
-The standalone repository now supports a defensible formal reading as a transparent clinical workflow baseline.
+The standalone repository now supports a defensible formal reading as a transparent clinical workflow system.
 
 That reading is strong enough to justify precise discussion of:
 

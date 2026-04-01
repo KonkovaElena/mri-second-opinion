@@ -4,7 +4,7 @@ Date: 2026-03-25
 
 ## Purpose
 
-This file is the single-file operator packet for publishing MRI Standalone on GitHub.
+This file is the single-file operator packet for publishing MRI Second Opinion on GitHub.
 
 It consolidates:
 
@@ -21,7 +21,7 @@ Publish the repository as:
 
 1. MRI-only
 2. clinician-in-the-loop
-3. workflow baseline
+3. workflow system
 4. suitable for conservative public publication and external review
 5. not launch-ready
 
@@ -37,7 +37,7 @@ Do not publish it as:
 
 ### About description
 
-Clinician-in-the-loop MRI second-opinion workflow baseline with a standalone TypeScript API and restart-safe local persistence.
+Clinician-in-the-loop MRI second-opinion workflow: intake, QC, AI-assisted draft, mandatory review, finalization, delivery, and interoperable exports.
 
 ### Optional caution line for profiles, releases, or discussions
 
@@ -50,11 +50,13 @@ For research-oriented and external review use only. Not validated for clinical d
 3. `radiology`
 4. `second-opinion`
 5. `clinical-review`
-6. `typescript`
-7. `nodejs`
-8. `express`
-9. `workflow-orchestration`
-10. `research-use-only`
+6. `dicom`
+7. `fhir`
+8. `typescript`
+9. `nodejs`
+10. `python`
+11. `workflow-orchestration`
+12. `research-use-only`
 
 ### Homepage field
 
@@ -63,8 +65,8 @@ Leave blank until a real public URL exists.
 ### Social preview text
 
 1. title: `MRI Second Opinion`
-2. subtitle: `Clinician-in-the-loop workflow baseline`
-3. footer: `MRI-only | TypeScript API | Not launch-ready`
+2. subtitle: `Clinician-in-the-loop MRI workflow`
+3. footer: `Human review | RUO | Not launch-ready`
 
 ## Publication-day sequence
 

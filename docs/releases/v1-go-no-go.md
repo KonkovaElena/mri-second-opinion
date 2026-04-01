@@ -1,4 +1,4 @@
-# MRI Standalone v1 Go/No-Go
+# MRI Second Opinion v1 Go/No-Go
 
 Date: 2026-03-29
 

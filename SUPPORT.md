@@ -2,7 +2,7 @@
 
 ## What this repository supports today
 
-This repository supports public discussion and contribution around the MRI-only second-opinion workflow baseline that is currently implemented.
+This repository supports public discussion and contribution around the MRI-only second-opinion workflow system that is currently implemented.
 
 Use support channels conservatively:
 

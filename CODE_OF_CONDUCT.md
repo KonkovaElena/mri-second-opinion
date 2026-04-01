@@ -1,4 +1,4 @@
-# MRI Standalone Community Conduct
+# MRI Second Opinion Community Conduct
 
 ## Purpose
 
@@ -34,4 +34,4 @@ Maintainers may remove comments, close discussions, or restrict participation wh
 
 ## Scope
 
-This document applies to repository issues, pull requests, code review, and discussion spaces directly associated with MRI Standalone.
+This document applies to repository issues, pull requests, code review, and discussion spaces directly associated with MRI Second Opinion.

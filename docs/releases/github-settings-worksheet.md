@@ -6,13 +6,13 @@ Date: 2026-03-27
 
 This worksheet is the copy-paste-ready source for configuring the public GitHub repository.
 
-Use it when filling out repository settings after the standalone MRI repository is created.
+Use it when filling out repository settings after the MRI Second Opinion repository is created.
 
 ## About panel
 
 ### Description
 
-Clinician-in-the-loop MRI second-opinion workflow baseline with a standalone TypeScript API and restart-safe local persistence.
+Clinician-in-the-loop MRI second-opinion workflow: intake, QC, AI-assisted draft, mandatory review, finalization, delivery, and interoperable exports.
 
 ### Website
 
@@ -29,11 +29,13 @@ Leave blank until one of these exists:
 3. `radiology`
 4. `second-opinion`
 5. `clinical-review`
-6. `typescript`
-7. `nodejs`
-8. `express`
-9. `workflow-orchestration`
-10. `research-use-only`
+6. `dicom`
+7. `fhir`
+8. `typescript`
+9. `nodejs`
+10. `python`
+11. `workflow-orchestration`
+12. `research-use-only`
 
 ## Repository features
 
@@ -104,8 +106,8 @@ Prepared file in the repository:
 Preferred text embedded in the image:
 
 1. title: `MRI Second Opinion`
-2. subtitle: `Clinician-in-the-loop workflow baseline`
-3. footer: `MRI-only | TypeScript API | Not launch-ready`
+2. subtitle: `Clinician-in-the-loop MRI workflow`
+3. footer: `Human review | RUO | Not launch-ready`
 
 ## Keep blank unless real
 

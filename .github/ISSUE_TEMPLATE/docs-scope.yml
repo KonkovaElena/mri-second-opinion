@@ -1,5 +1,5 @@
 name: Docs or scope issue
-description: Report documentation drift, misleading wording, or scope confusion in MRI Standalone
+description: Report documentation drift, misleading wording, or scope confusion in MRI Second Opinion
 title: "[Docs]: "
 labels:
   - documentation
@@ -7,7 +7,7 @@ body:
   - type: markdown
     attributes:
       value: |
-        Use this form when the repository docs, README, or release language no longer match the implemented MRI standalone baseline.
+        Use this form when the repository docs, README, or release language no longer match the implemented MRI second-opinion workflow system.
   - type: textarea
     id: problem
     attributes:

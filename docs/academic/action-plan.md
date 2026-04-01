@@ -58,6 +58,21 @@ evidence_sources: |
 | 17 | Data governance | 2/10 | 10/10 | Full policy |
 | **ИТОГО** | | **~85/100** | **100/100** | |
 
+## Важное разграничение: local closure vs. 100/100
+
+`docs/roadmap-and-validation.md` фиксирует conservative repository-local closure для текущего built-in workbench baseline, export seams и governance/evidence pack.
+
+Это не означает, что данный план исчерпан или что продукт уже достиг production-grade viewer, binary DICOM Part-10, real ML pipeline, hosted deployment proof или выполненного clinical validation.
+
+Уже локально закрыто и не является текущим blocker для этого плана:
+
+1. scope inventory + public vocabulary authority docs
+2. built-in review workbench + viewer-path handoff внутри текущего UI
+3. current DICOM SR JSON seam + FHIR R4 DiagnosticReport seam
+4. demo verification pack и closure audits для текущего standalone baseline
+
+Текущие blockers до 100/100 остаются ниже по плану: artifact-store hardening follow-up, real ML pipeline, production-grade viewer/archive layer, binary export closure, lifecycle/regulatory pack expansion и выполненная clinical validation program.
+
 ---
 
 ## Фаза A: Technical Completion (4-6 недель)
@@ -174,6 +189,8 @@ RUN pip install fastsurfer nnunetv2 dcm2niix nibabel
 
 **Что:** Профессиональный DICOM viewer для врача-рецензента.
 
+**Уточнение границы:** repository уже содержит built-in review workbench и archive-linked viewer-path handoff. Этот пункт описывает следующий production-grade OHIF/Orthanc layer, а не уже закрытый локальный workbench surface.
+
 **Компоненты:**
 
 ```yaml
@@ -241,6 +258,8 @@ export default {
 ### A5. Binary DICOM SR + FHIR Bundle (1 неделя, 2/10 gap)
 
 **Что:** Расширить JSON-only exports до production-grade форматов.
+
+**Уточнение границы:** текущий runtime уже отдаёт finalized-only JSON DICOM SR envelope и FHIR R4 DiagnosticReport. Здесь планируется следующий шаг: Part-10 binary packaging и richer enterprise-facing export bundle.
 
 **DICOM SR (binary Part-10):**
 - Библиотека: `dcmjs` (MIT, v0.34+)

@@ -4,7 +4,7 @@ Date: 2026-03-24
 
 ## Purpose
 
-This document defines how MRI Standalone should translate academic evidence, engineering work, and runtime verification into public-facing claims.
+This document defines how MRI Second Opinion should translate academic evidence, engineering work, and runtime verification into public-facing claims.
 
 Its purpose is to prevent three failure modes:
 
@@ -125,7 +125,7 @@ If those surfaces diverge, public wording must follow the narrower effective rig
 
 ## Product-Specific Guardrails
 
-For MRI Standalone, the following are mandatory:
+For MRI Second Opinion, the following are mandatory:
 
 1. clinician-in-the-loop language remains explicit
 2. MRI-only scope remains explicit in v1 docs
@@ -144,10 +144,10 @@ Before adding a new public statement, ask:
 
 ## Current Repository Position
 
-As of this document version, MRI Standalone is best described as:
+As of this document version, MRI Second Opinion is best described as:
 
-1. an academically grounded MRI-only workflow concept
-2. a public-facing standalone repository skeleton
-3. not yet an independently runnable product
-4. not yet internal-demo-ready
-5. not yet public-launch-ready
+1. an academically grounded MRI-only workflow system
+2. a public-facing standalone repository with runnable local workflow surfaces
+3. internal-demo-capable on the bounded synthetic path
+4. `PUBLIC_GITHUB_READY` for conservative repository publication
+5. not launch-ready, clinical-ready, or production-ready

@@ -4,7 +4,7 @@ Date: 2026-03-27
 
 ## Purpose
 
-This document is the operational playbook for publishing MRI Standalone on GitHub without overstating maturity.
+This document is the operational playbook for publishing MRI Second Opinion on GitHub without overstating maturity.
 
 Use it when configuring the repository home page, About metadata, issue intake, and first public release posture.
 
@@ -14,7 +14,7 @@ The repository should be published as:
 
 1. MRI-only
 2. clinician-in-the-loop
-3. workflow baseline
+3. workflow system
 4. open-source and contribution-ready
 5. not launch-ready
 
@@ -31,7 +31,7 @@ Use this short card anywhere a compact project summary is needed.
 
 ### One-line summary
 
-Clinician-in-the-loop MRI second-opinion workflow baseline with a standalone TypeScript API and restart-safe local persistence.
+Clinician-in-the-loop MRI second-opinion workflow: intake, QC, AI-assisted draft, mandatory review, finalization, delivery, and interoperable exports.
 
 ### Current verified baseline
 
@@ -39,9 +39,9 @@ Clinician-in-the-loop MRI second-opinion workflow baseline with a standalone Typ
 2. public workflow API for case intake, list, detail, review, finalize, report retrieval, and delivery retry
 3. built-in review workbench over the live API
 4. internal ingest, inference queue, delivery queue, inference callback, and delivery callback endpoints
-5. restart-safe local SQLite-backed persistence
+5. local durable workflow rails with SQLite as the default runtime path plus verified PostgreSQL bootstrap coverage
 6. hosted CI and docs-governance proof recorded in the evidence ledger
-6. conservative release verdict discipline
+7. conservative release verdict discipline
 
 ### Not included yet
 
@@ -54,7 +54,7 @@ Clinician-in-the-loop MRI second-opinion workflow baseline with a standalone Typ
 
 ### Intended audience
 
-1. contributors evaluating a focused MRI workflow baseline
+1. contributors evaluating a focused MRI workflow system
 2. engineers preparing the next runtime seams
 3. reviewers checking claim discipline and readiness evidence
 
@@ -64,7 +64,7 @@ Configure the repository About panel with the same honesty level as the README.
 
 ### Recommended description
 
-Clinician-in-the-loop MRI second-opinion workflow baseline with a standalone TypeScript API and restart-safe local persistence.
+Clinician-in-the-loop MRI second-opinion workflow: intake, QC, AI-assisted draft, mandatory review, finalization, delivery, and interoperable exports.
 
 ### Homepage field
 
@@ -87,11 +87,13 @@ Recommended initial set:
 3. `radiology`
 4. `second-opinion`
 5. `clinical-review`
-6. `typescript`
-7. `nodejs`
-8. `express`
-9. `workflow-orchestration`
-10. `research-use-only`
+6. `dicom`
+7. `fhir`
+8. `typescript`
+9. `nodejs`
+10. `python`
+11. `workflow-orchestration`
+12. `research-use-only`
 
 Do not add topics for capabilities that are not present yet, such as a real frontend, Orthanc integration, production queueing, or deployment-grade inference.
 
@@ -102,8 +104,8 @@ GitHub recommends a PNG, JPG, or GIF under 1 MB and at least 640x320 pixels, wit
 Recommended social-preview brief:
 
 1. title: `MRI Second Opinion`
-2. subtitle: `Clinician-in-the-loop workflow baseline`
-3. footer ribbon: `MRI-only | TypeScript API | Not launch-ready`
+2. subtitle: `Clinician-in-the-loop MRI workflow`
+3. footer ribbon: `Human review | RUO | Not launch-ready`
 
 Visual direction:
 

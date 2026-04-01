@@ -2,7 +2,7 @@
 
 ## Scope
 
-MRI Standalone is an early-stage open-source workflow project.
+MRI Second Opinion is an early-stage open-source clinician-in-the-loop MRI workflow project.
 
 At the current stage, the repository should be treated as pre-production software and not as a clinically validated deployment artifact.
 

@@ -26,7 +26,7 @@ Repository-level verdicts remain governed by `v1-go-no-go.md` and the full launc
 The current repository is best understood as:
 
 1. publicly hosted on GitHub with a conservative publication posture
-2. local workflow baseline and closure evidence exist for the standalone API path
+2. local workflow-system proof and closure evidence exist for the standalone API path
 3. Track A repository-content work is complete, with remaining GitHub-UI follow-up tracked separately
 4. Wave 1.5 hosted evidence closure is complete on `04cb0a57d1e64f8a5cf03a22b4a5c60d37dffc3a`; that head carries both hosted workflows for the worker-execution-contract alignment and release-doc reconciliation, while `f6021ecdb45f4ecf5aece2c52cc0e6f462361d49` remains the earlier Wave 2A artifact-persistence milestone
 5. workflow MVP is not yet closed
@@ -112,20 +112,22 @@ Do the tracks in this order.
 After repository publication is safe, use this order for follow-up work.
 
 1. close the remaining GitHub UI and operator follow-up captured in `pending-manual-github-actions.md`
-2. resume Wave 3A archive/viewer work while keeping the hosted-evidence ledger current for later runtime-bearing heads
-3. resume Track B with `WP-3` treated as locally closed bounded compute evidence and `WP-4` as the next code-bearing step
-4. reopen deeper phase-1 expansion only after the bounded MVP slice and its evidence ledger are current
+2. keep the hosted-evidence ledger current while docs, GitHub metadata, and public positioning continue to evolve
+3. resume code-bearing follow-up from the post-baseline hardening list in `../academic/action-plan.md`, starting with object-store hardening, richer compute proof, or production-grade viewer/archive runtime closure
+4. reopen deeper phase-1 expansion only after the new runtime-bearing slice and its evidence ledger are current
 
 ## Remaining-Wave Rule
 
 Wave 1.5 is now closed, so the project should not branch into multiple major implementation waves at once.
 
-Use `../academic/action-plan.md` as the authority for the remaining order. The current `main` history already includes the Wave 2A local closure from `f6021ecdb45f4ecf5aece2c52cc0e6f462361d49`, the later hosted-validated reconciliation head `04cb0a57d1e64f8a5cf03a22b4a5c60d37dffc3a`, and the bounded Wave 2B compute closure recorded in `../verification/wave-2b-bounded-compute-audit-2026-03-29.md`, so the next runtime wave after Wave 2B is:
+Use `../academic/action-plan.md` as the authority for the remaining order. The repository-local baseline already includes bounded archive/viewer, artifact/report, export, and clinical-evidence documentation closure, so the next work should be treated as follow-on hardening rather than as missing first-pass waves.
 
-1. archive and viewer truth
-2. artifact and report closure
-3. exports and regulatory hardening
-4. clinical evidence
+The current priority order is:
+
+1. object-store hardening and verification
+2. richer compute and DICOM QC proof
+3. production-grade viewer or archive runtime closure
+4. stronger hosted evidence and executed clinical validation
 
 This prevents a false impression that public publication safety is the same thing as product maturity.
 

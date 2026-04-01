@@ -1,6 +1,6 @@
-# MRI Standalone Launch Evidence Index
+# MRI Second Opinion Launch Evidence Index
 
-This file is the evidence ledger for MRI Standalone release readiness.
+This file is the evidence ledger for MRI Second Opinion release readiness.
 
 Every claim about launch readiness should link back to one or more artifacts listed here.
 
@@ -9,14 +9,14 @@ Every claim about launch readiness should link back to one or more artifacts lis
 - Current verdict: `PUBLIC_GITHUB_READY`
 - Last reviewed: 2026-03-30
 - Latest hosted-validated head: `04cb0a57d1e64f8a5cf03a22b4a5c60d37dffc3a`
-- Current local validation snapshot above that hosted head: `npm run build` is clean and `npm test` reports 145 total tests, 144 pass, 0 fail, and 1 skipped after semantic payload-size validation, archive-lookup graceful degradation, PostgreSQL payload round-trip hardening, and hyper-deep audit plus academic doc audit landed
+- Current local validation snapshot above that hosted head: `npm run build` is clean and `npm test` reports 148 total tests, 147 pass, 0 fail, and 1 skipped after semantic payload-size validation, archive-lookup graceful degradation, PostgreSQL payload round-trip hardening, hyper-deep audit plus academic doc audit, and the `s3-compatible` artifact backend plus post-A2 documentation reconciliation landed
 - Previous hosted-validated head: `1e340b978bfa35a2ed339adcdb0d2add56cc08c3`
 - Wave 1.5 evidence status: closed on `04cb0a57d1e64f8a5cf03a22b4a5c60d37dffc3a`; GitHub-hosted `ci` and `docs-governance` both succeeded on the same runtime-and-doc reconciliation head after the worker execution-contract alignment landed. Later docs-only evidence refreshes do not reopen Wave 1.5 unless they change platform-sensitive runtime paths or GitHub workflow surfaces.
 - Wave 2B evidence status: locally closed on the bounded compute seam recorded in `docs/verification/wave-2b-bounded-compute-audit-2026-03-29.md`; the remaining compute gaps are DICOM-derived or package-grade execution and distributed worker infrastructure, not the absence of a real worker boundary.
 - Wave 3A evidence status: locally closed on the bounded archive lookup and clinician-facing viewer path recorded in `docs/verification/archive-viewer-seam-audit-2026-03-27.md` v2.0.0 and `docs/verification/workbench-frontend-audit-2026-03-27.md` v2.0.0; 95 tests pass, 0 fail.
 - Wave 3B evidence status: locally closed; 4 new artifact/report closure tests confirm report-preview retrieval, provenance chain integrity, archive truth preservation through review/finalize/report surfaces, and lossless report artifact delivery; 99 tests pass, 0 fail. No new production code changes needed — existing Waves 2A/3A implementation already satisfies all 3 exit gates.
 - Wave 4 evidence status: locally closed; DICOM SR and FHIR R4 DiagnosticReport export seams implemented and tested end-to-end; regulatory governance pack (PCCP, IEC 62304, ISO 14971, data governance, vulnerability SOP) created with honest-claim discipline, and the current cumulative local validation snapshot is recorded in `docs/verification/release-validation-packet.md`.
-- Wave 5 evidence status: locally closed; clinical evidence program complete — reader-study protocol, subgroup analysis plan, PMS activation criteria, and release-linked validation packet created. The current local validation packet now records 145 total tests, 144 pass, 0 fail, and 1 skipped without changing the conservative publication verdict.
+- Wave 5 evidence status: locally closed; clinical evidence program complete — reader-study protocol, subgroup analysis plan, PMS activation criteria, and release-linked validation packet created. The current local validation packet now records 148 total tests, 147 pass, 0 fail, and 1 skipped without changing the conservative publication verdict.
 - Public repository: `https://github.com/KonkovaElena/mri-second-opinion`
 - Auditor handoff: `docs/verification/ai-auditor-handoff-2026-03-25.md` (historical snapshot dated 2026-03-25; current verdict advanced later)
 - Repository-status retrospective: `docs/verification/publication-retrospective-audit-2026-03-27.md`

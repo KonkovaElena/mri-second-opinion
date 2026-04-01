@@ -1,12 +1,12 @@
 ---
-title: "MRI Standalone Demo Transcript"
+title: "MRI Second Opinion Demo Transcript"
 status: "active"
 version: "1.0.0"
 last_updated: "2026-03-27"
 tags: [mri, demo, transcript, evidence]
 ---
 
-# MRI Standalone Demo Transcript
+# MRI Second Opinion Demo Transcript
 
 ## Purpose
 

@@ -4,7 +4,7 @@ Date: 2026-03-24
 
 ## Purpose
 
-This document explains why the MRI Standalone target stack is anchored in a specific open-source ecosystem rather than in custom infrastructure or proprietary-first assumptions.
+This document explains why the MRI Second Opinion target stack is anchored in a specific open-source ecosystem rather than in custom infrastructure or proprietary-first assumptions.
 
 It is a rationale document, not a runtime proof document.
 
