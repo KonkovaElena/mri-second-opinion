@@ -14,9 +14,10 @@
 10. `GET /api/operations/summary`
 11. `POST /api/delivery/:caseId/retry`
 12. `GET /workbench`
-13. `GET /healthz`
-14. `GET /readyz`
-15. `GET /metrics`
+13. `GET /`
+14. `GET /healthz`
+15. `GET /readyz`
+16. `GET /metrics`
 
 ## Internal Integration Endpoints
 
@@ -41,13 +42,14 @@ Route descriptions and public nouns should follow `docs/public-vocabulary.md`.
 3. public API is workflow-oriented, not PACS-oriented
 4. draft content is exposed through `GET /api/cases/:caseId` after internal ingest and inference complete; wave 1 does not expose a separate public draft-generation endpoint, and structured export endpoints remain finalized-only
 5. delivery state is exposed through case detail and operations summary; wave 1 does not expose a separate public delivery-detail endpoint
-6. current durability proof includes restart-safe local SQLite-backed case storage, a local persisted delivery-job queue, a local persisted inference-job queue with stale-claim recovery, and bounded local file-backed artifact persistence; broader production-grade PostgreSQL durability remains future work
+6. current durability proof includes restart-safe local SQLite-backed case storage, a local persisted delivery-job queue, a local persisted inference-job queue with stale-claim recovery, and bounded artifact persistence through `local-file` and `s3-compatible` providers; broader production-grade PostgreSQL durability remains future work
 7. report payloads may include archive-linked artifact descriptors; `viewerReady` is only true when the payload contains trustworthy archive-binding metadata for an external viewer handoff, and wave 1 still does not claim a built-in viewer engine or PACS archive implementation
-8. public artifact retrieval is available through `GET /api/cases/:caseId/artifacts/:artifactId` and retrieval URLs emitted on case-detail and report surfaces, but this remains local file-backed truth rather than object-store-backed durability
+8. public artifact retrieval is available through `GET /api/cases/:caseId/artifacts/:artifactId` and retrieval URLs emitted on case-detail and report surfaces; the stable route is now backed by `local-file` and `s3-compatible` artifact-store providers, while retention, multipart upload, and MinIO verification remain follow-on work
 9. public read endpoints use stable presenter envelopes for case list, case detail, report, and operations summary instead of returning raw internal models directly
 10. `GET /workbench` is a built-in operator surface for the current standalone API baseline; it is synthetic-demo-friendly, uses the live API plus existing internal callback seams, and does not claim an OHIF deployment or a production imaging workstation
 11. internal inference-job, delivery-job, and dispatch claim or heartbeat rails are implementation proof for the local queue baselines, not a claim of distributed workers, external brokers, or hosted execution closure
 12. if `MRI_INTERNAL_HMAC_SECRET` is configured, `/api/internal/dispatch/*` requires HMAC request-signing headers in addition to the optional namespace bearer token
-13. case detail and report surfaces expose persisted package-manifest, structural-execution, typed artifact-manifest truth, and public retrieval URLs for locally persisted artifacts rather than reconstructing worker state only from report wording
+13. case detail and report surfaces expose persisted package-manifest, structural-execution, typed artifact-manifest truth, and public retrieval URLs for persisted artifacts rather than reconstructing worker state only from report wording
+14. active API descriptions should frame the repository as MRI-only workflow software and not as a broader cross-project medical orchestration surface
 
 For non-HTTP repository surfaces, see `docs/scope-inventory.md`.

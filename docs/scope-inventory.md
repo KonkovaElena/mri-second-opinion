@@ -1,8 +1,8 @@
 ---
 title: "Scope Inventory"
 status: "active"
-version: "1.0.0"
-last_updated: "2026-03-31"
+version: "1.0.1"
+last_updated: "2026-04-01"
 tags: [scope, inventory, reference, mri]
 ---
 
@@ -113,16 +113,17 @@ Use it when checking whether a route, document, test, or demo asset is inside th
 2. `docs/academic/evidence-and-claims-policy.md`
 3. `docs/academic/formal-system-analysis.md`
 4. `docs/academic/project-fundamentals.md`
-5. `docs/academic/bias-analysis-framework.md`
-6. `docs/academic/reader-study-protocol.md`
-7. `docs/academic/subgroup-analysis-plan.md`
-8. `docs/academic/pms-activation.md`
-9. `docs/academic/regulatory-positioning.md`
-10. `docs/academic/model-licensing-and-deployment-gates.md`
-11. `docs/academic/open-source-rationale.md`
-12. `docs/academic/competitive-analysis.md`
-13. `docs/academic/ecosystem-landscape-march-2026.md`
-14. `docs/academic/external-evidence-register-march-2026.md`
+5. `docs/academic/deep-academic-analysis.md`
+6. `docs/academic/bias-analysis-framework.md`
+7. `docs/academic/reader-study-protocol.md`
+8. `docs/academic/subgroup-analysis-plan.md`
+9. `docs/academic/pms-activation.md`
+10. `docs/academic/regulatory-positioning.md`
+11. `docs/academic/model-licensing-and-deployment-gates.md`
+12. `docs/academic/open-source-rationale.md`
+13. `docs/academic/competitive-analysis.md`
+14. `docs/academic/ecosystem-landscape-march-2026.md`
+15. `docs/academic/external-evidence-register-march-2026.md`
 
 ### Regulatory governance
 

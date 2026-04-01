@@ -1,8 +1,8 @@
 ---
 title: "Public Vocabulary"
 status: "active"
-version: "1.0.0"
-last_updated: "2026-03-27"
+version: "1.1.0"
+last_updated: "2026-04-01"
 tags: [reference, vocabulary, api, mri]
 ---
 
@@ -15,6 +15,16 @@ This file freezes the current public terminology for the standalone MRI reposito
 Use these terms in active docs, API descriptions, demos, and release notes unless a runtime change explicitly revises them.
 
 ## Core Product Terms
+
+### Preferred repository identity
+
+Use these names first when describing the standalone product:
+
+1. `MRI Second Opinion`: preferred product name
+2. `MRI second-opinion workflow system`: preferred short description
+3. `clinician-in-the-loop MRI review workflow`: preferred safety framing
+
+Do not recast the standalone repository as a broader non-MRI or cross-project platform in active docs.
 
 1. `case`: the persisted workflow record for one MRI study review path
 2. `draft report`: machine-generated report payload before clinician approval
@@ -97,14 +107,28 @@ These codes are currently emitted by the API/runtime contract:
 
 ## Terms To Avoid As Implemented Truth
 
-The following may appear as target architecture or research direction, but they are not current implemented-runtime terms:
+The following may appear as target architecture, overstated implementation shorthand, or broader research direction, but they are not the precise current-runtime terms to use in active docs:
 
-1. PostgreSQL-backed workflow truth
-2. queue-backed dispatch
+1. PostgreSQL-only workflow truth
+2. distributed broker-backed dispatch
 3. Orthanc-integrated runtime
 4. OHIF review UI
 5. built-in viewer
 6. autonomous diagnosis
+7. non-MRI research workflow
+8. cross-project clinical pipeline
+9. medical AI control plane
+10. cross-project medical orchestration platform
+
+## Usage Rule For MRI-Only Surfaces
+
+When a public sentence can be written either as MRI-specific product language or as broader ecosystem language, choose the MRI-specific form.
+
+Examples:
+
+1. prefer `MRI second-opinion workflow system` over `medical AI control plane`
+2. prefer `clinician-in-the-loop MRI review` over `cross-project diagnostic orchestration`
+3. prefer `standalone MRI repository` over `shared platform node`
 
 ## Usage Rule
 

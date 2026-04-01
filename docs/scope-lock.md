@@ -20,8 +20,10 @@
 
 ## Product Positioning
 
-The product is a workflow orchestrator around MRI second-opinion review.
+The product is a standalone clinician-in-the-loop MRI second-opinion workflow system.
 
 It is not a replacement for enterprise radiology infrastructure.
+
+It should be described as MRI-specific product software, not as a broader non-MRI or cross-project platform.
 
 For the exact active repository surface, see `docs/scope-inventory.md`.
