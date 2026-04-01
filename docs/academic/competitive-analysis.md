@@ -1,8 +1,8 @@
 ---
 title: "Сравнительный анализ с аналогами и конкурентами"
 status: "active"
-version: "1.0.0"
-last_updated: "2026-03-28"
+version: "1.0.1"
+last_updated: "2026-04-01"
 tags: [competitive, analysis, market, comparison]
 role: documentation
 ---
@@ -74,7 +74,7 @@ role: documentation
 
 | Параметр | Kaapana | MRI Second Opinion |
 |---|---|---|
-| Назначение | Research platform | Clinical workflow |
+| Назначение | Research platform | RUO MRI workflow baseline |
 | Инфраструктура | Kubernetes (сложная) | Node.js (простая) |
 | Стейт-машина | ❌ DAG | ✅ 9-state FSM |
 | Clinician review | Опционально | Обязательно |
@@ -99,19 +99,19 @@ role: documentation
 
 | Параметр | XNAT | MRI Second Opinion |
 |---|---|---|
-| Назначение | Data management | Clinical workflow |
+| Назначение | Data management | RUO MRI workflow baseline |
 | Технология | Java/Tomcat | TypeScript/Node.js |
 | Стейт-машина | ❌ Архивная модель | ✅ 9-state FSM |
-| Clinical workflow | Минимальный | Полный lifecycle |
+| Workflow lifecycle | Минимальный | Полный MRI case lifecycle |
 
 ## Уникальная ниша MRI Second Opinion
 
-На март 2026 года MRI Second Opinion занимает **незанятую нишу**: open-source система, сочетающая:
+На март 2026 года MRI Second Opinion занимает **сильную и редкую нишу в RUO-first open-source MRI workflow tooling**: система, сочетающая:
 
-1. Строгую стейт-машину (9 состояний, формально верифицирована)
+1. Строгую стейт-машину (9 authority-locked состояний)
 2. Принудительную проверку врачом (не настройка, а инвариант)
-3. Прозрачную оркестрацию (все шаги видны)
+3. Прозрачную оркестрацию (workflow и review surfaces явно разделены)
 4. 4-уровневую дисциплину заявлений
-5. Низкий порог входа (npm install вместо Kubernetes)
+5. Низкий порог входа для standalone baseline (`npm install` вместо Kubernetes)
 
-Ни один из перечисленных коммерческих или открытых аналогов не реализует все пять характеристик одновременно.
+Ни один из перечисленных коммерческих или открытых аналогов не реализует все пять характеристик одновременно в том же MRI-only, RUO-first, lightweight standalone profile. Это сравнительное утверждение не означает regulatory clearance, production-grade viewer parity, или clinical deployment readiness.
