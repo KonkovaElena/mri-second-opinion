@@ -12,7 +12,8 @@ evidence_sources: |
   MDCG 2025-6, AAMI TIR 34971, OHIF v3.12 docs, Orthanc DICOMweb plugin docs,
   Henschel et al. (FastSurfer, NeuroImage), Isensee et al. (nnU-Net, Nature Methods),
   MONAI Deploy Express, CycloneDX 1.5, STARD 2015, MRMC methodology (DBM/OR),
-  Signify Research AI in Medical Imaging 2024-2030
+  Signify Research AI in Medical Imaging 2024-2030,
+  deep-academic-analysis.md (epidemiology, cognitive biases, implementation models, NASSS framework)
 ---
 
 # Детальный план доведения MRI Second Opinion до 100/100

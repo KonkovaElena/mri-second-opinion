@@ -23,6 +23,10 @@ role: documentation
 2. `docs/roadmap-and-validation.md` — phase and validation logic
 3. `docs/releases/public-github-and-mvp-path.md` — различие между безопасной публикацией и реальным MVP closure
 
+Для академического обоснования (эпидемиология, когнитивные предвзятости, модели реализации, стратегический синтез):
+
+4. `docs/academic/deep-academic-analysis.md` — гиперглубокий академический анализ
+
 ## Часть I. Технологический фундамент
 
 ### 1.1. Язык программирования

@@ -440,6 +440,7 @@ See `docs/academic/action-plan.md` for the detailed technical roadmap.
 
 | Document | Purpose |
 |---|---|
+| `docs/academic/deep-academic-analysis.md` | Epidemiology, cognitive biases, implementation models, strategic synthesis |
 | `docs/academic/project-fundamentals.md` | Complete project overview |
 | `docs/academic/formal-system-analysis.md` | EFSM and protocol analysis |
 | `docs/academic/competitive-analysis.md` | Comparison with MONAI, Kaapana, XNAT |
