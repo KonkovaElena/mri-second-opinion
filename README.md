@@ -305,9 +305,10 @@ python worker/main.py
 
 ### Environment Variables
 
-See `.env.example` for the current configurable parameters covering:
+The current configurable parameters are defined in `src/config.ts` and cover:
 - Server and database configuration
 - Internal and HMAC authentication
+- Optional browser-origin allowlisting via `MRI_CORS_ALLOWED_ORIGINS`
 - Rate limiting and payload limits
 - Artifact storage (`local-file` and `s3-compatible` backends)
 - Archive lookup integration
@@ -316,7 +317,7 @@ See `.env.example` for the current configurable parameters covering:
 
 ## Testing
 
-The project currently has 15 test files covering API lifecycle, persistence, runtime hardening, config parsing, and artifact routing (~7,100 lines of test code):
+The project ships a repo-native `npm test` suite covering API lifecycle, persistence, runtime hardening, config parsing, artifact routing, and browser-origin policy. The current full-suite snapshot is recorded in `docs/verification/release-validation-packet.md`.
 
 ```bash
 npm test
@@ -446,6 +447,13 @@ See `docs/academic/action-plan.md` for the detailed technical roadmap.
 | `docs/academic/competitive-analysis.md` | Comparison with MONAI, Kaapana, XNAT |
 | `docs/academic/action-plan.md` | Technical roadmap to 100/100 |
 | `docs/academic/ecosystem-landscape-march-2026.md` | Market and ecosystem context |
+
+### Investor and Diligence
+
+| Document | Purpose |
+|---|---|
+| `docs/investor/README.md` | Fast route for investors and technical due-diligence reviewers |
+| `docs/verification/github-investor-readiness-audit-2026-04-02.md` | April 2026 GitHub, freshness, and donor-cleanliness audit |
 
 ### Verification
 

@@ -1,0 +1,10 @@
+# Minimal ownership routing for the standalone MRI repository.
+# Expand by area when the project gains multiple active maintainers.
+
+* @KonkovaElena
+
+/.github/ @KonkovaElena
+/docs/ @KonkovaElena
+/src/ @KonkovaElena
+/tests/ @KonkovaElena
+/worker/ @KonkovaElena

@@ -7,6 +7,7 @@ on:
       - 'package.json'
       - 'README.md'
       - 'LICENSE'
+      - '.github/CODEOWNERS'
       - 'CODE_OF_CONDUCT.md'
       - 'SUPPORT.md'
       - 'GOVERNANCE.md'
@@ -16,12 +17,14 @@ on:
       - '.github/ISSUE_TEMPLATE/**'
       - '.github/dependabot.yml'
       - '.github/PULL_REQUEST_TEMPLATE.md'
+      - '.github/workflows/release.yml'
       - '.github/workflows/docs-governance.yml'
   pull_request:
     paths:
       - 'package.json'
       - 'README.md'
       - 'LICENSE'
+      - '.github/CODEOWNERS'
       - 'CODE_OF_CONDUCT.md'
       - 'SUPPORT.md'
       - 'GOVERNANCE.md'
@@ -31,6 +34,7 @@ on:
       - '.github/ISSUE_TEMPLATE/**'
       - '.github/dependabot.yml'
       - '.github/PULL_REQUEST_TEMPLATE.md'
+      - '.github/workflows/release.yml'
       - '.github/workflows/docs-governance.yml'
 
 permissions:
@@ -63,12 +67,18 @@ jobs:
           test -f .github/PULL_REQUEST_TEMPLATE.md
           test -f .github/dependabot.yml
 
+      - name: Verify governance and release files
+        run: |
+          test -f .github/CODEOWNERS
+          test -f .github/workflows/release.yml
+
       - name: Verify required docs files
         run: |
           test -f docs/scope-lock.md
           test -f docs/status-model.md
           test -f docs/api-scope.md
           test -f docs/architecture/overview.md
+          test -f docs/investor/README.md
           test -f docs/launch-readiness-checklist.md
           test -f docs/verification/launch-evidence-index.md
           test -f docs/demo/demo-script.md
@@ -85,6 +95,7 @@ jobs:
 
       - name: Verify README launch links
         run: |
+          grep -q 'docs/investor/README.md' README.md
           grep -q 'docs/launch-readiness-checklist.md' README.md
           grep -q 'docs/verification/launch-evidence-index.md' README.md
           grep -q 'docs/demo/demo-script.md' README.md

@@ -1,0 +1,88 @@
+name: release
+
+on:
+  workflow_dispatch:
+  release:
+    types:
+      - published
+
+permissions:
+  contents: write
+
+jobs:
+  verify-and-package:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Build
+        run: npm run build
+
+      - name: Test
+        run: npm test
+
+      - name: Generate CycloneDX SBOM
+        run: npm run sbom
+
+      - name: Create release manifest
+        run: |
+          mkdir -p artifacts
+          node <<'EOF'
+          const fs = require('node:fs');
+          const path = require('node:path');
+
+          const refName = process.env.GITHUB_REF_NAME || 'workflow-dispatch';
+          const lines = [
+            'repository=mri-second-opinion',
+            `ref=${refName}`,
+            `sha=${process.env.GITHUB_SHA}`,
+            `generated_at=${new Date().toISOString()}`,
+            `node=${process.version}`,
+          ];
+
+          fs.writeFileSync(path.join('artifacts', 'release-manifest.txt'), `${lines.join('\n')}\n`);
+          EOF
+
+      - name: Create source snapshot
+        run: |
+          mkdir -p artifacts
+          tar \
+            --exclude=.git \
+            --exclude=node_modules \
+            --exclude=dist \
+            --exclude=artifacts \
+            --exclude='*.diff' \
+            --exclude='_*.txt' \
+            -czf "artifacts/mri-second-opinion-${{ github.ref_name || github.sha }}-source-snapshot.tgz" .
+
+      - name: Upload workflow artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: release-artifacts
+          path: |
+            artifacts/sbom.cdx.json
+            artifacts/release-manifest.txt
+            artifacts/mri-second-opinion-${{ github.ref_name || github.sha }}-source-snapshot.tgz
+          if-no-files-found: error
+          retention-days: 30
+
+      - name: Publish release assets
+        if: github.event_name == 'release'
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          gh release upload "${{ github.event.release.tag_name }}" \
+            artifacts/sbom.cdx.json \
+            artifacts/release-manifest.txt \
+            "artifacts/mri-second-opinion-${{ github.event.release.tag_name }}-source-snapshot.tgz" \
+            --clobber
