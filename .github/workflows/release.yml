@@ -23,7 +23,7 @@ jobs:
           cache: npm
 
       - name: Install dependencies
-        run: npm ci
+        run: npm install --omit=optional
 
       - name: Build
         run: npm run build
@@ -64,6 +64,13 @@ jobs:
             --exclude='*.diff' \
             --exclude='_*.txt' \
             -czf "artifacts/mri-second-opinion-${{ github.ref_name || github.sha }}-source-snapshot.tgz" .
+
+      - name: Verify release artifacts exist
+        shell: bash
+        run: |
+          test -f artifacts/sbom.cdx.json
+          test -f artifacts/release-manifest.txt
+          test -f "artifacts/mri-second-opinion-${{ github.ref_name || github.sha }}-source-snapshot.tgz"
 
       - name: Upload workflow artifacts
         uses: actions/upload-artifact@v4

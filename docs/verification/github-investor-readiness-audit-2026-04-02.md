@@ -1,7 +1,7 @@
 ---
 title: "GitHub And Investor Readiness Audit"
 status: "active"
-version: "1.0.0"
+version: "1.1.0"
 last_updated: "2026-04-02"
 tags: [verification, github, investor, audit]
 role: documentation
@@ -89,6 +89,7 @@ The only matches came from dependency files inside `node_modules` or from the ge
 4. Moved the standalone runtime baseline to Node 24 LTS across package metadata, CI, and Docker.
 5. Refreshed safe patch-level dependencies while leaving major-version migrations for dedicated follow-on work.
 6. Extended docs-governance to protect the new investor and release-governance surfaces.
+7. Corrected the GitHub Actions install lane to use the same cross-platform `npm install --omit=optional` strategy already required by the Node 24 Linux validation path, and added an explicit release-asset existence check before upload.
 
 ## Remaining open items
 
@@ -97,6 +98,7 @@ The only matches came from dependency files inside `node_modules` or from the ge
 3. Execute a dedicated `zod@4` migration wave with validation-schema and error-surface updates.
 4. Evaluate `typescript@6` only after the runtime-hardening branch settles.
 5. Continue the existing clinical-evidence roadmap; this audit does not change RUO posture or claim boundaries.
+6. Revisit strict `npm ci` semantics in a dedicated dependency-hygiene wave if the CycloneDX optional validator branches are later made fully cross-platform in the lockfile.
 
 ## Conclusion
 

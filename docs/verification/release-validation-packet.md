@@ -1,6 +1,6 @@
 # Release-Linked Validation Packet
 
-Date: 2026-03-31
+Date: 2026-04-02
 
 ## Purpose
 
@@ -15,8 +15,8 @@ It satisfies Wave 5 exit gate 3: evidence ledger links runtime version, docs ver
 | Repository | mri-second-opinion |
 | Repository base head | `3d0df4f74010e6acc27164e2c0a581b145a11572` |
 | Latest hosted-validated head | `04cb0a57d1e64f8a5cf03a22b4a5c60d37dffc3a` |
-| Local validation scope | finalized-only export gating, release-doc reconciliation, audit remediation, later validation plus persistence hardening (semantic payload-size limits, archive lookup graceful degradation, PostgreSQL payload round-trip preservation), and the `s3-compatible` artifact backend plus post-A2 documentation reconciliation on the working tree above the base head |
-| Node.js target | 22+ |
+| Local validation scope | finalized-only export gating, release-doc reconciliation, audit remediation, later validation plus persistence hardening (semantic payload-size limits, archive lookup graceful degradation, PostgreSQL payload round-trip preservation), the `s3-compatible` artifact backend plus post-A2 documentation reconciliation, artifact-boundary hardening for local-file and object-store retrieval, strict-by-default browser-origin hardening with explicit allowlist parsing plus public-route preflight enforcement, and GitHub publication hardening with a Node 24 cross-platform install lane above the base head |
+| Node.js target | 24+ |
 | TypeScript target | ES2022 |
 | Test runner | `npm test` (`node --import tsx --test tests/**/*.test.ts`) |
 
@@ -24,11 +24,11 @@ It satisfies Wave 5 exit gate 3: evidence ledger links runtime version, docs ver
 
 | Metric | Value |
 |--------|-------|
-| Total tests | 148 |
-| Passing | 147 |
+| Total tests | 154 |
+| Passing | 153 |
 | Failing | 0 |
 | Skipped | 1 |
-| Duration | ~4.7 s |
+| Duration | ~3.1 s |
 | Runner | `npm test` (`node --import tsx --test tests/**/*.test.ts`) |
 
 ### Test Coverage By Wave
@@ -47,6 +47,8 @@ It satisfies Wave 5 exit gate 3: evidence ledger links runtime version, docs ver
 | Post-publication hardening | semantic payload-size validation, archive-lookup degradation, and PostgreSQL round-trip preservation | 136 |
 | Hyper-deep audit + academic doc audit | structured error logging, Dockerfile HEALTHCHECK, Helmet/CSP, CI docs-governance, persistence normalization, and runtime-hardening coverage | 145 |
 | A2 artifact backend + documentation reconciliation | `s3-compatible` artifact storage, object-store routing, config coverage, and authority-doc alignment | 148 |
+| Artifact boundary hardening | local-file root enforcement and object-store base-path enforcement for public artifact retrieval | 150 |
+| Browser-origin hardening | `MRI_CORS_ALLOWED_ORIGINS` parsing, deny-by-default cross-origin reads, allowlisted public preflights, and rejection of internal authorization-header browser preflights | 154 |
 
 ## TypeScript Compilation
 
@@ -108,7 +110,7 @@ Status: clean (`npm run build` -> `tsc -p tsconfig.json`)
 
 | Validation dimension | Artifact | Status |
 |---------------------|----------|--------|
-| Functional correctness | 148 tests, 147 pass, 0 fail, 1 skipped | Complete |
+| Functional correctness | 154 tests, 153 pass, 0 fail, 1 skipped | Complete |
 | Type safety | `npm run build` clean | Complete |
 | Interoperability | DICOM SR + FHIR R4 exports validated | Complete |
 | Regulatory readiness | 5-document governance pack | Complete |
@@ -123,14 +125,14 @@ Status: clean (`npm run build` -> `tsc -p tsconfig.json`)
 1. Reader study not yet executed — protocol exists, no data collected
 2. Subgroup analysis not yet executed — plan operationalizes framework, no results available
 3. PMS program not yet active — activation criteria defined, none met yet
-4. Hosted GitHub Actions evidence is not yet refreshed for the current local validation snapshot that includes the later validation and persistence hardening; the latest paired hosted-validated head remains `04cb0a57d1e64f8a5cf03a22b4a5c60d37dffc3a` in `docs/verification/launch-evidence-index.md`
-5. No automated SBOM generation in release workflow
+4. Hosted GitHub Actions evidence is not yet refreshed for the current local validation snapshot that now also includes browser-origin hardening plus GitHub publication hardening; the latest paired hosted-validated head remains `04cb0a57d1e64f8a5cf03a22b4a5c60d37dffc3a` in `docs/verification/launch-evidence-index.md`
+5. The current Node 24 Linux lane uses `npm install --omit=optional` rather than strict `npm ci` because the checked-in lockfile can reject optional CycloneDX validator branches on Linux; build, test, and SBOM generation still validate successfully with the active install path
 6. Skip count is 1 (one test intentionally skipped)
 7. Object-store hardening is still incomplete at production-grade level: retention, multipart upload, and MinIO verification remain follow-on work
 
 ## Interpretation
 
-This validation packet establishes that the repository has a current local validation snapshot with clean build output, validated interoperability exports, a strengthened validation and persistence regression net, and a documented regulatory and clinical evaluation path.
+This validation packet establishes that the repository has a current local validation snapshot with clean build output, validated interoperability exports, a strengthened validation, persistence, artifact-boundary, and browser-origin regression net, and a documented regulatory and clinical evaluation path.
 
 The gaps are execution gaps, not specification gaps: the protocols and plans exist, the studies have not been run yet. Hosted workflow truth also still points to the last paired `ci` and `docs-governance` success on `04cb0a57d1e64f8a5cf03a22b4a5c60d37dffc3a`; the current local validation snapshot above that hosted head has not been re-hosted yet.
 

@@ -63,7 +63,7 @@ body:
     attributes:
       label: Environment
       description: OS, Node version, and any other relevant environment details.
-      placeholder: Windows 11, Node 22.x
+      placeholder: Windows 11, Node 24.x
   - type: checkboxes
     id: safety
     attributes:

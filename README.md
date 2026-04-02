@@ -253,7 +253,7 @@ What remains next-wave direction rather than current runtime proof:
 
 ### Prerequisites
 
-- Node.js ≥ 22
+- Node.js ≥ 24
 - npm (included with Node.js)
 - Python 3.11+ (for the worker, optional)
 
@@ -261,7 +261,7 @@ What remains next-wave direction rather than current runtime proof:
 
 ```bash
 # Install dependencies
-npm ci
+npm install --omit=optional
 
 # Build TypeScript
 npm run build
@@ -738,7 +738,7 @@ Python-воркер (`worker/main.py`) работает по принципу pu
 
 ### Требования
 
-- Node.js ≥ 22
+- Node.js ≥ 24
 - npm (входит в комплект Node.js)
 - Python 3.11+ (для воркера, опционально)
 
@@ -746,7 +746,7 @@ Python-воркер (`worker/main.py`) работает по принципу pu
 
 ```bash
 # Установить зависимости
-npm ci
+npm install --omit=optional
 
 # Собрать TypeScript
 npm run build

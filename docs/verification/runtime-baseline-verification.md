@@ -1,6 +1,6 @@
 # Runtime Baseline Verification
 
-Date: 2026-03-30
+Date: 2026-04-02
 
 ## Scope
 
@@ -38,15 +38,17 @@ It is not a target-architecture document and it intentionally excludes supersede
 
 Confirmed locally from the standalone repository root.
 
-`npm ci` and `npm run build` both complete successfully against the checked-in lockfile and current TypeScript sources.
+The current cross-platform install baseline is `npm install --omit=optional`, followed by `npm run build`.
+
+This install path is used because the current Node 24 Linux dependency tree can reject `npm ci` on optional CycloneDX validator branches even though build, test, and SBOM generation succeed once those optional branches are omitted.
 
 ## 2. Full standalone test baseline
 
 Confirmed locally.
 
-The current standalone suite passes via `npm test` (`node --import tsx --test tests/**/*.test.ts`) with `145` total tests, `144` passing, `0` failures, and `1` skipped.
+The current standalone suite passes via `npm test` (`node --import tsx --test tests/**/*.test.ts`) with `154` total tests, `153` passing, `0` failures, and `1` skipped.
 
-The latest hardening pass extends the baseline with semantic payload-size validation, archive lookup graceful-degradation coverage, PostgreSQL payload round-trip preservation for Unicode content, multiline review comments, floating-point measurements, and large sequence inventories, plus hyper-deep audit (structured error logging, Dockerfile HEALTHCHECK, Helmet/CSP) and runtime-hardening coverage.
+The latest hardening pass extends the baseline with semantic payload-size validation, archive lookup graceful-degradation coverage, PostgreSQL payload round-trip preservation for Unicode content, multiline review comments, floating-point measurements, and large sequence inventories, plus hyper-deep audit (structured error logging, Dockerfile HEALTHCHECK, Helmet/CSP), runtime-hardening coverage, and GitHub publication-lane verification.
 
 The strongest current verification anchors are:
 
