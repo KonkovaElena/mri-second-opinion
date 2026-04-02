@@ -7,6 +7,7 @@ export interface AppConfig {
   port: number;
   caseStoreFile: string;
   caseStoreMode: CaseStoreMode;
+  corsAllowedOrigins: string[];
   artifactStoreProvider: ArtifactStoreProvider;
   artifactStoreBasePath: string;
   artifactStoreEndpoint?: string;
@@ -63,6 +64,17 @@ function parseBoolean(value: string, name: string) {
   throw new Error(`${name} must be true/false or 1/0`);
 }
 
+function parseOriginAllowlist(value: string | undefined) {
+  if (!value) {
+    return [];
+  }
+
+  return value
+    .split(",")
+    .map((origin) => origin.trim())
+    .filter((origin) => origin.length > 0);
+}
+
 export function getConfig(): AppConfig {
   const rawPort = process.env.PORT;
   const port = rawPort ? Number(rawPort) : DEFAULT_PORT;
@@ -72,6 +84,7 @@ export function getConfig(): AppConfig {
   }
 
   const caseStoreMode = rawCaseStoreMode as CaseStoreMode;
+  const corsAllowedOrigins = parseOriginAllowlist(process.env.MRI_CORS_ALLOWED_ORIGINS);
   const defaultCaseStoreFile =
     caseStoreMode === "sqlite" || caseStoreMode === "postgres"
       ? resolve(__dirname, "..", ".mri-data", "cases.sqlite")
@@ -197,6 +210,7 @@ export function getConfig(): AppConfig {
     port,
     caseStoreFile,
     caseStoreMode,
+    corsAllowedOrigins,
     artifactStoreProvider,
     artifactStoreBasePath,
     artifactStoreEndpoint,

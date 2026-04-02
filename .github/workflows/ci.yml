@@ -48,7 +48,7 @@ jobs:
           cache: npm
 
       - name: Install dependencies
-        run: npm install --omit=optional
+        run: npm install
 
       - name: Build
         run: npm run build
@@ -150,7 +150,7 @@ jobs:
           cache: npm
 
       - name: Install dependencies
-        run: npm install --omit=optional
+        run: npm install
 
       - name: Run migrations against clean database
         env:

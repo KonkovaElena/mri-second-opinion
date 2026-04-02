@@ -2,11 +2,12 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import { createServer } from "node:http";
 import type { AddressInfo } from "node:net";
-import { mkdtempSync, rmSync } from "node:fs";
+import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
+import { pathToFileURL } from "node:url";
 import { createApp } from "../src/app";
-import type { ArtifactStore } from "../src/case-artifact-storage";
+import { createArtifactStore, type ArtifactStore } from "../src/case-artifact-storage";
 
 function createTestStoreFile() {
   const tempDir = mkdtempSync(join(tmpdir(), "mri-second-opinion-object-store-"));
@@ -20,6 +21,7 @@ async function withServer(
   caseStoreFile: string,
   artifactStore: ArtifactStore,
   run: (helpers: { baseUrl: string }) => Promise<void>,
+  configOverrides: Partial<Parameters<typeof createApp>[0]> = {},
 ) {
   const app = createApp(
     {
@@ -46,6 +48,7 @@ async function withServer(
       serverKeepAliveTimeoutMs: 5000,
       serverMaxRequestsPerSocket: 100,
       gracefulShutdownTimeoutMs: 10000,
+      ...configOverrides,
     },
     { artifactStore },
   );
@@ -148,6 +151,150 @@ test("artifact route redirects to a presigned URL for object-store-backed artifa
       assert.equal(download.status, 302);
       assert.match(download.headers.get("location") ?? "", /^https:\/\/artifacts\.example\.test\/download\?/u);
     });
+  } finally {
+    rmSync(tempDir, { recursive: true, force: true });
+  }
+});
+
+test("artifact route rejects local-file artifact refs outside the configured artifact root", async () => {
+  const { tempDir, caseStoreFile } = createTestStoreFile();
+  const artifactRoot = join(tempDir, "artifacts");
+  const outsideFile = join(tempDir, "escape.txt");
+  writeFileSync(outsideFile, "outside-root-artifact", "utf-8");
+
+  const artifactStore = createArtifactStore({
+    provider: "local-file",
+    caseStoreFile,
+    basePath: artifactRoot,
+  });
+
+  try {
+    await withServer(
+      caseStoreFile,
+      artifactStore,
+      async ({ baseUrl }) => {
+        const created = await fetch(`${baseUrl}/api/cases`, {
+          method: "POST",
+          headers: {
+            "content-type": "application/json",
+          },
+          body: JSON.stringify({
+            patientAlias: "synthetic-patient-local-boundary-001",
+            studyUid: "1.2.840.local-boundary.1",
+            sequenceInventory: ["T1w", "FLAIR"],
+          }),
+        });
+        const createdBody = await created.json();
+        assert.equal(created.status, 201);
+
+        const caseId = createdBody.case.caseId as string;
+        const inferred = await fetch(`${baseUrl}/api/internal/inference-callback`, {
+          method: "POST",
+          headers: {
+            "content-type": "application/json",
+          },
+          body: JSON.stringify({
+            caseId,
+            qcDisposition: "pass",
+            findings: ["Local-file boundary verification."],
+            measurements: [{ label: "brain_volume_ml", value: 990 }],
+            artifacts: [pathToFileURL(outsideFile).href],
+            generatedSummary: "Boundary probe artifact draft.",
+          }),
+        });
+
+        assert.equal(inferred.status, 200);
+
+        const detail = await fetch(`${baseUrl}/api/cases/${caseId}`);
+        const detailBody = await detail.json();
+        assert.equal(detail.status, 200);
+
+        const artifact = detailBody.case.artifactManifest[0];
+        assert.equal(artifact.storageUri, `/api/cases/${caseId}/artifacts/${artifact.artifactId}`);
+
+        const download = await fetch(`${baseUrl}${artifact.storageUri}`);
+        const downloadBody = await download.json();
+
+        assert.equal(download.status, 404);
+        assert.equal(downloadBody.code, "ARTIFACT_NOT_AVAILABLE");
+      },
+      {
+        artifactStoreProvider: "local-file",
+        artifactStoreBasePath: artifactRoot,
+      },
+    );
+  } finally {
+    rmSync(tempDir, { recursive: true, force: true });
+  }
+});
+
+test("artifact route rejects object-store refs outside the configured base path", async () => {
+  const { tempDir, caseStoreFile } = createTestStoreFile();
+  const artifactStore = createArtifactStore({
+    provider: "s3-compatible",
+    basePath: "prefix",
+    bucket: "case-artifacts",
+    signGetObjectUrl: async ({ key }) => `https://artifacts.example.test/download?key=${encodeURIComponent(key)}`,
+  });
+
+  try {
+    await withServer(
+      caseStoreFile,
+      artifactStore,
+      async ({ baseUrl }) => {
+        const created = await fetch(`${baseUrl}/api/cases`, {
+          method: "POST",
+          headers: {
+            "content-type": "application/json",
+          },
+          body: JSON.stringify({
+            patientAlias: "synthetic-patient-object-boundary-001",
+            studyUid: "1.2.840.object-boundary.1",
+            sequenceInventory: ["T1w", "FLAIR"],
+          }),
+        });
+        const createdBody = await created.json();
+        assert.equal(created.status, 201);
+
+        const caseId = createdBody.case.caseId as string;
+        const inferred = await fetch(`${baseUrl}/api/internal/inference-callback`, {
+          method: "POST",
+          headers: {
+            "content-type": "application/json",
+          },
+          body: JSON.stringify({
+            caseId,
+            qcDisposition: "pass",
+            findings: ["Object-store boundary verification."],
+            measurements: [{ label: "brain_volume_ml", value: 995 }],
+            artifacts: ["object-store://case-artifacts/outside/qc-summary.json"],
+            generatedSummary: "Boundary probe object-store artifact draft.",
+          }),
+        });
+
+        assert.equal(inferred.status, 200);
+
+        const detail = await fetch(`${baseUrl}/api/cases/${caseId}`);
+        const detailBody = await detail.json();
+        assert.equal(detail.status, 200);
+
+        const artifact = detailBody.case.artifactManifest[0];
+        assert.equal(artifact.storageUri, `/api/cases/${caseId}/artifacts/${artifact.artifactId}`);
+
+        const download = await fetch(`${baseUrl}${artifact.storageUri}`, {
+          redirect: "manual",
+        });
+        const downloadBody = await download.json();
+
+        assert.equal(download.status, 404);
+        assert.equal(downloadBody.code, "ARTIFACT_NOT_AVAILABLE");
+      },
+      {
+        artifactStoreProvider: "s3-compatible",
+        artifactStoreBasePath: "prefix",
+        artifactStoreBucket: "case-artifacts",
+      },
+    );
   } finally {
     rmSync(tempDir, { recursive: true, force: true });
   }

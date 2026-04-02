@@ -168,6 +168,87 @@ test("public API rate limiting returns 429 while internal routes stay exempt", a
   }
 });
 
+test("cross-origin browser requests are rejected unless the origin is explicitly allowlisted", async () => {
+  const { tempDir, caseStoreFile } = createTestStoreFile();
+
+  try {
+    await withServer(caseStoreFile, async ({ baseUrl }) => {
+      const response = await fetch(`${baseUrl}/api/cases`, {
+        headers: {
+          Origin: "https://viewer.example.test",
+        },
+      });
+      const body = await response.json();
+
+      assert.equal(response.status, 403);
+      assert.equal(body.code, "CORS_ORIGIN_NOT_ALLOWED");
+      assert.equal(typeof body.requestId, "string");
+    });
+  } finally {
+    rmSync(tempDir, { recursive: true, force: true });
+  }
+});
+
+test("allowlisted origins receive explicit CORS preflight approval for public JSON routes", async () => {
+  const { tempDir, caseStoreFile } = createTestStoreFile();
+
+  try {
+    await withServer(
+      caseStoreFile,
+      async ({ baseUrl }) => {
+        const response = await fetch(`${baseUrl}/api/cases`, {
+          method: "OPTIONS",
+          headers: {
+            Origin: "https://viewer.example.test",
+            "Access-Control-Request-Method": "POST",
+            "Access-Control-Request-Headers": "content-type",
+          },
+        });
+
+        assert.equal(response.status, 204);
+        assert.equal(response.headers.get("access-control-allow-origin"), "https://viewer.example.test");
+        assert.equal(response.headers.get("access-control-allow-headers"), "content-type");
+        assert.match(response.headers.get("access-control-allow-methods") ?? "", /POST/);
+        assert.match(response.headers.get("vary") ?? "", /Origin/);
+      },
+      {
+        corsAllowedOrigins: ["https://viewer.example.test"],
+      } as Partial<Parameters<typeof createApp>[0]>,
+    );
+  } finally {
+    rmSync(tempDir, { recursive: true, force: true });
+  }
+});
+
+test("allowlisted origins cannot preflight unsupported authorization headers", async () => {
+  const { tempDir, caseStoreFile } = createTestStoreFile();
+
+  try {
+    await withServer(
+      caseStoreFile,
+      async ({ baseUrl }) => {
+        const response = await fetch(`${baseUrl}/api/internal/inference-jobs`, {
+          method: "OPTIONS",
+          headers: {
+            Origin: "https://viewer.example.test",
+            "Access-Control-Request-Method": "GET",
+            "Access-Control-Request-Headers": "authorization, content-type",
+          },
+        });
+        const body = await response.json();
+
+        assert.equal(response.status, 403);
+        assert.equal(body.code, "CORS_HEADERS_NOT_ALLOWED");
+      },
+      {
+        corsAllowedOrigins: ["https://viewer.example.test"],
+      } as Partial<Parameters<typeof createApp>[0]>,
+    );
+  } finally {
+    rmSync(tempDir, { recursive: true, force: true });
+  }
+});
+
 test("workbench document responses include CSP and document security headers", async () => {
   const { tempDir, caseStoreFile } = createTestStoreFile();
 

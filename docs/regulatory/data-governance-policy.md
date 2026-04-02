@@ -79,9 +79,12 @@ A future governed deployment should implement:
 
 ### Current Implementation
 
-1. API routes are unauthenticated except for inference callbacks which use HMAC-SHA256
-2. the workbench review surface serves from the same process
-3. no role-based access control is implemented at the application level
+1. public clinical routes currently follow the bounded standalone baseline and do not yet implement clinician or operator authentication
+2. the workbench review surface serves from the same process and shares that same-origin baseline
+3. cross-origin browser access to selected public routes is disabled by default and can be opened only through the explicit `MRI_CORS_ALLOWED_ORIGINS` allowlist
+4. `/api/internal/*` can be gated with bearer authentication through `MRI_INTERNAL_API_TOKEN`
+5. `/api/internal/dispatch/*` additionally require HMAC-SHA256 request signing with nonce replay enforcement
+6. no role-based access control is implemented at the application level
 
 ### Target State
 
@@ -99,7 +102,7 @@ A future governed deployment should implement:
 1. Zod schema validation on all API inputs
 2. state machine enforcement preventing invalid workflow transitions
 3. SQLite WAL mode and PostgreSQL ACID transactions
-4. HMAC authentication on inference callbacks preventing unauthorized data injection
+4. bearer authentication on internal mutation routes plus HMAC-SHA256 request signing with nonce replay enforcement on dispatch rails
 5. report builder requiring complete provenance chain before finalization
 6. derived-artifact manifest tracking for output integrity
 

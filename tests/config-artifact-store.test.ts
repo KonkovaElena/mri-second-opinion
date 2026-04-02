@@ -48,3 +48,16 @@ test("getConfig parses s3-compatible artifact storage settings", () => {
     },
   );
 });
+
+test("getConfig parses explicit CORS allowlist origins", () => {
+  withEnv(
+    {
+      MRI_CORS_ALLOWED_ORIGINS: "https://viewer.example.test, http://127.0.0.1:4173",
+    },
+    () => {
+      const config = getConfig() as Record<string, unknown>;
+
+      assert.deepEqual(config.corsAllowedOrigins, ["https://viewer.example.test", "http://127.0.0.1:4173"]);
+    },
+  );
+});

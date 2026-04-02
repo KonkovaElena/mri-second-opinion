@@ -1,7 +1,7 @@
 import { GetObjectCommand, PutObjectCommand, S3Client } from "@aws-sdk/client-s3";
 import { getSignedUrl } from "@aws-sdk/s3-request-presigner";
 import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
-import { dirname, posix, resolve } from "node:path";
+import { dirname, isAbsolute, posix, relative, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import {
   canonicalizeArtifactReference,
@@ -73,6 +73,23 @@ function normalizeObjectStoreKey(basePath: string, plannedStorageKey: string) {
   return posix.join(...normalizedBasePath, plannedStorageKey);
 }
 
+function normalizeObjectStoreBasePath(basePath: string) {
+  return basePath
+    .replace(/\\/gu, "/")
+    .split("/")
+    .map((segment) => segment.trim())
+    .filter((segment) => segment.length > 0)
+    .join("/");
+}
+
+function isWithinResolvedRoot(rootPath: string, candidatePath: string) {
+  const resolvedRoot = resolve(rootPath);
+  const resolvedCandidate = resolve(candidatePath);
+  const relativePath = relative(resolvedRoot, resolvedCandidate);
+
+  return relativePath === "" || (!relativePath.startsWith("..") && !isAbsolute(relativePath));
+}
+
 function toObjectStoreUri(key: string) {
   return canonicalizeArtifactReference(`${OBJECT_STORE_URI_PREFIX}${key}`);
 }
@@ -128,7 +145,12 @@ class LocalFileArtifactStore implements ArtifactStore {
     }
 
     try {
-      const filePath = fileURLToPath(storageUri);
+      const filePath = resolve(fileURLToPath(storageUri));
+
+      if (!isWithinResolvedRoot(this.artifactStoreRoot, filePath)) {
+        return null;
+      }
+
       return {
         kind: "buffer" as const,
         content: readFileSync(filePath),
@@ -141,6 +163,7 @@ class LocalFileArtifactStore implements ArtifactStore {
 
 class S3CompatibleArtifactStore implements ArtifactStore {
   private readonly s3Client: S3Client;
+  private readonly normalizedBasePath: string;
   private readonly region: string;
   private readonly endpoint?: string;
   private readonly forcePathStyle: boolean;
@@ -158,6 +181,7 @@ class S3CompatibleArtifactStore implements ArtifactStore {
       signGetObjectUrl?: (input: { bucket: string; key: string }) => Promise<string>;
     },
   ) {
+    this.normalizedBasePath = normalizeObjectStoreBasePath(options.basePath);
     this.region = options.region ?? DEFAULT_ARTIFACT_STORE_REGION;
     this.endpoint = options.endpoint;
     this.forcePathStyle = options.forcePathStyle ?? Boolean(options.endpoint);
@@ -208,6 +232,14 @@ class S3CompatibleArtifactStore implements ArtifactStore {
     const key = parseObjectStoreUri(storageUri);
 
     if (!key) {
+      return null;
+    }
+
+    if (
+      this.normalizedBasePath.length > 0 &&
+      key !== this.normalizedBasePath &&
+      !key.startsWith(`${this.normalizedBasePath}/`)
+    ) {
       return null;
     }
 

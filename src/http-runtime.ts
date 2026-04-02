@@ -80,6 +80,173 @@ function resolveRouteGroup(pathname: string) {
   return "other";
 }
 
+interface CorsRoutePolicy {
+  methods: string[];
+  allowedHeaders: string[];
+  allowActualRequest: boolean;
+}
+
+function addVaryHeader(res: express.Response, value: string) {
+  const existing = res.getHeader("Vary");
+
+  if (typeof existing !== "string" || existing.trim().length === 0) {
+    res.setHeader("Vary", value);
+    return;
+  }
+
+  const entries = existing
+    .split(",")
+    .map((entry) => entry.trim())
+    .filter((entry) => entry.length > 0);
+
+  if (!entries.includes(value)) {
+    entries.push(value);
+  }
+
+  res.setHeader("Vary", entries.join(", "));
+}
+
+function isSameOriginRequest(req: express.Request, origin: string) {
+  const host = req.get("host");
+
+  if (!host) {
+    return false;
+  }
+
+  return origin === `${req.protocol}://${host}`;
+}
+
+function parseRequestedHeaders(value: string | string[] | undefined) {
+  const raw = Array.isArray(value) ? value.join(",") : value;
+
+  if (!raw) {
+    return [];
+  }
+
+  return raw
+    .split(",")
+    .map((header) => header.trim().toLowerCase())
+    .filter((header) => header.length > 0);
+}
+
+function resolveCorsRoutePolicy(pathname: string): CorsRoutePolicy | null {
+  if (pathname === "/api/cases") {
+    return {
+      methods: ["GET", "POST"],
+      allowedHeaders: ["content-type"],
+      allowActualRequest: true,
+    };
+  }
+
+  if (pathname.startsWith("/api/cases/")) {
+    return {
+      methods: ["GET", "POST"],
+      allowedHeaders: ["content-type"],
+      allowActualRequest: true,
+    };
+  }
+
+  if (pathname === "/api/operations/summary") {
+    return {
+      methods: ["GET"],
+      allowedHeaders: [],
+      allowActualRequest: true,
+    };
+  }
+
+  if (pathname.startsWith("/api/delivery/")) {
+    return {
+      methods: ["POST"],
+      allowedHeaders: ["content-type"],
+      allowActualRequest: true,
+    };
+  }
+
+  if (pathname.startsWith("/api/internal/")) {
+    return {
+      methods: [],
+      allowedHeaders: [],
+      allowActualRequest: false,
+    };
+  }
+
+  return null;
+}
+
+export function createCorsMiddleware(config: AppConfig): express.RequestHandler {
+  const allowlistedOrigins = new Set(config.corsAllowedOrigins);
+
+  return (req, res, next) => {
+    const origin = req.get("origin");
+
+    if (!origin || isSameOriginRequest(req, origin)) {
+      next();
+      return;
+    }
+
+    const policy = resolveCorsRoutePolicy(req.path);
+
+    if (!policy || !allowlistedOrigins.has(origin)) {
+      addVaryHeader(res, "Origin");
+      res.status(403).json({
+        error: "Cross-origin browser access is not allowed for this route",
+        code: "CORS_ORIGIN_NOT_ALLOWED",
+        requestId: getRequestId(res),
+      });
+      return;
+    }
+
+    addVaryHeader(res, "Origin");
+
+    const requestedMethod = req.get("access-control-request-method")?.trim().toUpperCase();
+
+    if (req.method === "OPTIONS" && requestedMethod) {
+      const requestedHeaders = parseRequestedHeaders(req.get("access-control-request-headers"));
+      const unsupportedHeaders = requestedHeaders.filter((header) => !policy.allowedHeaders.includes(header));
+
+      if (unsupportedHeaders.length > 0) {
+        res.status(403).json({
+          error: `Cross-origin browser headers are not allowed for this route: ${unsupportedHeaders.join(", ")}`,
+          code: "CORS_HEADERS_NOT_ALLOWED",
+          requestId: getRequestId(res),
+        });
+        return;
+      }
+
+      if (!policy.methods.includes(requestedMethod)) {
+        res.status(403).json({
+          error: `Cross-origin browser method is not allowed for this route: ${requestedMethod}`,
+          code: "CORS_METHOD_NOT_ALLOWED",
+          requestId: getRequestId(res),
+        });
+        return;
+      }
+
+      res.setHeader("Access-Control-Allow-Origin", origin);
+      res.setHeader("Access-Control-Allow-Methods", policy.methods.join(", "));
+
+      if (requestedHeaders.length > 0) {
+        res.setHeader("Access-Control-Allow-Headers", requestedHeaders.join(", "));
+      }
+
+      res.status(204).end();
+      return;
+    }
+
+    if (!policy.allowActualRequest) {
+      res.status(403).json({
+        error: "Cross-origin browser access is not allowed for this route",
+        code: "CORS_ORIGIN_NOT_ALLOWED",
+        requestId: getRequestId(res),
+      });
+      return;
+    }
+
+    res.setHeader("Access-Control-Allow-Origin", origin);
+    next();
+  };
+}
+
 export function metricsMiddleware(req: express.Request, res: express.Response, next: express.NextFunction) {
   const startedAt = process.hrtime.bigint();
 

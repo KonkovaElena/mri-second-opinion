@@ -7,16 +7,16 @@ Every claim about launch readiness should link back to one or more artifacts lis
 ## Repository Status
 
 - Current verdict: `PUBLIC_GITHUB_READY`
-- Last reviewed: 2026-03-30
+- Last reviewed: 2026-04-02
 - Latest hosted-validated head: `04cb0a57d1e64f8a5cf03a22b4a5c60d37dffc3a`
-- Current local validation snapshot above that hosted head: `npm run build` is clean and `npm test` reports 148 total tests, 147 pass, 0 fail, and 1 skipped after semantic payload-size validation, archive-lookup graceful degradation, PostgreSQL payload round-trip hardening, hyper-deep audit plus academic doc audit, and the `s3-compatible` artifact backend plus post-A2 documentation reconciliation landed
+- Current local validation snapshot above that hosted head: `npm run build` is clean and `npm test` reports 154 total tests, 153 pass, 0 fail, and 1 skipped after adding strict-by-default browser-origin hardening: explicit `MRI_CORS_ALLOWED_ORIGINS` parsing, public-route preflight approval for allowlisted origins, denial of disallowed cross-origin reads, and rejection of internal authorization-header browser preflights, on top of the earlier artifact-boundary hardening, semantic payload-size validation, archive-lookup graceful degradation, PostgreSQL payload round-trip hardening, hyper-deep audit plus academic doc audit, and the `s3-compatible` artifact backend plus post-A2 documentation reconciliation
 - Previous hosted-validated head: `1e340b978bfa35a2ed339adcdb0d2add56cc08c3`
 - Wave 1.5 evidence status: closed on `04cb0a57d1e64f8a5cf03a22b4a5c60d37dffc3a`; GitHub-hosted `ci` and `docs-governance` both succeeded on the same runtime-and-doc reconciliation head after the worker execution-contract alignment landed. Later docs-only evidence refreshes do not reopen Wave 1.5 unless they change platform-sensitive runtime paths or GitHub workflow surfaces.
 - Wave 2B evidence status: locally closed on the bounded compute seam recorded in `docs/verification/wave-2b-bounded-compute-audit-2026-03-29.md`; the remaining compute gaps are DICOM-derived or package-grade execution and distributed worker infrastructure, not the absence of a real worker boundary.
 - Wave 3A evidence status: locally closed on the bounded archive lookup and clinician-facing viewer path recorded in `docs/verification/archive-viewer-seam-audit-2026-03-27.md` v2.0.0 and `docs/verification/workbench-frontend-audit-2026-03-27.md` v2.0.0; 95 tests pass, 0 fail.
 - Wave 3B evidence status: locally closed; 4 new artifact/report closure tests confirm report-preview retrieval, provenance chain integrity, archive truth preservation through review/finalize/report surfaces, and lossless report artifact delivery; 99 tests pass, 0 fail. No new production code changes needed — existing Waves 2A/3A implementation already satisfies all 3 exit gates.
 - Wave 4 evidence status: locally closed; DICOM SR and FHIR R4 DiagnosticReport export seams implemented and tested end-to-end; regulatory governance pack (PCCP, IEC 62304, ISO 14971, data governance, vulnerability SOP) created with honest-claim discipline, and the current cumulative local validation snapshot is recorded in `docs/verification/release-validation-packet.md`.
-- Wave 5 evidence status: locally closed; clinical evidence program complete — reader-study protocol, subgroup analysis plan, PMS activation criteria, and release-linked validation packet created. The current local validation packet now records 148 total tests, 147 pass, 0 fail, and 1 skipped without changing the conservative publication verdict.
+- Wave 5 evidence status: locally closed; clinical evidence program complete — reader-study protocol, subgroup analysis plan, PMS activation criteria, and release-linked validation packet created. The current local validation packet now records 154 total tests, 153 pass, 0 fail, and 1 skipped without changing the conservative publication verdict.
 - Public repository: `https://github.com/KonkovaElena/mri-second-opinion`
 - Auditor handoff: `docs/verification/ai-auditor-handoff-2026-03-25.md` (historical snapshot dated 2026-03-25; current verdict advanced later)
 - Repository-status retrospective: `docs/verification/publication-retrospective-audit-2026-03-27.md`
@@ -146,8 +146,8 @@ Record:
   - `package.json`
   - `package-lock.json`
   - `tsconfig.json`
-  - `.env.example`
   - `src/config.ts`
+  - `README.md`
   - `src/app.ts`
   - `src/index.ts`
   - `.github/workflows/ci.yml`

@@ -68,6 +68,7 @@ The repository already has meaningful baseline mitigations.
 7. HMAC-SHA256 nonce replay store is wired into the live dispatch middleware with configurable TTL and max-entries bounds
 8. Helmet manages the document response header baseline: strict Content-Security-Policy, `X-Content-Type-Options`, `X-Frame-Options`, `Referrer-Policy`, `X-Permitted-Cross-Domain-Policies`, same-origin COOP/CORP, production HSTS, and `X-Powered-By` remains suppressed
 9. archive-lookup HTTP client enforces a 10-second `AbortSignal.timeout` to bound external-service latency
+10. browser-origin access is strict by default: cross-origin reads require explicit `MRI_CORS_ALLOWED_ORIGINS` allowlisting on selected public routes, while internal browser preflights remain unapproved
 
 ## Open Gaps
 

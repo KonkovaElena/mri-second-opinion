@@ -61,8 +61,7 @@ function parseWithSchema<T>(body: unknown, schema: z.ZodType<T>) {
 const requiredTrimmedString = (fieldName: string, maxLength = MAX_LONG_TEXT) =>
   z
     .string({
-      required_error: `${fieldName} is required`,
-      invalid_type_error: `${fieldName} is required`,
+      error: `${fieldName} is required`,
     })
     .max(maxLength, `${fieldName} must be at most ${maxLength} characters`)
     .transform((value) => value.trim())
@@ -83,7 +82,7 @@ const optionalNumberField = (fieldName: string) =>
     (value) => (typeof value === "undefined" ? undefined : value),
     z
       .number({
-        invalid_type_error: `${fieldName} must be a number`,
+        error: `${fieldName} must be a number`,
       })
       .optional(),
   );
@@ -96,8 +95,7 @@ function stringArrayField(
   const maxItemLength = options.maxItemLength ?? MAX_TEXT;
   return z
     .array(z.string().max(maxItemLength, `${fieldName} entries must be at most ${maxItemLength} characters`), {
-      required_error: `${fieldName} must be an array`,
-      invalid_type_error: `${fieldName} must be an array`,
+      error: `${fieldName} must be an array`,
     })
     .max(maxItems, `${fieldName} must have at most ${maxItems} entries`)
     .transform((entries) => Array.from(new Set(entries.map((entry) => entry.trim()).filter((entry) => entry.length > 0))))
@@ -116,7 +114,7 @@ const optionalStringArrayField = (fieldName: string, maxItems = MAX_FINDINGS, ma
     (value) => (typeof value === "undefined" ? undefined : value),
     z
       .array(z.string().max(maxItemLength, `${fieldName} entries must be at most ${maxItemLength} characters`), {
-        invalid_type_error: `${fieldName} must be an array`,
+        error: `${fieldName} must be an array`,
       })
       .max(maxItems, `${fieldName} must have at most ${maxItems} entries`)
       .transform((entries) => entries.map((entry) => entry.trim()).filter((entry) => entry.length > 0))
@@ -148,7 +146,7 @@ const studyContextInputSchema = z.object({
       (value) => (typeof value === "undefined" ? undefined : value),
       z
         .array(studySeriesSchema, {
-          invalid_type_error: "studyContext.series must be an array",
+          error: "studyContext.series must be an array",
         })
         .max(MAX_SERIES, `studyContext.series must have at most ${MAX_SERIES} entries`)
         .transform((entries) =>
@@ -193,7 +191,7 @@ const finalizeCaseInputSchema = z.object({
 const qcCheckSchema = z.object({
   checkId: requiredTrimmedString("qcSummary.checks[].checkId", MAX_SHORT),
   status: z.enum(["pass", "warn", "reject"], {
-    errorMap: () => ({ message: "qcSummary.checks[].status must be pass, warn, or reject" }),
+    error: "qcSummary.checks[].status must be pass, warn, or reject",
   }),
   detail: requiredTrimmedString("qcSummary.checks[].detail", MAX_TEXT),
 }).strict();
@@ -201,8 +199,7 @@ const qcCheckSchema = z.object({
 const qcMetricSchema = z.object({
   name: requiredTrimmedString("qcSummary.metrics[].name", MAX_SHORT),
   value: z.number({
-    required_error: "qcSummary.metrics[].value must be a number",
-    invalid_type_error: "qcSummary.metrics[].value must be a number",
+    error: "qcSummary.metrics[].value must be a number",
   }),
   unit: optionalTrimmedString(MAX_SHORT),
 }).strict();
@@ -214,13 +211,13 @@ const qcSummarySchema = z.preprocess(
     checks: z.preprocess(
       (entry) => (typeof entry === "undefined" ? undefined : entry),
       z.array(qcCheckSchema, {
-        invalid_type_error: "qcSummary.checks must be an array",
+        error: "qcSummary.checks must be an array",
       }).max(MAX_QC_CHECKS, `qcSummary.checks must have at most ${MAX_QC_CHECKS} entries`).optional(),
     ),
     metrics: z.preprocess(
       (entry) => (typeof entry === "undefined" ? undefined : entry),
       z.array(qcMetricSchema, {
-        invalid_type_error: "qcSummary.metrics must be an array",
+        error: "qcSummary.metrics must be an array",
       }).max(MAX_QC_METRICS, `qcSummary.metrics must have at most ${MAX_QC_METRICS} entries`).optional(),
     ),
   }).strict().optional(),
@@ -229,8 +226,7 @@ const qcSummarySchema = z.preprocess(
 const measurementSchema = z.object({
   label: requiredTrimmedString("measurement.label", MAX_SHORT),
   value: z.number({
-    required_error: "measurement.value is required",
-    invalid_type_error: "measurement.value is required",
+    error: "measurement.value is required",
   }),
   unit: optionalTrimmedString(MAX_SHORT),
 }).strict();
@@ -249,7 +245,7 @@ const artifactPayloadSchema = z.object({
 const executionContextSchema = z
   .object({
     computeMode: z.enum(["metadata-fallback", "voxel-backed"], {
-      errorMap: () => ({ message: "executionContext.computeMode must be metadata-fallback or voxel-backed" }),
+      error: "executionContext.computeMode must be metadata-fallback or voxel-backed",
     }),
     fallbackCode: z.preprocess(
       (value) => (value === null ? undefined : value),
@@ -272,19 +268,18 @@ const inferenceCallbackSchema = z.object({
   caseId: requiredTrimmedString("caseId", MAX_ID),
   workerId: optionalTrimmedString(MAX_ID),
   qcDisposition: z.enum(["pass", "warn", "reject"], {
-    errorMap: () => ({ message: "qcDisposition must be pass, warn, or reject" }),
+    error: "qcDisposition must be pass, warn, or reject",
   }),
   findings: stringArrayField("findings", { maxItems: MAX_FINDINGS, maxItemLength: MAX_TEXT }),
   measurements: z.array(measurementSchema, {
-    required_error: "measurements must be an array",
-    invalid_type_error: "measurements must be an array",
+    error: "measurements must be an array",
   }).max(MAX_MEASUREMENTS, `measurements must have at most ${MAX_MEASUREMENTS} entries`),
   artifacts: stringArrayField("artifacts", { maxItems: MAX_ARTIFACTS, maxItemLength: MAX_REF }),
   artifactPayloads: z
     .preprocess(
       (value) => (typeof value === "undefined" ? undefined : value),
       z.array(artifactPayloadSchema, {
-        invalid_type_error: "artifactPayloads must be an array",
+        error: "artifactPayloads must be an array",
       }).max(MAX_ARTIFACT_PAYLOADS, `artifactPayloads must have at most ${MAX_ARTIFACT_PAYLOADS} entries`).optional(),
     ),
   executionContext: z
@@ -334,7 +329,7 @@ const deliveryCallbackSchema = z.object({
   caseId: requiredTrimmedString("caseId", MAX_ID),
   workerId: optionalTrimmedString(MAX_ID),
   deliveryStatus: z.enum(["delivered", "failed"], {
-    errorMap: () => ({ message: "deliveryStatus must be delivered or failed" }),
+    error: "deliveryStatus must be delivered or failed",
   }),
   detail: optionalTrimmedString(MAX_TEXT),
 }).strict();
@@ -461,8 +456,10 @@ const dispatchFailSchema = z.object({
   caseId: requiredTrimmedString("caseId", MAX_ID),
   leaseId: requiredTrimmedString("leaseId", MAX_ID),
   failureClass: z.enum(["transient", "terminal"], {
-    required_error: "failureClass is required",
-    invalid_type_error: "failureClass must be 'transient' or 'terminal'",
+    error: (issue) =>
+      typeof issue.input === "undefined"
+        ? "failureClass is required"
+        : "failureClass must be 'transient' or 'terminal'",
   }),
   errorCode: requiredTrimmedString("errorCode", MAX_SHORT),
   detail: optionalTrimmedString(MAX_TEXT),

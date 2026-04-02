@@ -1,8 +1,8 @@
 ---
 title: "Фундаментальное описание проекта"
 status: "active"
-version: "1.0.0"
-last_updated: "2026-03-31"
+version: "1.1.0"
+last_updated: "2026-04-01"
 tags: [academic, fundamentals, overview, architecture]
 role: documentation
 ---
@@ -307,7 +307,7 @@ INGESTING ──────→ SUBMITTED
 |---|---|---|---|---|---|
 | **Тип** | Закрытый SaMD | Закрытый SaMD | Закрытый SaMD | Закрытая платформа | **Открытый (MIT)** |
 | **Фокус** | Нейро-волюметрия | MS, TBI, деменция | Инсульт | Enterprise triage | **Workflow (любой ИИ)** |
-| **FDA** | ✅ 510(k) cleared | ✅ CE + FDA | ✅ CE + FDA | ✅ Multiple clearances | RUO (целевой: CDS Non-Device) |
+| **FDA** | ✅ 510(k) cleared | ✅ CE + FDA | ✅ CE + FDA | ✅ Multiple clearances | RUO (pathway TBD) |
 | **Стоимость** | $50-100K/год | Аналогично | Аналогично | Enterprise pricing | **$0** |
 | **Модели** | Собственные | Собственные | Собственные | Агрегатор | **Любые (FastSurfer, nnU-Net...)** |
 | **Clinician-in-loop** | Dashboard | Dashboard | Dashboard | Alert-based | **Архитектурный инвариант** |
@@ -319,7 +319,7 @@ INGESTING ──────→ SUBMITTED
 
 | Параметр | Kaapana (DKFZ) | MONAI Deploy (NVIDIA) | XNAT | **MRI Second Opinion** |
 |---|---|---|---|---|
-| **Назначение** | Research platform | AI packaging + deploy | Imaging informatics | **Clinical workflow** |
+| **Назначение** | Research platform | AI packaging + deploy | Imaging informatics | **RUO MRI workflow baseline** |
 | **Инфраструктура** | Kubernetes (сложная) | Docker + MAP | Java/Tomcat | **Node.js (простая)** |
 | **Стейт-машина** | ❌ DAG workflow | ❌ Linear pipeline | ❌ Архивная модель | **✅ 9-state FSM** |
 | **Clinician review** | Опционально | Нет | Нет | **Обязательно** |
@@ -329,12 +329,14 @@ INGESTING ──────→ SUBMITTED
 
 ### 6.3. Ключевые отличия MRI Second Opinion
 
-На март 2026 **ни один** из перечисленных проектов не сочетает:
+На март 2026 MRI Second Opinion занимает редкую нишу в **MRI-only RUO workflow tooling** и сочетает:
 
 1. **Принудительный clinician-in-the-loop** — в других системах проверка врачом опциональна или реализована через настройку. В MRI-SO она встроена в стейт-машину на уровне кода
 2. **Transparent orchestration** — врач видит не только результат, а всю цепочку: что нашла нейросеть, какие измерения сделала, какого качества были снимки
 3. **4-level claim discipline** — формальное разделение: что реализовано, что запланировано, что обосновано наукой, что исключено
 4. **Низкий порог входа** — `npm install && npm run dev` вместо Kubernetes-кластера
+
+Это сравнительное утверждение относится к текущему lightweight standalone profile и не означает regulatory clearance, production-grade viewer parity, или clinical deployment readiness.
 
 ---
 
@@ -342,27 +344,31 @@ INGESTING ──────→ SUBMITTED
 
 ### 7.1. Количественные показатели
 
+Вместо быстро устаревающих file-count и LOC claims ниже зафиксированы более стабильные repository-backed метрики.
+
 | Метрика | Значение |
 |---|---|
-| Исходный код | 22 файла, ~5 300 строк |
-| Тесты | 7 файлов, ~2 300 строк, 15 сценариев |
-| Документация | 73 файла, ~300 КБ |
-| Зависимости (runtime) | 4 (express, pg, redis, zod) |
+| Публичные маршруты API | 16 |
+| Internal routes | 11 |
+| Persisted workflow states | 9 |
+| Artifact-store providers | 2 (`local-file`, `s3-compatible`) |
+| Export families | 2 (DICOM SR JSON envelope, FHIR R4 DiagnosticReport) |
+| Зависимости (runtime) | 9 |
 | Зависимости (dev) | 6 |
-| Покрытие тестами (API) | Все 16 публичных маршрутов |
 | CI pipeline | 2 job'а: build+test+SBOM, PostgreSQL smoke |
-| SBOM | CycloneDX 1.5, 228 КБ |
+| Node baseline | 22+ |
+| SBOM | CycloneDX generation + CI artifact upload |
 
 ### 7.2. Качественные оценки
 
 | Критерий | Оценка | Комментарий |
 |---|---|---|
 | Доменная модель | 10/10 | 9-state FSM, формально верифицирована |
-| Безопасность | 8/10 | HMAC-SHA256 (dispatch routes), timing-safe bearer auth; nonce replay store implemented but not yet enforced |
+| Безопасность | 8.5/10 | Bearer protection for `/api/internal/*`, HMAC-SHA256 + nonce replay on dispatch routes, Helmet/CSP, rate limiting; remaining gap is stronger clinician/operator authorization on public clinical routes |
 | Валидация входных данных | 10/10 | Полная Zod-схема для всех endpoints |
 | Качество кода | 9.9/10 | Clean separation, модульность, TypeScript strict |
-| Тестирование | 9.5/10 | 1 875 строк тестов, restart-safety проверена |
-| Документация | 9.8/10 | Академический уровень, 73 файла, honest non-claims |
+| Тестирование | 9.5/10 | Route-level и persistence tests покрывают workflow transitions, exports, runtime hardening, config, и queue behavior |
+| Документация | 9.8/10 | Академический, regulatory, security, release и verification surfaces с honest non-claims |
 | Регуляторная готовность | 8.7/10 | SBOM, threat model, bias framework, PMS plan |
 
 ### 7.3. Оценка стоимости разработки
@@ -380,32 +386,34 @@ INGESTING ──────→ SUBMITTED
 ### 8.1. Пять волн развития
 
 ```
-Волна 1 (1-2 недели):    Hardening → rate limiting, graceful shutdown,
-                           Prometheus-метрики
+Волна 1 (закрыта):       Hardening baseline → rate limiting, graceful shutdown,
+                           Prometheus-метрики, document security headers
                               ↓
-Волна 2 (3-4 недели):    Compute → реальный Python-воркер с FastSurfer
-                           и nnU-Net для сегментации мозга
+Волна 2 (закрыта):       Compute/control baseline → Python worker,
+                           dispatch API, HMAC + replay, durable queue rails
                               ↓
-Волна 3 (2-3 недели):    Viewer → OHIF v3.12 + Orthanc для
-                           профессионального просмотра снимков
+Волна 3 (следующая):     Real ML pipeline → FastSurfer + nnU-Net
+                           на bounded MRI workflow families
                               ↓
-Волна 4 (4-6 недель):    Interop → DICOM SR + FHIR export
-                           для интеграции с больничными системами
+Волна 4 (следующая):     Viewer/archive layer → OHIF v3.12 + Orthanc/
+                           DICOMweb deployment proof
                               ↓
-Волна 5 (3-6 месяцев):   Evidence → клиническое исследование
-                           (50-100 случаев, 2-3 нейрорадиолога)
+Волна 5 (следующая):     Interop + evidence → binary DICOM Part-10,
+                           stronger FHIR packaging, reader study operations
 ```
 
 ### 8.2. Регуляторный путь
 
-Наиболее вероятный путь: **FDA CDS Non-Device**.
+Наиболее честная текущая позиция: **RUO-first с pathway evaluation later**.
 
-FDA в январе 2026 расширила категорию ПО, которое **не является медицинским устройством**: если программа даёт **одну клинически обоснованную рекомендацию**, а врач может **независимо проверить её основу** — регистрация как медизделие не требуется.
+Текущий репозиторий не должен предполагать, что будущий FDA-путь уже решён как CDS Non-Device, 510(k), или другой вариант. Итоговая классификация зависит от точного intended use, claim surface, human-oversight semantics, и того, какие clinical or deployment claims реально будут заявлены.
 
-MRI Second Opinion попадает в эту категорию, потому что:
-- Выдаёт второе мнение, а не диагноз
-- Показывает основу заключения (findings, measurements, QC)
-- Врач обязан проверить и подтвердить результат
+Что уже помогает будущему pathway analysis:
+- система выдаёт AI-assisted draft, а не автономный диагноз
+- структура findings, measurements, QC и provenance делает reasoning surface более проверяемым
+- clinician review остаётся обязательным архитектурным инвариантом
+
+Но эти свойства сами по себе не закрывают regulatory classification question. Authority surface для текущего статуса остаётся `docs/academic/regulatory-positioning.md`.
 
 ### 8.3. Научная публикация
 

@@ -35,7 +35,7 @@ import {
   parseReviewCaseInput,
   parseRequeueExpiredInferenceJobsInput,
 } from "./validation";
-import { createPublicApiRateLimiter, metricsMiddleware, writeMetricsResponse } from "./http-runtime";
+import { createCorsMiddleware, createPublicApiRateLimiter, metricsMiddleware, writeMetricsResponse } from "./http-runtime";
 
 export interface CreateAppOptions {
   postgresPoolFactory?: PostgresPoolFactory;
@@ -109,6 +109,7 @@ export function createApp(config: AppConfig, options: CreateAppOptions = {}) {
   app.use(requestContextMiddleware);
   app.use(metricsMiddleware);
   app.use(requestLoggingMiddleware);
+  app.use(createCorsMiddleware(config));
   app.use("/api/internal", createInternalAuthMiddleware(config));
   app.use("/api", publicApiRateLimiter);
   app.use(express.json({ limit: config.jsonBodyLimit ?? "1mb" }));
