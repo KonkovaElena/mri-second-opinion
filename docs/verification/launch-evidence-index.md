@@ -8,8 +8,9 @@ Every claim about launch readiness should link back to one or more artifacts lis
 
 - Current verdict: `PUBLIC_GITHUB_READY`
 - Last reviewed: 2026-04-02
+- Current boundary note: the publication-safe verdict still stands, but the 2026-04-02 runtime and production-boundary audit confirms unresolved blockers for any stronger security or deployment claim: body-supplied reviewer identity, missing object-level authorization on public case/report/export/artifact surfaces, public-to-worker `volumeDownloadUrl` fetch reachability, and public delivery-outcome mutation through finalize.
 - Latest hosted-validated head: `04cb0a57d1e64f8a5cf03a22b4a5c60d37dffc3a`
-- Current local validation snapshot above that hosted head: `npm run build` is clean and `npm test` reports 154 total tests, 153 pass, 0 fail, and 1 skipped after adding strict-by-default browser-origin hardening: explicit `MRI_CORS_ALLOWED_ORIGINS` parsing, public-route preflight approval for allowlisted origins, denial of disallowed cross-origin reads, and rejection of internal authorization-header browser preflights, on top of the earlier artifact-boundary hardening, semantic payload-size validation, archive-lookup graceful degradation, PostgreSQL payload round-trip hardening, hyper-deep audit plus academic doc audit, and the `s3-compatible` artifact backend plus post-A2 documentation reconciliation
+- Current local validation snapshot above that hosted head: `npm run build` is clean and the latest local audit rerun recorded `npm test` as green with 154 total tests, 153 passes, 0 failures, and 1 skipped test. The current local snapshot still includes the earlier strict-by-default browser-origin hardening, artifact-boundary hardening, semantic payload-size validation, archive-lookup graceful degradation, PostgreSQL payload round-trip hardening, bounded worker execution-contract alignment, and the `s3-compatible` artifact backend.
 - Previous hosted-validated head: `1e340b978bfa35a2ed339adcdb0d2add56cc08c3`
 - Wave 1.5 evidence status: closed on `04cb0a57d1e64f8a5cf03a22b4a5c60d37dffc3a`; GitHub-hosted `ci` and `docs-governance` both succeeded on the same runtime-and-doc reconciliation head after the worker execution-contract alignment landed. Later docs-only evidence refreshes do not reopen Wave 1.5 unless they change platform-sensitive runtime paths or GitHub workflow surfaces.
 - Wave 2B evidence status: locally closed on the bounded compute seam recorded in `docs/verification/wave-2b-bounded-compute-audit-2026-03-29.md`; the remaining compute gaps are DICOM-derived or package-grade execution and distributed worker infrastructure, not the absence of a real worker boundary.
@@ -20,6 +21,7 @@ Every claim about launch readiness should link back to one or more artifacts lis
 - Public repository: `https://github.com/KonkovaElena/mri-second-opinion`
 - Auditor handoff: `docs/verification/ai-auditor-handoff-2026-03-25.md` (historical snapshot dated 2026-03-25; current verdict advanced later)
 - Repository-status retrospective: `docs/verification/publication-retrospective-audit-2026-03-27.md`
+- Runtime and production boundary audit: `docs/verification/runtime-and-production-boundary-audit-2026-04-02.md`
 - Gap audit: `docs/verification/standalone-gap-audit-2026-03-27.md`
 - Archive/viewer seam audit: `docs/verification/archive-viewer-seam-audit-2026-03-27.md`
 - Presentation surface audit: `docs/verification/presentation-surface-audit-2026-03-27.md`

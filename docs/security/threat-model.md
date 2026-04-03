@@ -21,7 +21,7 @@ That means:
 3. built-in workbench review surface
 4. internal callback, dispatch-auth, and queue-claim routes used by the bounded workflow system
 
-It does not yet describe a production deployment perimeter with external identity, hosted DICOM infrastructure, or a hosted or distributed Python inference fleet.
+It does not yet describe a production deployment perimeter with external identity, actor-scoped object authorization, hosted DICOM infrastructure, controlled worker egress, or a hosted or distributed Python inference fleet.
 
 ## Trust Boundaries
 
@@ -31,6 +31,8 @@ The most important current trust boundaries are:
 2. persisted workflow truth versus transient worker execution state
 3. report and derived-artifact metadata versus the underlying stored files
 4. repository dependency inputs versus the runtime assembled in CI or local installation
+5. reviewer metadata supplied in public requests versus authenticated clinician authority
+6. public study input versus worker-side network fetch targets
 
 ## Protected Assets
 
@@ -49,7 +51,10 @@ The current workflow system should protect:
 | stale writer on queue claim | partially mitigated on the tested local path | duplicate or misleading background work attribution |
 | duplicate inference callback replay | mitigated by callback replay guards | repeated case mutation or state confusion |
 | premature delivery callback after queue loss | mitigated by active delivery-job guard | incorrect delivery completion state |
-| machine impersonation of clinician actions | open gap | review or finalize actions are recorded as data, not authenticated proof |
+| machine impersonation of clinician actions | open gap | review or finalize actions are still recorded as request data rather than authenticated clinician proof |
+| public object access without actor-scoped authorization | open gap | unauthorized callers can reach case, report, export, or artifact surfaces more broadly than a stronger deployment posture would allow |
+| public-supplied worker fetch target | open gap | a caller can influence worker-side URL fetching through study payload fields, creating the current SSRF-class boundary |
+| clinician finalization coupled to delivery mutation | open gap | public finalize can simulate delivery success or failure instead of leaving that truth to delivery-plane actors |
 | internal route replay or signature spoofing | mitigated | namespace bearer protection gates all `/api/internal/*` routes; HMAC-SHA256 request signing with nonce replay enforcement protects `/api/internal/dispatch/*` |
 | artifact tampering after generation | open gap | report and derived artifacts do not yet have checksum verification |
 | inference-worker crash and silent work loss | open gap | stronger lease recovery and scheduler-driven liveness are absent |
@@ -69,16 +74,20 @@ The repository already has meaningful baseline mitigations.
 8. Helmet manages the document response header baseline: strict Content-Security-Policy, `X-Content-Type-Options`, `X-Frame-Options`, `Referrer-Policy`, `X-Permitted-Cross-Domain-Policies`, same-origin COOP/CORP, production HSTS, and `X-Powered-By` remains suppressed
 9. archive-lookup HTTP client enforces a 10-second `AbortSignal.timeout` to bound external-service latency
 10. browser-origin access is strict by default: cross-origin reads require explicit `MRI_CORS_ALLOWED_ORIGINS` allowlisting on selected public routes, while internal browser preflights remain unapproved
+11. internal bearer and HMAC protections currently apply only to internal routes and do not yet authenticate public clinician, report, export, or artifact access paths
 
 ## Open Gaps
 
 The highest-value security gaps that still remain are:
 
 1. authenticated clinician identity and stronger operator authorization semantics
-2. ~~nonce replay enforcement~~ — closed: replay store is now wired into dispatch middleware (see mitigations 6–7)
-3. artifact checksum persistence and verification
-4. stronger lease recovery for inference work after crash or network interruption
-5. a formal vulnerability-intake and remediation SOP tied to release evidence
+2. object-level authorization for public case, report, export, and artifact surfaces
+3. worker egress allowlisting and SSRF-resistant handling for public-to-worker volume references
+4. separation of clinician finalization from delivery-outcome mutation authority
+5. ~~nonce replay enforcement~~ — closed: replay store is now wired into dispatch middleware (see mitigations 6–7)
+6. artifact checksum persistence and verification
+7. stronger lease recovery for inference work after crash or network interruption
+8. a formal vulnerability-intake and remediation SOP tied to release evidence
 
 ## Phase 1 Hardening Actions
 
@@ -100,6 +109,7 @@ This document must not be read as proof of:
 2. hospital deployment readiness
 3. regulated cybersecurity-file completion
 4. authenticated multi-actor clinical operations
+5. closed object-level authorization or worker-egress policy
 
 ## Interaction With Other Docs
 

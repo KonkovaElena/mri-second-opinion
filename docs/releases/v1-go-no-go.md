@@ -18,9 +18,20 @@ Only these verdicts are allowed:
 
 The seven launch gates in `../launch-readiness-checklist.md` remain satisfied for the conservative public-publication posture: the repository is independently buildable, the bounded workflow slice is locally verified, the built-in review workbench and synthetic demo path are real, public repository hygiene is hosted-proof-backed on the latest fully hosted-validated head, and documentation honesty is aligned to current runtime truth. The latest fully hosted-validated head is now `04cb0a57d1e64f8a5cf03a22b4a5c60d37dffc3a`, which closes Wave 1.5 for the current platform-sensitive and release-evidence baseline. The earlier runtime-bearing head `f6021ecdb45f4ecf5aece2c52cc0e6f462361d49` remains the Wave 2A artifact-persistence milestone, and `1e340b978bfa35a2ed339adcdb0d2add56cc08c3` remains the prior full hosted-validation milestone. Later docs-only evidence refresh commits do not reopen Wave 1.5 or the publication verdict unless they change platform-sensitive runtime behavior or GitHub workflow surfaces. Remaining gaps are still real, and they belong to higher product-maturity work rather than to safe public GitHub publication.
 
+The 2026-04-02 runtime and production-boundary audit adds a sharper boundary around that verdict:
+
+1. reviewer identity on public review and finalize flows is still request-body data rather than authenticated clinician authority
+2. public case, report, export, and artifact surfaces still lack actor-scoped object authorization proof
+3. public study input can still reach worker-side `volumeDownloadUrl` fetch paths
+4. public finalize can still mutate `deliveryOutcome`
+
+These are real blockers for production, clinical, and stronger security-readiness claims.
+
+They do not invalidate `PUBLIC_GITHUB_READY`, because this verdict is about safe and honest repository publication, not about deployment safety.
+
 ## Evidence Basis
 
-For the current evidence ledger and the publication reconciliation lessons behind this verdict, use `../verification/launch-evidence-index.md` together with `../verification/publication-retrospective-audit-2026-03-27.md`.
+For the current evidence ledger and the publication reconciliation lessons behind this verdict, use `../verification/launch-evidence-index.md` together with `../verification/publication-retrospective-audit-2026-03-27.md` and `../verification/runtime-and-production-boundary-audit-2026-04-02.md`.
 
 The active evidence ledger records that `04cb0a57d1e64f8a5cf03a22b4a5c60d37dffc3a` is now the latest head with both hosted `ci` and `docs-governance` proof, while `f6021ecdb45f4ecf5aece2c52cc0e6f462361d49` remains the earlier runtime-bearing artifact-persistence milestone and `1e340b978bfa35a2ed339adcdb0d2add56cc08c3` remains the prior fully hosted-validated head. That closes Wave 1.5 without changing the repository-level verdict.
 
@@ -55,6 +66,9 @@ Open evidence that still blocks higher product-maturity claims:
 2. release-linked or hosted workflow execution beyond the local bounded slice
 3. broader real-PostgreSQL runtime durability proof beyond clean bootstrap and targeted queue coverage
 4. distributed or external worker execution proof
+5. authenticated clinician authority and object-level authorization on public workflow surfaces
+6. closed worker egress policy for public-to-worker volume references
+7. separation of clinician finalization from delivery-plane mutation authority
 
 ## Upgrade Rules
 

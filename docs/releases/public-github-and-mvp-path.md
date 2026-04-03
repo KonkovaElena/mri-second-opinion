@@ -31,6 +31,7 @@ The current repository is best understood as:
 4. Wave 1.5 hosted evidence closure is complete on `04cb0a57d1e64f8a5cf03a22b4a5c60d37dffc3a`; that head carries both hosted workflows for the worker-execution-contract alignment and release-doc reconciliation, while `f6021ecdb45f4ecf5aece2c52cc0e6f462361d49` remains the earlier Wave 2A artifact-persistence milestone
 5. workflow MVP is not yet closed
 6. repository verdict is `PUBLIC_GITHUB_READY`
+7. the April 2026 deep boundary audit confirms that authenticated clinician authority, object-level authorization, worker fetch allowlisting, and clinical-versus-delivery control-plane separation are still open follow-on work rather than closed current-state proof
 
 ## Track A: Public GitHub Readiness
 
@@ -63,6 +64,8 @@ Track A is complete when the repository can be published publicly on GitHub with
 This is a publication-safety state and now supports the repository-level verdict `PUBLIC_GITHUB_READY`.
 
 It still does not imply `INTERNAL_DEMO_READY`, launch readiness, or clinical/product readiness.
+
+It also does not imply closed clinician authentication, object-level authorization, or secure worker egress policy.
 
 Primary planning references:
 

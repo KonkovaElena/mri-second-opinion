@@ -1,8 +1,8 @@
 ---
 title: "Аудит-отчёт v6"
-status: "active"
-version: "6.0.0"
-last_updated: "2026-03-28"
+status: "archived-historical"
+version: "6.0.1"
+last_updated: "2026-04-02"
 tags: [audit, verification, quality, assessment]
 role: evidence
 ---
@@ -10,6 +10,12 @@ role: evidence
 # Аудит-отчёт v6 — Оценка качества проекта
 
 Дата: 2026-03-28 | Commit: d77e31f
+
+## Historical Note
+
+This document is preserved as a dated historical audit snapshot.
+
+Use `runtime-and-production-boundary-audit-2026-04-02.md` for the current security and production-boundary assessment, and use `launch-evidence-index.md` plus `../releases/v1-go-no-go.md` for the active publication verdict.
 
 ## Резюме
 
