@@ -5,9 +5,11 @@ import { getConfig } from "../src/config";
 test("getConfig defaults to snapshot persistence when DATABASE_URL is absent", () => {
   const previousPort = process.env.PORT;
   const previousDatabaseUrl = process.env.DATABASE_URL;
+  const previousJwtSecret = process.env.MRI_REVIEWER_JWT_HS256_SECRET;
 
   delete process.env.DATABASE_URL;
   process.env.PORT = "4010";
+  process.env.MRI_REVIEWER_JWT_HS256_SECRET = "test-reviewer-jwt-secret-0123456789";
 
   try {
     const config = getConfig();
@@ -20,15 +22,22 @@ test("getConfig defaults to snapshot persistence when DATABASE_URL is absent", (
     } else {
       process.env.DATABASE_URL = previousDatabaseUrl;
     }
+    if (previousJwtSecret === undefined) {
+      delete process.env.MRI_REVIEWER_JWT_HS256_SECRET;
+    } else {
+      process.env.MRI_REVIEWER_JWT_HS256_SECRET = previousJwtSecret;
+    }
   }
 });
 
 test("getConfig switches to postgres persistence when DATABASE_URL is present", () => {
   const previousPort = process.env.PORT;
   const previousDatabaseUrl = process.env.DATABASE_URL;
+  const previousJwtSecret = process.env.MRI_REVIEWER_JWT_HS256_SECRET;
 
   process.env.PORT = "4010";
   process.env.DATABASE_URL = "postgresql://demo:demo@127.0.0.1:5432/mri_second_opinion";
+  process.env.MRI_REVIEWER_JWT_HS256_SECRET = "test-reviewer-jwt-secret-0123456789";
 
   try {
     const config = getConfig();
@@ -41,6 +50,11 @@ test("getConfig switches to postgres persistence when DATABASE_URL is present", 
     } else {
       process.env.DATABASE_URL = previousDatabaseUrl;
     }
+    if (previousJwtSecret === undefined) {
+      delete process.env.MRI_REVIEWER_JWT_HS256_SECRET;
+    } else {
+      process.env.MRI_REVIEWER_JWT_HS256_SECRET = previousJwtSecret;
+    }
   }
 });
 
@@ -48,10 +62,12 @@ test("getConfig exposes MRI_INTERNAL_API_TOKEN when configured", () => {
   const previousPort = process.env.PORT;
   const previousDatabaseUrl = process.env.DATABASE_URL;
   const previousInternalApiToken = process.env.MRI_INTERNAL_API_TOKEN;
+  const previousJwtSecret = process.env.MRI_REVIEWER_JWT_HS256_SECRET;
 
   process.env.PORT = "4010";
   delete process.env.DATABASE_URL;
   process.env.MRI_INTERNAL_API_TOKEN = "demo-internal-token";
+  process.env.MRI_REVIEWER_JWT_HS256_SECRET = "test-reviewer-jwt-secret-0123456789";
 
   try {
     const config = getConfig();
@@ -69,55 +85,146 @@ test("getConfig exposes MRI_INTERNAL_API_TOKEN when configured", () => {
     } else {
       process.env.MRI_INTERNAL_API_TOKEN = previousInternalApiToken;
     }
+    if (previousJwtSecret === undefined) {
+      delete process.env.MRI_REVIEWER_JWT_HS256_SECRET;
+    } else {
+      process.env.MRI_REVIEWER_JWT_HS256_SECRET = previousJwtSecret;
+    }
   }
 });
 
-test("getConfig defaults reviewer identity source to request-body", () => {
+test("getConfig requires MRI_REVIEWER_JWT_HS256_SECRET", () => {
   const previousPort = process.env.PORT;
-  const previousIdentitySource = process.env.MRI_REVIEWER_IDENTITY_SOURCE;
+  const previousJwtSecret = process.env.MRI_REVIEWER_JWT_HS256_SECRET;
 
   process.env.PORT = "4010";
-  delete process.env.MRI_REVIEWER_IDENTITY_SOURCE;
+  delete process.env.MRI_REVIEWER_JWT_HS256_SECRET;
+
+  try {
+    assert.throws(
+      () => getConfig(),
+      /MRI_REVIEWER_JWT_HS256_SECRET is required/,
+    );
+  } finally {
+    process.env.PORT = previousPort;
+    if (previousJwtSecret === undefined) {
+      delete process.env.MRI_REVIEWER_JWT_HS256_SECRET;
+    } else {
+      process.env.MRI_REVIEWER_JWT_HS256_SECRET = previousJwtSecret;
+    }
+  }
+});
+
+test("getConfig accepts valid reviewer JWT secret", () => {
+  const previousPort = process.env.PORT;
+  const previousJwtSecret = process.env.MRI_REVIEWER_JWT_HS256_SECRET;
+
+  process.env.PORT = "4010";
+  process.env.MRI_REVIEWER_JWT_HS256_SECRET = "reviewer-jwt-secret-0123456789abcdef";
 
   try {
     const config = getConfig();
-    assert.equal(config.reviewerIdentitySource, "request-body");
+    assert.equal(config.reviewerJwtSecret, "reviewer-jwt-secret-0123456789abcdef");
   } finally {
     process.env.PORT = previousPort;
-    if (previousIdentitySource === undefined) {
-      delete process.env.MRI_REVIEWER_IDENTITY_SOURCE;
+    if (previousJwtSecret === undefined) {
+      delete process.env.MRI_REVIEWER_JWT_HS256_SECRET;
     } else {
-      process.env.MRI_REVIEWER_IDENTITY_SOURCE = previousIdentitySource;
+      process.env.MRI_REVIEWER_JWT_HS256_SECRET = previousJwtSecret;
     }
   }
 });
 
-test("getConfig rejects unsupported reviewer identity source", () => {
+test("getConfig defaults reviewer allowed roles to the qualified clinician baseline", () => {
   const previousPort = process.env.PORT;
-  const previousIdentitySource = process.env.MRI_REVIEWER_IDENTITY_SOURCE;
+  const previousJwtSecret = process.env.MRI_REVIEWER_JWT_HS256_SECRET;
+  const previousReviewerRoles = process.env.MRI_REVIEWER_ALLOWED_ROLES;
 
   process.env.PORT = "4010";
-  process.env.MRI_REVIEWER_IDENTITY_SOURCE = "header";
+  process.env.MRI_REVIEWER_JWT_HS256_SECRET = "reviewer-jwt-secret-0123456789abcdef";
+  delete process.env.MRI_REVIEWER_ALLOWED_ROLES;
 
   try {
-    assert.throws(() => getConfig(), /MRI_REVIEWER_IDENTITY_SOURCE must be request-body/);
+    const config = getConfig();
+    assert.deepEqual(config.reviewerAllowedRoles, ["clinician", "radiologist", "neuroradiologist"]);
   } finally {
     process.env.PORT = previousPort;
-    if (previousIdentitySource === undefined) {
-      delete process.env.MRI_REVIEWER_IDENTITY_SOURCE;
+    if (previousJwtSecret === undefined) {
+      delete process.env.MRI_REVIEWER_JWT_HS256_SECRET;
     } else {
-      process.env.MRI_REVIEWER_IDENTITY_SOURCE = previousIdentitySource;
+      process.env.MRI_REVIEWER_JWT_HS256_SECRET = previousJwtSecret;
+    }
+    if (previousReviewerRoles === undefined) {
+      delete process.env.MRI_REVIEWER_ALLOWED_ROLES;
+    } else {
+      process.env.MRI_REVIEWER_ALLOWED_ROLES = previousReviewerRoles;
     }
   }
 });
+
+test("getConfig parses explicit reviewer allowed roles", () => {
+  const previousPort = process.env.PORT;
+  const previousJwtSecret = process.env.MRI_REVIEWER_JWT_HS256_SECRET;
+  const previousReviewerRoles = process.env.MRI_REVIEWER_ALLOWED_ROLES;
+
+  process.env.PORT = "4010";
+  process.env.MRI_REVIEWER_JWT_HS256_SECRET = "reviewer-jwt-secret-0123456789abcdef";
+  process.env.MRI_REVIEWER_ALLOWED_ROLES = " Neuroradiologist , reviewer , radiologist, reviewer ";
+
+  try {
+    const config = getConfig();
+    assert.deepEqual(config.reviewerAllowedRoles, ["neuroradiologist", "reviewer", "radiologist"]);
+  } finally {
+    process.env.PORT = previousPort;
+    if (previousJwtSecret === undefined) {
+      delete process.env.MRI_REVIEWER_JWT_HS256_SECRET;
+    } else {
+      process.env.MRI_REVIEWER_JWT_HS256_SECRET = previousJwtSecret;
+    }
+    if (previousReviewerRoles === undefined) {
+      delete process.env.MRI_REVIEWER_ALLOWED_ROLES;
+    } else {
+      process.env.MRI_REVIEWER_ALLOWED_ROLES = previousReviewerRoles;
+    }
+  }
+});
+
+test("getConfig rejects an explicitly empty reviewer role allowlist", () => {
+  const previousPort = process.env.PORT;
+  const previousJwtSecret = process.env.MRI_REVIEWER_JWT_HS256_SECRET;
+  const previousReviewerRoles = process.env.MRI_REVIEWER_ALLOWED_ROLES;
+
+  process.env.PORT = "4010";
+  process.env.MRI_REVIEWER_JWT_HS256_SECRET = "reviewer-jwt-secret-0123456789abcdef";
+  process.env.MRI_REVIEWER_ALLOWED_ROLES = " ,  , ";
+
+  try {
+    assert.throws(() => getConfig(), /MRI_REVIEWER_ALLOWED_ROLES must define at least one role/);
+  } finally {
+    process.env.PORT = previousPort;
+    if (previousJwtSecret === undefined) {
+      delete process.env.MRI_REVIEWER_JWT_HS256_SECRET;
+    } else {
+      process.env.MRI_REVIEWER_JWT_HS256_SECRET = previousJwtSecret;
+    }
+    if (previousReviewerRoles === undefined) {
+      delete process.env.MRI_REVIEWER_ALLOWED_ROLES;
+    } else {
+      process.env.MRI_REVIEWER_ALLOWED_ROLES = previousReviewerRoles;
+    }
+  }
+});
+
 test("getConfig rejects production mode without internal route auth", () => {
   const previousPort = process.env.PORT;
   const previousNodeEnv = process.env.NODE_ENV;
   const previousHmac = process.env.MRI_INTERNAL_HMAC_SECRET;
   const previousToken = process.env.MRI_INTERNAL_API_TOKEN;
+  const previousJwtSecret = process.env.MRI_REVIEWER_JWT_HS256_SECRET;
 
   process.env.PORT = "4010";
   process.env.NODE_ENV = "production";
+  process.env.MRI_REVIEWER_JWT_HS256_SECRET = "test-reviewer-jwt-secret-0123456789";
   delete process.env.MRI_INTERNAL_HMAC_SECRET;
   delete process.env.MRI_INTERNAL_API_TOKEN;
 
@@ -143,6 +250,11 @@ test("getConfig rejects production mode without internal route auth", () => {
     } else {
       process.env.MRI_INTERNAL_API_TOKEN = previousToken;
     }
+    if (previousJwtSecret === undefined) {
+      delete process.env.MRI_REVIEWER_JWT_HS256_SECRET;
+    } else {
+      process.env.MRI_REVIEWER_JWT_HS256_SECRET = previousJwtSecret;
+    }
   }
 });
 
@@ -150,10 +262,14 @@ test("getConfig accepts production mode with HMAC auth configured", () => {
   const previousPort = process.env.PORT;
   const previousNodeEnv = process.env.NODE_ENV;
   const previousHmac = process.env.MRI_INTERNAL_HMAC_SECRET;
+  const previousJwtSecret = process.env.MRI_REVIEWER_JWT_HS256_SECRET;
+  const previousOperatorToken = process.env.MRI_OPERATOR_API_TOKEN;
 
   process.env.PORT = "4010";
   process.env.NODE_ENV = "production";
   process.env.MRI_INTERNAL_HMAC_SECRET = "0123456789abcdef0123456789abcdef";
+  process.env.MRI_REVIEWER_JWT_HS256_SECRET = "test-reviewer-jwt-secret-0123456789";
+  process.env.MRI_OPERATOR_API_TOKEN = "test-operator-token-secret-001";
 
   try {
     const config = getConfig();
@@ -173,6 +289,59 @@ test("getConfig accepts production mode with HMAC auth configured", () => {
       delete process.env.MRI_INTERNAL_HMAC_SECRET;
     } else {
       process.env.MRI_INTERNAL_HMAC_SECRET = previousHmac;
+    }
+    if (previousJwtSecret === undefined) {
+      delete process.env.MRI_REVIEWER_JWT_HS256_SECRET;
+    } else {
+      process.env.MRI_REVIEWER_JWT_HS256_SECRET = previousJwtSecret;
+    }
+    if (previousOperatorToken === undefined) {
+      delete process.env.MRI_OPERATOR_API_TOKEN;
+    } else {
+      process.env.MRI_OPERATOR_API_TOKEN = previousOperatorToken;
+    }
+  }
+});
+
+test("getConfig rejects production mode without operator API token", () => {
+  const previousPort = process.env.PORT;
+  const previousNodeEnv = process.env.NODE_ENV;
+  const previousHmac = process.env.MRI_INTERNAL_HMAC_SECRET;
+  const previousJwtSecret = process.env.MRI_REVIEWER_JWT_HS256_SECRET;
+  const previousOperatorToken = process.env.MRI_OPERATOR_API_TOKEN;
+
+  process.env.PORT = "4010";
+  process.env.NODE_ENV = "production";
+  process.env.MRI_INTERNAL_HMAC_SECRET = "0123456789abcdef0123456789abcdef";
+  process.env.MRI_REVIEWER_JWT_HS256_SECRET = "test-reviewer-jwt-secret-0123456789";
+  delete process.env.MRI_OPERATOR_API_TOKEN;
+
+  try {
+    assert.throws(
+      () => getConfig(),
+      /MRI_OPERATOR_API_TOKEN is required in production/,
+    );
+  } finally {
+    process.env.PORT = previousPort;
+    if (previousNodeEnv === undefined) {
+      delete process.env.NODE_ENV;
+    } else {
+      process.env.NODE_ENV = previousNodeEnv;
+    }
+    if (previousHmac === undefined) {
+      delete process.env.MRI_INTERNAL_HMAC_SECRET;
+    } else {
+      process.env.MRI_INTERNAL_HMAC_SECRET = previousHmac;
+    }
+    if (previousJwtSecret === undefined) {
+      delete process.env.MRI_REVIEWER_JWT_HS256_SECRET;
+    } else {
+      process.env.MRI_REVIEWER_JWT_HS256_SECRET = previousJwtSecret;
+    }
+    if (previousOperatorToken === undefined) {
+      delete process.env.MRI_OPERATOR_API_TOKEN;
+    } else {
+      process.env.MRI_OPERATOR_API_TOKEN = previousOperatorToken;
     }
   }
 });

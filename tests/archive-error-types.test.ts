@@ -8,6 +8,10 @@ import { tmpdir } from "node:os";
 import { createApp } from "../src/app";
 import type { AppConfig } from "../src/config";
 
+const DEFAULT_INTERNAL_API_TOKEN = "test-internal-token-secret-001";
+const DEFAULT_OPERATOR_API_TOKEN = "test-operator-token-secret-001";
+const DEFAULT_REVIEWER_JWT_SECRET = "reviewer-jwt-secret-0123456789abcdef";
+
 // ---------- helpers (mirrors workflow-api.test.ts patterns) ----------
 
 function createTestStoreFile() {
@@ -29,13 +33,15 @@ function buildTestConfig(
     caseStoreDatabaseUrl: undefined,
     caseStoreSchema: "public",
     databaseUrl: undefined,
-    internalApiToken: undefined,
+    internalApiToken: DEFAULT_INTERNAL_API_TOKEN,
     hmacSecret: undefined,
+    operatorApiToken: DEFAULT_OPERATOR_API_TOKEN,
     clockSkewToleranceMs: 60_000,
     replayStoreTtlMs: 120_000,
     replayStoreMaxEntries: 10_000,
     persistenceMode: "snapshot",
-    reviewerIdentitySource: "request-body",
+    reviewerJwtSecret: DEFAULT_REVIEWER_JWT_SECRET,
+    reviewerAllowedRoles: ["clinician", "radiologist", "neuroradiologist"],
     jsonBodyLimit: "1mb",
     publicApiRateLimitWindowMs: 900_000,
     publicApiRateLimitMaxRequests: 300,
@@ -82,7 +88,7 @@ async function withServer<T>(
       jsonRequest: async (path: string, init?: RequestInit) => {
         const response = await fetch(`${baseUrl}${path}`, {
           ...init,
-          headers: { "content-type": "application/json", ...(init?.headers ?? {}) },
+          headers: withImplicitAuth(path, { "content-type": "application/json", ...(init?.headers ?? {}) }),
         });
         const text = await response.text();
         const body = text.length > 0 ? JSON.parse(text) : null;
@@ -94,6 +100,28 @@ async function withServer<T>(
       await app.locals.caseService.close();
     });
   }
+}
+
+function isInternalProtectedPath(path: string) {
+  return /^\/api\/internal(\/|$)/.test(path);
+}
+
+function isOperatorProtectedPath(path: string) {
+  return /^\/api\/(cases|operations|delivery)(\/|$)/.test(path);
+}
+
+function withImplicitAuth(path: string, headers: HeadersInit | undefined) {
+  const normalizedHeaders = new Headers(headers ?? {});
+
+  if (isInternalProtectedPath(path) && !normalizedHeaders.has("authorization")) {
+    normalizedHeaders.set("authorization", `Bearer ${DEFAULT_INTERNAL_API_TOKEN}`);
+  }
+
+  if (isOperatorProtectedPath(path) && !normalizedHeaders.has("x-api-key")) {
+    normalizedHeaders.set("x-api-key", DEFAULT_OPERATOR_API_TOKEN);
+  }
+
+  return normalizedHeaders;
 }
 
 /**

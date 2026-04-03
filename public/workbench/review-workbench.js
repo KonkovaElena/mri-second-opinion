@@ -18,10 +18,15 @@ const elements = {
   selectedCaseChip: document.getElementById("selected-case-chip"),
   reviewForm: document.getElementById("review-form"),
   finalizeForm: document.getElementById("finalize-form"),
+  reviewerBearerToken: document.getElementById("reviewer-bearer-token"),
+  operatorApiKey: document.getElementById("operator-api-key"),
   refreshButton: document.getElementById("refresh-button"),
   retryButton: document.getElementById("retry-submit"),
   draftButton: document.getElementById("draft-submit"),
 };
+
+const REVIEWER_TOKEN_STORAGE_KEY = "mri-reviewer-bearer-token";
+const OPERATOR_KEY_STORAGE_KEY = "mri-operator-api-key";
 
 function setFlash(message, isError = false) {
   elements.flash.textContent = message;
@@ -29,10 +34,17 @@ function setFlash(message, isError = false) {
 }
 
 async function fetchJson(path, init) {
+  const operatorKey = elements.operatorApiKey?.value?.trim() || "";
+  const implicitHeaders = {};
+  if (operatorKey) {
+    implicitHeaders["x-api-key"] = operatorKey;
+  }
+
   const response = await fetch(path, {
     ...init,
     headers: {
       "content-type": "application/json",
+      ...implicitHeaders,
       ...(init?.headers ?? {}),
     },
   });
@@ -44,6 +56,33 @@ async function fetchJson(path, init) {
   }
 
   return body;
+}
+
+function getReviewerBearerToken() {
+  return elements.reviewerBearerToken?.value?.trim() || "";
+}
+
+function requireReviewerMutationHeaders() {
+  const token = getReviewerBearerToken();
+
+  if (!token) {
+    throw new Error("Provide a reviewer bearer token before submitting review or finalize actions.");
+  }
+
+  return {
+    authorization: `Bearer ${token}`,
+  };
+}
+
+function persistReviewerBearerToken() {
+  const token = getReviewerBearerToken();
+
+  if (!token) {
+    window.localStorage.removeItem(REVIEWER_TOKEN_STORAGE_KEY);
+    return;
+  }
+
+  window.localStorage.setItem(REVIEWER_TOKEN_STORAGE_KEY, token);
 }
 
 function updateQuery(caseId, panel, artifactId = null) {
@@ -327,21 +366,20 @@ async function ensureDraft(caseId, stage) {
 async function ensureReviewed(caseId) {
   await fetchJson(`/api/cases/${caseId}/review`, {
     method: "POST",
+    headers: requireReviewerMutationHeaders(),
     body: JSON.stringify({
-      reviewerId: "clinician-demo",
-      reviewerRole: "neuroradiologist",
       comments: "Synthetic demo review completed.",
       finalImpression: "No acute intracranial abnormality. Mild chronic volume loss only.",
     }),
   });
 }
 
-async function ensureFinalized(caseId, deliveryOutcome) {
+async function ensureFinalized(caseId) {
   await fetchJson(`/api/cases/${caseId}/finalize`, {
     method: "POST",
+    headers: requireReviewerMutationHeaders(),
     body: JSON.stringify({
       finalSummary: "Clinician-reviewed summary locked and queued for delivery.",
-      deliveryOutcome,
     }),
   });
 }
@@ -353,7 +391,19 @@ async function seedDemo(stage) {
   }
   if (stage === "delivery-failed" || stage === "delivery-pending") {
     await ensureReviewed(caseId);
-    await ensureFinalized(caseId, "failed");
+    await ensureFinalized(caseId);
+    await fetchJson("/api/internal/delivery-jobs/claim-next", {
+      method: "POST",
+      body: JSON.stringify({ workerId: "workbench-demo" }),
+    });
+    await fetchJson("/api/internal/delivery-callback", {
+      method: "POST",
+      body: JSON.stringify({
+        caseId,
+        deliveryStatus: "failed",
+        detail: "Synthetic demo delivery failure.",
+      }),
+    });
   }
   if (stage === "delivery-pending") {
     await fetchJson(`/api/delivery/${caseId}/retry`, {
@@ -374,9 +424,12 @@ async function submitReview(event) {
     setFlash("Select a case before submitting a review.", true);
     return;
   }
+  persistReviewerBearerToken();
   const payload = Object.fromEntries(new FormData(elements.reviewForm).entries());
+  delete payload.reviewerBearerToken;
   await fetchJson(`/api/cases/${state.selectedCaseId}/review`, {
     method: "POST",
+    headers: requireReviewerMutationHeaders(),
     body: JSON.stringify(payload),
   });
   await refresh();
@@ -389,9 +442,11 @@ async function submitFinalize(event) {
     setFlash("Select a case before finalizing.", true);
     return;
   }
+  persistReviewerBearerToken();
   const payload = Object.fromEntries(new FormData(elements.finalizeForm).entries());
   await fetchJson(`/api/cases/${state.selectedCaseId}/finalize`, {
     method: "POST",
+    headers: requireReviewerMutationHeaders(),
     body: JSON.stringify(payload),
   });
   await refresh();
@@ -430,6 +485,9 @@ elements.reviewForm.addEventListener("submit", (event) => {
 elements.finalizeForm.addEventListener("submit", (event) => {
   submitFinalize(event).catch((error) => setFlash(error.message, true));
 });
+elements.reviewerBearerToken?.addEventListener("change", () => {
+  persistReviewerBearerToken();
+});
 elements.retryButton.addEventListener("click", () => {
   retryDelivery().catch((error) => setFlash(error.message, true));
 });
@@ -444,6 +502,24 @@ for (const button of document.querySelectorAll("[data-demo-stage]")) {
 }
 
 const autoDemoStage = query.get("demoStage");
+const persistedReviewerToken = window.localStorage.getItem(REVIEWER_TOKEN_STORAGE_KEY);
+if (persistedReviewerToken && elements.reviewerBearerToken) {
+  elements.reviewerBearerToken.value = persistedReviewerToken;
+}
+const persistedOperatorKey = window.localStorage.getItem(OPERATOR_KEY_STORAGE_KEY);
+if (persistedOperatorKey && elements.operatorApiKey) {
+  elements.operatorApiKey.value = persistedOperatorKey;
+}
+if (elements.operatorApiKey) {
+  elements.operatorApiKey.addEventListener("change", () => {
+    const key = elements.operatorApiKey.value?.trim() || "";
+    if (key) {
+      window.localStorage.setItem(OPERATOR_KEY_STORAGE_KEY, key);
+    } else {
+      window.localStorage.removeItem(OPERATOR_KEY_STORAGE_KEY);
+    }
+  });
+}
 refresh()
   .then(async () => {
     if (autoDemoStage) {

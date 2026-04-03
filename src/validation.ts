@@ -5,7 +5,6 @@ import {
   type DeliveryCallbackInput,
   type FinalizeCaseInput,
   type InferenceCallbackInput,
-  type ReviewCaseInput,
 } from "./case-contracts";
 import type { QcSummaryInput, StudyContextInput } from "./case-imaging";
 
@@ -176,9 +175,7 @@ const createCaseInputSchema = z.object({
   studyContext: studyContextSchema,
 }).strict();
 
-const reviewCaseInputSchema = z.object({
-  reviewerId: requiredTrimmedString("reviewerId", MAX_ID),
-  reviewerRole: optionalTrimmedString(MAX_ID),
+const authenticatedReviewCaseInputSchema = z.object({
   comments: optionalTrimmedString(MAX_LONG_TEXT),
   finalImpression: optionalTrimmedString(MAX_LONG_TEXT),
 }).strict();
@@ -186,6 +183,10 @@ const reviewCaseInputSchema = z.object({
 const finalizeCaseInputSchema = z.object({
   finalSummary: optionalTrimmedString(MAX_LONG_TEXT),
   deliveryOutcome: z.enum(["pending", "failed", "delivered"]).optional(),
+}).strict();
+
+const publicFinalizeCaseInputSchema = z.object({
+  finalSummary: optionalTrimmedString(MAX_LONG_TEXT),
 }).strict();
 
 const qcCheckSchema = z.object({
@@ -345,11 +346,12 @@ export function parseCreateCaseInput(body: unknown): CreateCaseInput {
   };
 }
 
-export function parseReviewCaseInput(body: unknown): ReviewCaseInput {
-  const parsed = parseWithSchema(body, reviewCaseInputSchema);
+export function parseAuthenticatedReviewCaseInput(body: unknown): {
+  comments?: string;
+  finalImpression?: string;
+} {
+  const parsed = parseWithSchema(body, authenticatedReviewCaseInputSchema);
   return {
-    reviewerId: parsed.reviewerId,
-    reviewerRole: parsed.reviewerRole as string | undefined,
     comments: parsed.comments as string | undefined,
     finalImpression: parsed.finalImpression as string | undefined,
   };
@@ -360,6 +362,15 @@ export function parseFinalizeCaseInput(body: unknown): FinalizeCaseInput {
   return {
     finalSummary: parsed.finalSummary as string | undefined,
     deliveryOutcome: parsed.deliveryOutcome,
+  };
+}
+
+export function parsePublicFinalizeCaseInput(body: unknown): {
+  finalSummary?: string;
+} {
+  const parsed = parseWithSchema(body, publicFinalizeCaseInputSchema);
+  return {
+    finalSummary: parsed.finalSummary as string | undefined,
   };
 }
 

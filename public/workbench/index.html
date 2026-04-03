@@ -32,6 +32,10 @@
           <p class="panel-copy">
             These controls drive the current API baseline and internal callback seams so the operator flow can be reviewed honestly before a real worker plane exists.
           </p>
+          <label>
+            Operator API Key
+            <input id="operator-api-key" name="operatorApiKey" placeholder="Paste MRI_OPERATOR_API_TOKEN value" autocomplete="off" />
+          </label>
           <div class="control-grid">
             <button class="action-button" data-demo-stage="submitted">Seed Queue Case</button>
             <button class="action-button" data-demo-stage="awaiting-review">Seed Draft Review Case</button>
@@ -65,12 +69,8 @@
           </div>
           <form id="review-form" class="stack-form">
             <label>
-              Reviewer ID
-              <input name="reviewerId" value="clinician-demo" required />
-            </label>
-            <label>
-              Reviewer Role
-              <input name="reviewerRole" value="neuroradiologist" />
+              Reviewer Bearer Token
+              <input id="reviewer-bearer-token" name="reviewerBearerToken" placeholder="Paste reviewer JWT" autocomplete="off" />
             </label>
             <label>
               Review Notes
@@ -90,14 +90,6 @@
             <label>
               Final Summary
               <textarea name="finalSummary" rows="3">Clinician-reviewed summary locked and queued for delivery.</textarea>
-            </label>
-            <label>
-              Delivery Outcome
-              <select name="deliveryOutcome">
-                <option value="pending">pending</option>
-                <option value="failed">failed</option>
-                <option value="delivered">delivered</option>
-              </select>
             </label>
             <div class="action-row">
               <button id="finalize-submit" class="action-button" type="submit">Finalize Case</button>

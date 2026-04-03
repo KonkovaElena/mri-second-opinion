@@ -1,8 +1,8 @@
 ---
 title: "Formal System Analysis"
 status: "active"
-version: "1.0.0"
-last_updated: "2026-03-27"
+version: "1.0.1"
+last_updated: "2026-04-03"
 tags: [academic, formal-analysis, workflow, mri]
 ---
 
@@ -18,23 +18,26 @@ It does not promote target architecture or external research posture into implem
 
 ## Evidence Boundary
 
-This analysis uses the current standalone repository state as of 2026-03-27.
+This analysis uses the current standalone repository state as of 2026-04-03.
 
 Implemented claims in this document are grounded in:
 
 1. `src/cases.ts`
 2. `src/case-planning.ts`
 3. `src/app.ts`
-4. `tests/workflow-api.test.ts`
-5. `tests/memory-case-service.test.ts`
-6. `docs/status-model.md`
-7. `docs/api-scope.md`
-8. `docs/verification/durable-delivery-queue-audit-2026-03-27.md`
+4. `src/reviewer-auth.ts`
+5. `tests/workflow-api.test.ts`
+6. `tests/runtime-hardening.test.ts`
+7. `tests/memory-case-service.test.ts`
+8. `docs/status-model.md`
+9. `docs/api-scope.md`
+10. `docs/verification/durable-delivery-queue-audit-2026-03-27.md`
+11. `docs/verification/runtime-and-production-boundary-revalidation-2026-04-03.md`
 
 The following remain target seams or open gaps, not implemented standalone truth:
 
-1. ~~nonce replay defense~~ — closed: HMAC request signing with nonce replay enforcement is active on all `/api/internal/dispatch/*` routes
-2. inference-worker lease, heartbeat, and expiry-driven requeue scheduler
+1. relationship-based or case-scoped reviewer authorization
+2. hosted or distributed inference-worker lease recovery and scheduler-backed expiry automation
 3. production PostgreSQL durability
 4. distributed or externally brokered workers
 5. production-grade Python compute-plane closure
@@ -116,7 +119,7 @@ The current standalone runtime enforces these invariants directly:
 
 The following are explicitly not enforced today:
 
-1. transport-level proof that `review` and `finalize` were performed by an authenticated human actor
+1. relationship-based or case-scoped reviewer authorization beyond authenticated reviewer JWT identity plus role allowlisting
 2. signed internal callbacks
 3. lease-based recovery for inference execution
 
@@ -130,24 +133,24 @@ The current guarded transitions are:
 | `START` | `POST /api/internal/ingest` | request payload valid | create initial case in `INGESTING`, then evaluate sequence gate | `INGESTING` then `SUBMITTED` or `QC_REJECTED` |
 | `SUBMITTED` | `POST /api/internal/inference-callback` with `qcDisposition=reject` | payload valid and fingerprint not conflicting | write QC summary, append blocked operation | `QC_REJECTED` |
 | `SUBMITTED` | `POST /api/internal/inference-callback` with `qcDisposition in {pass,warn}` | payload valid and fingerprint not conflicting | create draft report, update evidence cards, append completion operation | `AWAITING_REVIEW` |
-| `AWAITING_REVIEW` | `POST /api/cases/:caseId/review` | report exists and reviewer payload present | write review metadata and comments, append clinician operation | `REVIEWED` |
-| `REVIEWED` | `POST /api/cases/:caseId/finalize` | report exists | lock report, append finalization operation | `FINALIZED` |
+| `AWAITING_REVIEW` | `POST /api/cases/:caseId/review` | report exists, reviewer JWT is valid, and reviewer role is allowlisted | write JWT-derived reviewer identity plus comments, append clinician operation | `REVIEWED` |
+| `REVIEWED` | `POST /api/cases/:caseId/finalize` | report exists, reviewer JWT is valid, and reviewer role is allowlisted | lock report, append finalization operation | `FINALIZED` |
 | `FINALIZED` | same finalize request | always in current standalone path | enqueue persisted delivery job and append queue operation | `DELIVERY_PENDING` |
 | `DELIVERY_PENDING` | `POST /api/internal/delivery-callback` with `deliveryStatus=delivered` | active persisted delivery job exists | mark job delivered, append delivery success operation | `DELIVERED` |
 | `DELIVERY_PENDING` | `POST /api/internal/delivery-callback` with `deliveryStatus=failed` | active persisted delivery job exists | mark job failed, append delivery failure operation | `DELIVERY_FAILED` |
 | `DELIVERY_FAILED` | `POST /api/delivery/:caseId/retry` | retry explicitly requested | create new queued delivery job and append retry operation | `DELIVERY_PENDING` |
 
-### 2.1. Demo Shortcut Inside Finalize
+### 2.1. Public Finalize No Longer Accepts Delivery Overrides
 
-The current standalone finalize flow also exposes a synthetic shortcut through `deliveryOutcome`.
+The current standalone public finalize flow no longer exposes a `deliveryOutcome` shortcut.
 
-That shortcut still walks the legal state path:
+The public finalize contract now locks the report and then walks the legal delivery path through persisted delivery-job state:
 
 $$
 \texttt{REVIEWED} \rightarrow \texttt{FINALIZED} \rightarrow \texttt{DELIVERY\_PENDING} \rightarrow \{\texttt{DELIVERED},\ \texttt{DELIVERY\_FAILED}\}
 $$
 
-It exists to support deterministic local verification and demo closure, not to claim a production delivery worker.
+Delivery success or failure is now expressed through internal delivery callbacks or explicit retry from `DELIVERY_FAILED`, not through a public finalize request field.
 
 ## 3. Companion Delivery-Job Automaton
 
@@ -236,12 +239,14 @@ The current standalone repo already implements bounded dispatch claim and heartb
 Clinician-facing client -> POST /api/cases/:id/review
 API -> require status AWAITING_REVIEW
 API -> require report draft
-API -> write reviewer metadata and comments
+API -> require reviewer JWT identity and allowlisted reviewer role
+API -> write JWT-derived reviewer metadata and comments
 API -> persist REVIEWED
 
 Clinician-facing client -> POST /api/cases/:id/finalize
 API -> require status REVIEWED
 API -> require report draft
+API -> require reviewer JWT identity and allowlisted reviewer role
 API -> lock report and enqueue delivery job
 API -> persist FINALIZED then DELIVERY_PENDING
 ```
@@ -254,7 +259,7 @@ $$
 
 Important boundary note:
 
-The current standalone repo records clinician identifiers in payload data, but it does not yet prove human identity through a separate authenticated actor-gate.
+The current standalone repo now binds reviewer identity to reviewer JWT subject data and enforces a reviewer-role allowlist, but it does not yet prove relationship-based or case-scoped reviewer authorization.
 
 ### 5.4. Delivery Claim And Callback
 
@@ -289,7 +294,7 @@ $$
 | `S-05` | duplicate inference callbacks are only idempotent when the stored fingerprint matches | implemented |
 | `S-06` | delivery callback cannot mutate the case without an active persisted delivery job | implemented |
 | `S-07` | early delivery-job claim before `availableAt` is blocked | implemented |
-| `S-08` | authenticated machine credentials are rejected on review/finalize | absent in standalone runtime |
+| `S-08` | review/finalize reject missing or non-allowlisted reviewer JWT principals | implemented |
 | `S-09` | nonce replay on internal routes is rejected | implemented: `MemoryReplayStore` wired into dispatch HMAC middleware with configurable TTL and max-entries |
 
 ### 6.2. Liveness Properties
@@ -320,7 +325,7 @@ $$
 | stale writer on queue claim | mitigated on the tested local path by persistence reload and retry logic |
 | duplicate inference callback replay | mitigated by fingerprint-based replay detection |
 | premature delivery callback after queue loss | mitigated by active delivery-job guard |
-| machine impersonation of clinician actions | open gap because clinician identity is recorded as data, not separately authenticated proof |
+| machine impersonation of clinician actions | partially mitigated by reviewer JWT identity plus role allowlisting; object-scoped and relationship-based authorization remain open |
 | internal route replay or signature spoofing | mitigated: HMAC request signing with nonce replay enforcement is active on dispatch routes |
 | artifact tampering after generation | open gap because checksum verification is not implemented |
 | inference-worker crash and silent work loss | open liveness gap because lease and scheduler recovery are not implemented |
@@ -356,7 +361,7 @@ The strongest repo-backed contribution is a transparent workflow orchestrator wi
 
 The strongest open seams are:
 
-1. transport and actor authentication
+1. object-scoped and relationship-based authorization
 2. inference liveness and scheduler recovery
 3. production durability beyond local SQLite-backed truth
 4. artifact integrity and compute reproducibility closure
@@ -376,7 +381,7 @@ That reading is strong enough to justify precise discussion of:
 
 It is not strong enough to justify claims of:
 
-1. authenticated clinician actor-gating
+1. case-scoped clinician authorization
 2. production inference-worker recovery
 3. production PostgreSQL-backed durability
 4. full reproducibility of compute outputs

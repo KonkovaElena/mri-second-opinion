@@ -20,11 +20,14 @@ import { buildHealthSnapshot, buildReadinessSnapshot, type RuntimeState } from "
 import { buildDicomSrExport, buildFhirDiagnosticReport } from "./case-exports";
 import { createInternalAuthMiddleware } from "./internal-auth";
 import { createHmacAuthMiddleware } from "./hmac-auth";
+import { createOperatorAuthMiddleware } from "./operator-auth";
 import { MemoryReplayStore } from "./replay-store";
 import { getRequestId, requestContextMiddleware, requestLoggingMiddleware } from "./request-context";
+import { resolveAuthorizedReviewer } from "./reviewer-auth";
 import {
   parseClaimJobInput,
   type parseCreateCaseInput as parseCreateCaseInputType,
+  parseAuthenticatedReviewCaseInput,
   parseCreateCaseInput,
   parseDeliveryCallbackInput,
   parseDispatchClaimInput,
@@ -32,7 +35,7 @@ import {
   parseDispatchHeartbeatInput,
   parseFinalizeCaseInput,
   parseInferenceCallbackInput,
-  parseReviewCaseInput,
+  parsePublicFinalizeCaseInput,
   parseRequeueExpiredInferenceJobsInput,
 } from "./validation";
 import { createCorsMiddleware, createPublicApiRateLimiter, metricsMiddleware, writeMetricsResponse } from "./http-runtime";
@@ -111,6 +114,9 @@ export function createApp(config: AppConfig, options: CreateAppOptions = {}) {
   app.use(requestLoggingMiddleware);
   app.use(createCorsMiddleware(config));
   app.use("/api/internal", createInternalAuthMiddleware(config));
+  app.use("/api/cases", createOperatorAuthMiddleware(config));
+  app.use("/api/operations", createOperatorAuthMiddleware(config));
+  app.use("/api/delivery", createOperatorAuthMiddleware(config));
   app.use("/api", publicApiRateLimiter);
   app.use(express.json({ limit: config.jsonBodyLimit ?? "1mb" }));
   app.use("/workbench", express.static(workbenchRoot, { index: false }));
@@ -329,7 +335,10 @@ export function createApp(config: AppConfig, options: CreateAppOptions = {}) {
 
   app.post("/api/cases/:caseId/review", async (req, res) => {
     try {
-      const updated = await caseService.reviewCase(req.params.caseId, parseReviewCaseInput(req.body));
+      const updated = await caseService.reviewCase(req.params.caseId, {
+        ...parseAuthenticatedReviewCaseInput(req.body),
+        ...resolveAuthorizedReviewer(req, config, "review"),
+      });
 
       res.json({ case: updated });
     } catch (error) {
@@ -339,7 +348,9 @@ export function createApp(config: AppConfig, options: CreateAppOptions = {}) {
 
   app.post("/api/cases/:caseId/finalize", async (req, res) => {
     try {
-      const updated = await caseService.finalizeCase(req.params.caseId, parseFinalizeCaseInput(req.body));
+      resolveAuthorizedReviewer(req, config, "finalize");
+
+      const updated = await caseService.finalizeCase(req.params.caseId, parsePublicFinalizeCaseInput(req.body));
 
       res.json({ case: updated });
     } catch (error) {

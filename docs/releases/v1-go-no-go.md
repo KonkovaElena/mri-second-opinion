@@ -1,6 +1,7 @@
 # MRI Second Opinion v1 Go/No-Go
 
 Date: 2026-03-29
+Last updated: 2026-04-03
 
 ## Allowed Verdicts
 
@@ -18,12 +19,14 @@ Only these verdicts are allowed:
 
 The seven launch gates in `../launch-readiness-checklist.md` remain satisfied for the conservative public-publication posture: the repository is independently buildable, the bounded workflow slice is locally verified, the built-in review workbench and synthetic demo path are real, public repository hygiene is hosted-proof-backed on the latest fully hosted-validated head, and documentation honesty is aligned to current runtime truth. The latest fully hosted-validated head is now `04cb0a57d1e64f8a5cf03a22b4a5c60d37dffc3a`, which closes Wave 1.5 for the current platform-sensitive and release-evidence baseline. The earlier runtime-bearing head `f6021ecdb45f4ecf5aece2c52cc0e6f462361d49` remains the Wave 2A artifact-persistence milestone, and `1e340b978bfa35a2ed339adcdb0d2add56cc08c3` remains the prior full hosted-validation milestone. Later docs-only evidence refresh commits do not reopen Wave 1.5 or the publication verdict unless they change platform-sensitive runtime behavior or GitHub workflow surfaces. Remaining gaps are still real, and they belong to higher product-maturity work rather than to safe public GitHub publication.
 
-The 2026-04-02 runtime and production-boundary audit adds a sharper boundary around that verdict:
+The 2026-04-03 independent runtime revalidation plus follow-on auth hardening sharpens that boundary further and corrects older findings that no longer match current runtime truth. Reviewer identity is now derived from reviewer JWTs, review and finalize mutations enforce an explicit reviewer-role allowlist, internal and operator routes now fail closed outside development when auth secrets are unset, and the public finalize route now rejects `deliveryOutcome` overrides. The latest local full-suite rerun is green at 166 total tests, 165 passing, 0 failing, and 1 skipped.
 
-1. reviewer identity on public review and finalize flows is still request-body data rather than authenticated clinician authority
-2. public case, report, export, and artifact surfaces still lack actor-scoped object authorization proof
-3. public study input can still reach worker-side `volumeDownloadUrl` fetch paths
-4. public finalize can still mutate `deliveryOutcome`
+The remaining blockers for stronger claims are:
+
+1. public case, report, export, and artifact surfaces still lack actor-scoped and object-scoped authorization proof beyond route-level shared secrets
+2. reviewer JWTs now enforce an explicit role allowlist, but current review/finalize handling still does not prove relationship-based or case-scoped authorization policy
+3. worker fetch control is materially stronger than before, but the long-term target is still signed or API-allowlisted input provenance rather than caller-supplied URL surfaces
+4. the latest hosted evidence still lags the current green local head
 
 These are real blockers for production, clinical, and stronger security-readiness claims.
 
@@ -31,9 +34,9 @@ They do not invalidate `PUBLIC_GITHUB_READY`, because this verdict is about safe
 
 ## Evidence Basis
 
-For the current evidence ledger and the publication reconciliation lessons behind this verdict, use `../verification/launch-evidence-index.md` together with `../verification/publication-retrospective-audit-2026-03-27.md` and `../verification/runtime-and-production-boundary-audit-2026-04-02.md`.
+For the current evidence ledger and the publication reconciliation lessons behind this verdict, use `../verification/launch-evidence-index.md` together with `../verification/publication-retrospective-audit-2026-03-27.md`, `../verification/runtime-and-production-boundary-revalidation-2026-04-03.md`, and `../verification/release-validation-packet.md`.
 
-The active evidence ledger records that `04cb0a57d1e64f8a5cf03a22b4a5c60d37dffc3a` is now the latest head with both hosted `ci` and `docs-governance` proof, while `f6021ecdb45f4ecf5aece2c52cc0e6f462361d49` remains the earlier runtime-bearing artifact-persistence milestone and `1e340b978bfa35a2ed339adcdb0d2add56cc08c3` remains the prior fully hosted-validated head. That closes Wave 1.5 without changing the repository-level verdict.
+The active evidence ledger records that `04cb0a57d1e64f8a5cf03a22b4a5c60d37dffc3a` is now the latest head with both hosted `ci` and `docs-governance` proof, while the current local validated head is `aef1acba8f96ba489af912743a72fda55e00f2ac` with clean build output plus a green 166-test local rerun. `f6021ecdb45f4ecf5aece2c52cc0e6f462361d49` remains the earlier runtime-bearing artifact-persistence milestone and `1e340b978bfa35a2ed339adcdb0d2add56cc08c3` remains the prior fully hosted-validated head. That closes Wave 1.5 without changing the repository-level verdict.
 
 Supporting artifacts that exist now:
 
@@ -66,9 +69,9 @@ Open evidence that still blocks higher product-maturity claims:
 2. release-linked or hosted workflow execution beyond the local bounded slice
 3. broader real-PostgreSQL runtime durability proof beyond clean bootstrap and targeted queue coverage
 4. distributed or external worker execution proof
-5. authenticated clinician authority and object-level authorization on public workflow surfaces
+5. actor-scoped clinician and operator authority plus object-level authorization on public workflow surfaces
 6. closed worker egress policy for public-to-worker volume references
-7. separation of clinician finalization from delivery-plane mutation authority
+7. synchronized hosted evidence and committed release artifacts
 
 ## Upgrade Rules
 

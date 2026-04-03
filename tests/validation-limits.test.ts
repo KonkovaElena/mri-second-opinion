@@ -1,5 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
+import { createHmac } from "node:crypto";
 import { mkdtempSync, rmSync } from "node:fs";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
@@ -8,6 +9,61 @@ import type { AppConfig } from "../src/config";
 import type { Server } from "node:http";
 
 // ---------- helpers ----------
+
+const DEFAULT_INTERNAL_API_TOKEN = "test-internal-token-secret-001";
+const DEFAULT_OPERATOR_API_TOKEN = "test-operator-token-secret-001";
+const DEFAULT_REVIEWER_JWT_SECRET = "reviewer-jwt-secret-0123456789abcdef";
+
+function isReviewerProtectedPath(path: string) {
+  return /\/api\/cases\/[^/]+\/(review|finalize)$/.test(path);
+}
+
+function isInternalProtectedPath(path: string) {
+  return /^\/api\/internal(\/|$)/.test(path);
+}
+
+function isOperatorProtectedPath(path: string) {
+  return /^\/api\/(cases|operations|delivery)(\/|$)/.test(path);
+}
+
+function createReviewerJwt() {
+  const encodedHeader = Buffer.from(JSON.stringify({ alg: "HS256", typ: "JWT" }), "utf-8").toString("base64url");
+  const encodedPayload = Buffer.from(
+    JSON.stringify({
+      sub: "validation-test-reviewer",
+      role: "neuroradiologist",
+      exp: Math.floor(Date.now() / 1000) + 60,
+    }),
+    "utf-8",
+  ).toString("base64url");
+  const signingInput = `${encodedHeader}.${encodedPayload}`;
+  const signature = createHmac("sha256", DEFAULT_REVIEWER_JWT_SECRET).update(signingInput).digest("base64url");
+  return `${signingInput}.${signature}`;
+}
+
+function withImplicitReviewerAuth(path: string, headers: HeadersInit | undefined) {
+  const normalizedHeaders = new Headers(headers ?? {});
+
+  if (isReviewerProtectedPath(path) && !normalizedHeaders.has("authorization")) {
+    normalizedHeaders.set("authorization", `Bearer ${createReviewerJwt()}`);
+  }
+
+  return normalizedHeaders;
+}
+
+function withImplicitProtectedAuth(path: string, headers: HeadersInit | undefined) {
+  const normalizedHeaders = withImplicitReviewerAuth(path, headers);
+
+  if (isInternalProtectedPath(path) && !normalizedHeaders.has("authorization")) {
+    normalizedHeaders.set("authorization", `Bearer ${DEFAULT_INTERNAL_API_TOKEN}`);
+  }
+
+  if (isOperatorProtectedPath(path) && !normalizedHeaders.has("x-api-key")) {
+    normalizedHeaders.set("x-api-key", DEFAULT_OPERATOR_API_TOKEN);
+  }
+
+  return normalizedHeaders;
+}
 
 function createTestStoreFile(): string {
   const dir = mkdtempSync(join(tmpdir(), "mri-validation-limits-"));
@@ -21,17 +77,19 @@ function buildTestConfig(caseStoreFile: string): AppConfig {
     caseStoreFile,
     caseStoreMode: "sqlite",
     archiveLookupBaseUrl: undefined,
-    archiveLookupSource: undefined,
-    caseStoreDatabaseUrl: undefined,
-    caseStoreSchema: "public",
+        headers: withImplicitProtectedAuth("/api/cases", {
+          "content-type": "application/json",
+        }),
     databaseUrl: undefined,
-    internalApiToken: undefined,
+    internalApiToken: DEFAULT_INTERNAL_API_TOKEN,
     hmacSecret: undefined,
+    operatorApiToken: DEFAULT_OPERATOR_API_TOKEN,
     clockSkewToleranceMs: 60_000,
     replayStoreTtlMs: 120_000,
     replayStoreMaxEntries: 10_000,
     persistenceMode: "snapshot",
-    reviewerIdentitySource: "request-body",
+    reviewerJwtSecret: DEFAULT_REVIEWER_JWT_SECRET,
+    reviewerAllowedRoles: ["clinician", "radiologist", "neuroradiologist"],
     jsonBodyLimit: "1mb",
     publicApiRateLimitWindowMs: 900_000,
     publicApiRateLimitMaxRequests: 300,
@@ -73,7 +131,7 @@ async function withServer<T>(
       jsonRequest: async (path: string, init?: RequestInit) => {
         const response = await fetch(`${baseUrl}${path}`, {
           ...init,
-          headers: { "content-type": "application/json", ...(init?.headers ?? {}) },
+          headers: withImplicitProtectedAuth(path, { "content-type": "application/json", ...(init?.headers ?? {}) }),
         });
         const text = await response.text();
         const body = text.length > 0 ? JSON.parse(text) : null;

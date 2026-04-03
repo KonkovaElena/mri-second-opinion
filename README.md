@@ -236,6 +236,8 @@ What remains next-wave direction rather than current runtime proof:
 | Feature | Implementation |
 |---|---|
 | **Internal Auth** | Bearer token (`MRI_INTERNAL_API_TOKEN`) for all `/api/internal/*` |
+| **Operator Auth** | Static API key (`MRI_OPERATOR_API_TOKEN`) via `x-api-key` header for `/api/cases`, `/api/operations`, `/api/delivery` |
+| **Reviewer JWT** | HS256 JWT (`MRI_REVIEWER_JWT_HS256_SECRET`) plus deny-by-default reviewer-role allowlist (`MRI_REVIEWER_ALLOWED_ROLES`) for review and finalize mutations |
 | **HMAC Auth** | SHA-256 signed requests for `/api/internal/dispatch/*` |
 | **Replay Protection** | Nonce-based replay store with configurable TTL |
 | **Clock Skew** | Configurable timestamp tolerance (default 60s) |
@@ -308,6 +310,7 @@ python worker/main.py
 The current configurable parameters are defined in `src/config.ts` and cover:
 - Server and database configuration
 - Internal and HMAC authentication
+- Reviewer JWT verification and reviewer-role allowlisting via `MRI_REVIEWER_ALLOWED_ROLES`
 - Optional browser-origin allowlisting via `MRI_CORS_ALLOWED_ORIGINS`
 - Rate limiting and payload limits
 - Artifact storage (`local-file` and `s3-compatible` backends)
@@ -364,6 +367,7 @@ mri-second-opinion/
 │   ├── validation.ts             # Zod schemas for all inputs
 │   ├── hmac-auth.ts              # HMAC-SHA256 request signing
 │   ├── internal-auth.ts          # Bearer token middleware
+│   ├── operator-auth.ts          # x-api-key operator middleware
 │   ├── health.ts                 # Health and readiness probes
 │   ├── http-runtime.ts           # Metrics, rate limit, hardening
 │   ├── config.ts                 # Configuration from environment
@@ -665,10 +669,10 @@ Python-воркер (`worker/main.py`) работает по принципу pu
 
 | Уровень | Технология | Назначение |
 |---|---|---|
-| **Среда** | Node.js ≥ 22, TypeScript 5.8 | API-сервер и движок рабочего процесса |
+| **Среда** | Node.js ≥ 24, TypeScript 5.8 | API-сервер и движок рабочего процесса |
 | **Фреймворк** | Express 4.21 | HTTP-маршрутизация и middleware |
 | **Валидация** | Zod 3.25 | Валидация схем для всех входных данных |
-| **Авторизация** | HMAC-SHA256 + Bearer-токены | Аутентификация воркеров (timing-safe) |
+| **Авторизация** | HMAC-SHA256 + Bearer/JWT + `x-api-key` | Аутентификация воркеров, reviewer JWT и операторский доступ |
 | **Метрики** | prom-client 15.1 | Prometheus-совместимые метрики |
 | **Ограничение** | express-rate-limit 8.3 | Защита публичного API |
 | **БД (умолч.)** | SQLite (WAL-режим) | Локальная персистенция, переживает перезапуск |
@@ -682,7 +686,7 @@ Python-воркер (`worker/main.py`) работает по принципу pu
 
 ## API проекта
 
-### Публичные маршруты (11)
+### Публичные маршруты
 
 | Метод | Путь | Описание |
 |---|---|---|
@@ -698,7 +702,7 @@ Python-воркер (`worker/main.py`) работает по принципу pu
 | `GET` | `/api/operations/summary` | Данные для операционной панели |
 | `POST` | `/api/delivery/:caseId/retry` | Повторить неудачную доставку |
 
-### Внутренние маршруты (12)
+### Внутренние маршруты
 
 | Метод | Путь | Описание |
 |---|---|---|
@@ -720,7 +724,9 @@ Python-воркер (`worker/main.py`) работает по принципу pu
 
 | Функция | Реализация |
 |---|---|
-| **Внутренняя авторизация** | Bearer-токен для всех `/api/internal/*` |
+| **Внутренняя авторизация** | Bearer-токен (`MRI_INTERNAL_API_TOKEN`) для всех `/api/internal/*` |
+| **Операторская авторизация** | Статический `x-api-key` (`MRI_OPERATOR_API_TOKEN`) для `/api/cases`, `/api/operations`, `/api/delivery` |
+| **Reviewer JWT** | HS256 JWT (`MRI_REVIEWER_JWT_HS256_SECRET`) плюс deny-by-default allowlist ролей (`MRI_REVIEWER_ALLOWED_ROLES`) для `review` и `finalize` |
 | **HMAC-авторизация** | SHA-256 подпись для `/api/internal/dispatch/*` |
 | **Защита от повтора** | Хранилище nonce с настраиваемым TTL |
 | **Временной сдвиг** | Настраиваемая толерантность (по умолчанию 60 сек.) |
@@ -751,7 +757,7 @@ npm install --omit=optional
 # Собрать TypeScript
 npm run build
 
-# Запустить тесты (136 тестов)
+# Запустить тесты
 npm test
 
 # Запустить сервер (порт 4010 по умолчанию)
@@ -792,7 +798,7 @@ python worker/main.py
 
 ## Тестирование
 
-Проект содержит **136 тестов** в 13 файлах (~5 200 строк тестового кода):
+Проект содержит repo-native набор `npm test`, покрывающий API lifecycle, persistence, runtime hardening, config parsing, artifact routing и browser-origin policy.
 
 ```bash
 npm test
@@ -807,7 +813,12 @@ npm test
 | `postgres-payload-roundtrip.test.ts` | Сохранность данных в PostgreSQL |
 | `runtime-hardening.test.ts` | Метрики, rate limiting, таймауты |
 | `memory-case-service.test.ts` | Инварианты машины состояний |
-| `case-artifacts.test.ts` | Каноникализация URI (Windows, POSIX) |
+| `case-artifacts.test.ts` | Каноникализация URI, retrieval URLs и descriptors |
+| `config.test.ts` | Парсинг конфигурации и reviewer-role allowlist |
+| `config-artifact-store.test.ts` | Конфигурация `s3-compatible` artifact store |
+| `object-store-artifact-routing.test.ts` | Локальная и object-store маршрутизация артефактов |
+
+Актуальный полный snapshot локальной проверки зафиксирован в `docs/verification/release-validation-packet.md`.
 
 ---
 
@@ -815,7 +826,7 @@ npm test
 
 ```
 mri-second-opinion/
-├── src/                          # TypeScript-код (27 файлов, ~10 000 строк)
+├── src/                          # TypeScript-код API и workflow runtime
 │   ├── index.ts                  # Точка входа, graceful shutdown
 │   ├── app.ts                    # Express-приложение (23 маршрута)
 │   ├── cases.ts                  # Доменная модель, 9 состояний (~1 400 строк)
@@ -824,13 +835,14 @@ mri-second-opinion/
 │   ├── archive-lookup.ts         # Клиент Orthanc/DICOMweb
 │   ├── validation.ts             # Zod-схемы для всех входных данных
 │   ├── hmac-auth.ts              # HMAC-SHA256 подпись запросов
+│   ├── operator-auth.ts          # x-api-key мидлвара для оператора
 │   └── ...                       # Вспомогательные модули
 ├── worker/                       # Python-воркер (853 строки)
 │   ├── main.py                   # Инференс + доставка
 │   └── requirements.txt          # Только stdlib — без зависимостей
-├── tests/                        # Тесты (13 файлов, ~5 200 строк)
+├── tests/                        # API, persistence, runtime и config test suite
 ├── public/workbench/             # Встроенный интерфейс рецензирования
-├── docs/                         # Документация (90+ файлов)
+├── docs/                         # Документация, evidence и governance surfaces
 │   ├── academic/                 # Исследования и анализ
 │   ├── regulatory/               # Регуляторная документация
 │   ├── security/                 # Документация безопасности

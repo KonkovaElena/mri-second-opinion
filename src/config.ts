@@ -22,11 +22,13 @@ export interface AppConfig {
   databaseUrl?: string;
   internalApiToken?: string;
   hmacSecret?: string;
+  operatorApiToken?: string;
   clockSkewToleranceMs: number;
   replayStoreTtlMs: number;
   replayStoreMaxEntries: number;
   persistenceMode: "snapshot" | "postgres";
-  reviewerIdentitySource: "request-body";
+  reviewerJwtSecret: string;
+  reviewerAllowedRoles: string[];
   jsonBodyLimit: string;
   publicApiRateLimitWindowMs: number;
   publicApiRateLimitMaxRequests: number;
@@ -39,6 +41,7 @@ export interface AppConfig {
 }
 
 const DEFAULT_PORT = 4010;
+export const DEFAULT_REVIEWER_ALLOWED_ROLES = ["clinician", "radiologist", "neuroradiologist"] as const;
 
 function parsePositiveInteger(value: string, name: string) {
   const parsed = Number(value);
@@ -73,6 +76,27 @@ function parseOriginAllowlist(value: string | undefined) {
     .split(",")
     .map((origin) => origin.trim())
     .filter((origin) => origin.length > 0);
+}
+
+function parseReviewerAllowedRoles(value: string | undefined) {
+  if (typeof value === "undefined") {
+    return [...DEFAULT_REVIEWER_ALLOWED_ROLES];
+  }
+
+  const roles = Array.from(
+    new Set(
+      value
+        .split(",")
+        .map((role) => role.trim().toLowerCase())
+        .filter((role) => role.length > 0),
+    ),
+  );
+
+  if (roles.length === 0) {
+    throw new Error("MRI_REVIEWER_ALLOWED_ROLES must define at least one role");
+  }
+
+  return roles;
 }
 
 export function getConfig(): AppConfig {
@@ -120,7 +144,9 @@ export function getConfig(): AppConfig {
   const caseStoreSchema = process.env.MRI_CASE_STORE_SCHEMA?.trim() || "public";
   const internalApiToken = process.env.MRI_INTERNAL_API_TOKEN?.trim() || undefined;
   const hmacSecret = process.env.MRI_INTERNAL_HMAC_SECRET?.trim() || undefined;
-  const reviewerIdentitySource = process.env.MRI_REVIEWER_IDENTITY_SOURCE?.trim() || "request-body";
+  const operatorApiToken = process.env.MRI_OPERATOR_API_TOKEN?.trim() || undefined;
+  const reviewerJwtSecret = process.env.MRI_REVIEWER_JWT_HS256_SECRET?.trim() || "";
+  const reviewerAllowedRoles = parseReviewerAllowedRoles(process.env.MRI_REVIEWER_ALLOWED_ROLES);
   const clockSkewToleranceMs = Number(process.env.MRI_CLOCK_SKEW_TOLERANCE_MS ?? "60000");
   const replayStoreTtlMs = Number(process.env.MRI_REPLAY_STORE_TTL_MS ?? "120000");
   const replayStoreMaxEntries = Number(process.env.MRI_REPLAY_STORE_MAX_ENTRIES ?? "10000");
@@ -175,8 +201,8 @@ export function getConfig(): AppConfig {
     throw new Error("MRI_ARTIFACT_STORE_BUCKET is required for s3-compatible artifact storage");
   }
 
-  if (reviewerIdentitySource !== "request-body") {
-    throw new Error("MRI_REVIEWER_IDENTITY_SOURCE must be request-body");
+  if (!reviewerJwtSecret) {
+    throw new Error("MRI_REVIEWER_JWT_HS256_SECRET is required");
   }
 
   if (jsonBodyLimit.length === 0) {
@@ -205,6 +231,10 @@ export function getConfig(): AppConfig {
     throw new Error("In production, set MRI_INTERNAL_HMAC_SECRET or MRI_INTERNAL_API_TOKEN to protect internal mutation routes");
   }
 
+  if (nodeEnv === "production" && !operatorApiToken) {
+    throw new Error("MRI_OPERATOR_API_TOKEN is required in production to protect public data endpoints");
+  }
+
   return {
     nodeEnv,
     port,
@@ -225,11 +255,13 @@ export function getConfig(): AppConfig {
     databaseUrl,
     internalApiToken,
     hmacSecret,
+    operatorApiToken,
     clockSkewToleranceMs,
     replayStoreTtlMs,
     replayStoreMaxEntries,
     persistenceMode,
-    reviewerIdentitySource,
+    reviewerJwtSecret,
+    reviewerAllowedRoles,
     jsonBodyLimit,
     publicApiRateLimitWindowMs,
     publicApiRateLimitMaxRequests,

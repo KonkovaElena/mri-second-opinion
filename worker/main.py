@@ -171,7 +171,44 @@ def resolve_download_url(base_url: str, download_url: str) -> str:
     return parse.urljoin(f"{base_url}/", download_url.lstrip("/"))
 
 
+def normalize_origin(url: str) -> str | None:
+    parsed_url = parse.urlparse(url)
+    if not parsed_url.scheme or not parsed_url.netloc:
+        return None
+    return f"{parsed_url.scheme.lower()}://{parsed_url.netloc.lower()}"
+
+
+def is_loopback_hostname(hostname: str | None) -> bool:
+    normalized = (hostname or "").strip().lower()
+    return normalized in {"127.0.0.1", "localhost", "::1"}
+
+
+def is_permitted_volume_download_url(base_url: str, download_url: str) -> bool:
+    parsed_download_url = parse.urlparse(download_url)
+
+    if not parsed_download_url.scheme:
+        return True
+
+    if parsed_download_url.scheme.lower() not in {"http", "https"}:
+        return False
+
+    download_origin = normalize_origin(download_url)
+    base_origin = normalize_origin(base_url)
+
+    if download_origin and base_origin and download_origin == base_origin:
+        return True
+
+    base_hostname = parse.urlparse(base_url).hostname
+    if is_loopback_hostname(base_hostname) and is_loopback_hostname(parsed_download_url.hostname):
+        return True
+
+    return False
+
+
 def download_binary_payload(base_url: str, download_url: str, correlation_id: str) -> bytes:
+    if not is_permitted_volume_download_url(base_url, download_url):
+        raise RuntimeError("Volume download URL origin is not permitted for worker fetch.")
+
     resolved_url = resolve_download_url(base_url, download_url)
     req = request.Request(
         resolved_url,

@@ -1,8 +1,8 @@
 ---
 title: "Runtime And Production Boundary Audit"
 status: "active"
-version: "1.0.0"
-last_updated: "2026-04-02"
+version: "1.0.1"
+last_updated: "2026-04-03"
 tags: [verification, audit, security, production, publication]
 role: evidence
 ---
@@ -10,6 +10,16 @@ role: evidence
 # Runtime And Production Boundary Audit
 
 Date: 2026-04-02
+
+Supersession note:
+
+This audit remains valuable as historical evidence, but it is no longer the best current-state authority.
+
+Use `runtime-and-production-boundary-revalidation-2026-04-03.md` for the current working-tree revalidation. Two findings in this 2026-04-02 note are now outdated in the latest code and tests:
+
+1. reviewer identity is no longer request-body data on the public review flow
+2. public finalize no longer accepts `deliveryOutcome`
+3. the 154-test snapshot below is historical audit evidence, not the current local validation count
 
 ## Purpose
 
@@ -27,7 +37,7 @@ It does tighten the language around what the current implementation still does n
 
 ## Verification Snapshot
 
-The current local rerun used during this audit confirmed:
+The historical local rerun used during this 2026-04-02 audit confirmed:
 
 1. `npm test` succeeds on the current head with 154 total tests, 153 passing tests, 0 failures, and 1 skipped test
 2. `npm run build` succeeds on the current head

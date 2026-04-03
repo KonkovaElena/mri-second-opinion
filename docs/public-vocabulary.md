@@ -1,8 +1,8 @@
 ---
 title: "Public Vocabulary"
 status: "active"
-version: "1.1.0"
-last_updated: "2026-04-01"
+version: "1.1.1"
+last_updated: "2026-04-03"
 tags: [reference, vocabulary, api, mri]
 ---
 
@@ -72,13 +72,11 @@ Do not describe `warn` as a separate persisted workflow state.
 
 ## Delivery Terms
 
-### Finalization input
+### Public finalization input
 
-`deliveryOutcome` may be:
+Public `POST /api/cases/:caseId/finalize` input is `finalSummary` only.
 
-1. `pending`
-2. `failed`
-3. `delivered`
+Do not describe `deliveryOutcome` as a current public finalize field. Delivery state changes now come from persisted delivery-job creation, internal delivery callbacks, and public retry from `DELIVERY_FAILED`.
 
 ### Internal delivery callback
 
@@ -104,6 +102,9 @@ These codes are currently emitted by the API/runtime contract:
 5. `DUPLICATE_STUDY_UID`
 6. `INVALID_TRANSITION`
 7. `INFERENCE_CONFLICT`
+8. `UNAUTHORIZED`
+9. `FORBIDDEN`
+10. `SERVICE_CONFIG_ERROR`
 
 ## Terms To Avoid As Implemented Truth
 

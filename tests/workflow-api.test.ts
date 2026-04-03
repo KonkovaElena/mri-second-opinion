@@ -1,6 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import { spawn, spawnSync } from "node:child_process";
+import { createHmac } from "node:crypto";
 import { createServer, type Server } from "node:http";
 import type { AddressInfo } from "node:net";
 import { mkdtempSync, rmSync } from "node:fs";
@@ -45,6 +46,24 @@ function createPostgresTestStore() {
   };
 }
 
+async function cleanupTempDir(tempDir: string) {
+  for (let attempt = 0; attempt < 5; attempt += 1) {
+    try {
+      rmSync(tempDir, { recursive: true, force: true });
+      return;
+    } catch (error) {
+      const errorCode = (error as NodeJS.ErrnoException).code;
+      if (errorCode !== "EPERM" && errorCode !== "EBUSY") {
+        throw error;
+      }
+
+      await new Promise((resolve) => setTimeout(resolve, 25 * (attempt + 1)));
+    }
+  }
+
+  rmSync(tempDir, { recursive: true, force: true });
+}
+
 async function withPostgresAdminPool<T>(
   store: ReturnType<typeof createPostgresTestStore>,
   run: (pool: Pool) => Promise<T>,
@@ -67,6 +86,10 @@ async function startServer(
     port: 0,
     caseStoreFile,
     caseStoreMode: "sqlite",
+    internalApiToken: DEFAULT_INTERNAL_API_TOKEN,
+    operatorApiToken: DEFAULT_OPERATOR_API_TOKEN,
+    reviewerJwtSecret: DEFAULT_REVIEWER_JWT_SECRET,
+    reviewerAllowedRoles: ["clinician", "radiologist", "neuroradiologist"],
     ...configOverrides,
   });
   const server = createServer(app);
@@ -317,6 +340,9 @@ async function startPostgresServer(
       caseStoreMode: "postgres",
       caseStoreDatabaseUrl: store.caseStoreDatabaseUrl,
       caseStoreSchema: store.caseStoreSchema,
+      internalApiToken: DEFAULT_INTERNAL_API_TOKEN,
+      operatorApiToken: DEFAULT_OPERATOR_API_TOKEN,
+      reviewerJwtSecret: DEFAULT_REVIEWER_JWT_SECRET,
       ...configOverrides,
     },
     {
@@ -360,7 +386,10 @@ async function withServer<T>(
   }) => Promise<T>,
   configOverrides: Partial<Parameters<typeof createApp>[0]> = {},
 ) {
-  const { app, server, baseUrl } = await startServer(caseStoreFile, configOverrides);
+  const { app, server, baseUrl } = await startServer(caseStoreFile, {
+    operatorApiToken: DEFAULT_OPERATOR_API_TOKEN,
+    ...configOverrides,
+  });
 
   try {
     return await run({
@@ -368,10 +397,10 @@ async function withServer<T>(
       jsonRequest: async (path: string, init?: RequestInit) => {
         const response = await fetch(`${baseUrl}${path}`, {
           ...init,
-          headers: {
+          headers: withImplicitAuth(path, {
             "content-type": "application/json",
             ...(init?.headers ?? {}),
-          },
+          }),
         });
         const bodyText = await response.text();
         const body = bodyText.length > 0 ? JSON.parse(bodyText) : null;
@@ -380,9 +409,9 @@ async function withServer<T>(
       textRequest: async (path: string, init?: RequestInit) => {
         const response = await fetch(`${baseUrl}${path}`, {
           ...init,
-          headers: {
+          headers: withImplicitAuth(path, {
             ...(init?.headers ?? {}),
-          },
+          }),
         });
         const body = await response.text();
         return { response, body };
@@ -404,7 +433,10 @@ async function withPostgresServer<T>(
   }) => Promise<T>,
   configOverrides: Partial<Parameters<typeof createApp>[0]> = {},
 ) {
-  const { app, server, baseUrl } = await startPostgresServer(store, configOverrides);
+  const { app, server, baseUrl } = await startPostgresServer(store, {
+    operatorApiToken: DEFAULT_OPERATOR_API_TOKEN,
+    ...configOverrides,
+  });
 
   try {
     return await run({
@@ -412,10 +444,10 @@ async function withPostgresServer<T>(
       jsonRequest: async (path: string, init?: RequestInit) => {
         const response = await fetch(`${baseUrl}${path}`, {
           ...init,
-          headers: {
+          headers: withImplicitAuth(path, {
             "content-type": "application/json",
             ...(init?.headers ?? {}),
-          },
+          }),
         });
         const bodyText = await response.text();
         const body = bodyText.length > 0 ? JSON.parse(bodyText) : null;
@@ -424,9 +456,9 @@ async function withPostgresServer<T>(
       textRequest: async (path: string, init?: RequestInit) => {
         const response = await fetch(`${baseUrl}${path}`, {
           ...init,
-          headers: {
+          headers: withImplicitAuth(path, {
             ...(init?.headers ?? {}),
-          },
+          }),
         });
         const body = await response.text();
         return { response, body };
@@ -441,6 +473,8 @@ async function withPostgresServer<T>(
 
 const DEFAULT_INTERNAL_API_TOKEN = "dispatch-internal-token-0001";
 const DEFAULT_HMAC_SECRET = "dispatch-hmac-secret-0123456789abcdef";
+const DEFAULT_REVIEWER_JWT_SECRET = "reviewer-jwt-secret-0123456789abcdef";
+const DEFAULT_OPERATOR_API_TOKEN = "test-operator-token-secret-001";
 
 type PythonLaunch = {
   command: string;
@@ -448,6 +482,39 @@ type PythonLaunch = {
 };
 
 let cachedPythonLaunch: PythonLaunch | null = null;
+
+function isReviewerProtectedPath(path: string) {
+  return /\/api\/cases\/[^/]+\/(review|finalize)$/.test(path);
+}
+
+function isInternalProtectedPath(path: string) {
+  return /^\/api\/internal(\/|$)/.test(path);
+}
+
+function isOperatorProtectedPath(path: string) {
+  return /^\/api\/(cases|operations|delivery)(\/|$)/.test(path);
+}
+
+function withImplicitAuth(path: string, headers: HeadersInit | undefined) {
+  const normalizedHeaders = new Headers(headers ?? {});
+
+  if (isInternalProtectedPath(path) && !normalizedHeaders.has("authorization")) {
+    normalizedHeaders.set("authorization", `Bearer ${DEFAULT_INTERNAL_API_TOKEN}`);
+  }
+
+  if (isOperatorProtectedPath(path) && !normalizedHeaders.has("x-api-key")) {
+    normalizedHeaders.set("x-api-key", DEFAULT_OPERATOR_API_TOKEN);
+  }
+
+  if (isReviewerProtectedPath(path) && !normalizedHeaders.has("authorization")) {
+    const reviewerHeaders = createReviewerAuthHeaders("implicit-test-reviewer", "neuroradiologist");
+    for (const [name, value] of Object.entries(reviewerHeaders)) {
+      normalizedHeaders.set(name, value);
+    }
+  }
+
+  return normalizedHeaders;
+}
 
 function resolvePythonLaunch(): PythonLaunch {
   if (cachedPythonLaunch) {
@@ -576,6 +643,35 @@ function createSignedDispatchRequest(
   };
 }
 
+function createReviewerJwt(payload: {
+  reviewerId: string;
+  reviewerRole?: string;
+  exp?: number;
+  secret?: string;
+}) {
+  const encodedHeader = Buffer.from(JSON.stringify({ alg: "HS256", typ: "JWT" }), "utf-8").toString("base64url");
+  const encodedPayload = Buffer.from(
+    JSON.stringify({
+      sub: payload.reviewerId,
+      ...(payload.reviewerRole ? { role: payload.reviewerRole } : {}),
+      exp: payload.exp ?? Math.floor(Date.now() / 1000) + 60,
+    }),
+    "utf-8",
+  ).toString("base64url");
+  const signingInput = `${encodedHeader}.${encodedPayload}`;
+  const signature = createHmac("sha256", payload.secret ?? DEFAULT_REVIEWER_JWT_SECRET)
+    .update(signingInput)
+    .digest("base64url");
+
+  return `${signingInput}.${signature}`;
+}
+
+function createReviewerAuthHeaders(reviewerId: string, reviewerRole?: string, secret?: string) {
+  return {
+    authorization: `Bearer ${createReviewerJwt({ reviewerId, reviewerRole, secret })}`,
+  };
+}
+
 async function signedJsonRequest(
   baseUrl: string,
   path: string,
@@ -676,8 +772,6 @@ async function createReviewedCase(
   const reviewed = await jsonRequest(`/api/cases/${caseId}/review`, {
     method: "POST",
     body: JSON.stringify({
-      reviewerId: "clinician-queue",
-      reviewerRole: "neuroradiologist",
       comments: "Queue path reviewed.",
       finalImpression: "No acute intracranial abnormality. Queue-ready summary.",
     }),
@@ -793,8 +887,6 @@ test("public case lifecycle reaches delivery failure and retry path", async () =
       const reviewed = await jsonRequest(`/api/cases/${caseId}/review`, {
         method: "POST",
         body: JSON.stringify({
-          reviewerId: "clinician-01",
-          reviewerRole: "neuroradiologist",
           comments: "Findings acceptable for release after manual review.",
           finalImpression: "No acute intracranial abnormality. Mild chronic volume loss.",
         }),
@@ -807,12 +899,31 @@ test("public case lifecycle reaches delivery failure and retry path", async () =
         method: "POST",
         body: JSON.stringify({
           finalSummary: "Clinician-reviewed summary locked and queued for delivery.",
-          deliveryOutcome: "failed",
         }),
       });
 
       assert.equal(finalized.response.status, 200);
-      assert.equal(finalized.body.case.status, "DELIVERY_FAILED");
+      assert.equal(finalized.body.case.status, "DELIVERY_PENDING");
+
+      const deliveryClaim = await jsonRequest("/api/internal/delivery-jobs/claim-next", {
+        method: "POST",
+        body: JSON.stringify({ workerId: "delivery-test-worker" }),
+      });
+
+      assert.equal(deliveryClaim.response.status, 200);
+      assert.equal(deliveryClaim.body.job.caseId, caseId);
+
+      const failedDelivery = await jsonRequest("/api/internal/delivery-callback", {
+        method: "POST",
+        body: JSON.stringify({
+          caseId,
+          deliveryStatus: "failed",
+          detail: "Simulated outbound delivery failure recorded by delivery callback.",
+        }),
+      });
+
+      assert.equal(failedDelivery.response.status, 200);
+      assert.equal(failedDelivery.body.case.status, "DELIVERY_FAILED");
 
       const report = await jsonRequest(`/api/cases/${caseId}/report`);
       assert.equal(report.response.status, 200);
@@ -863,7 +974,7 @@ test("public case lifecycle reaches delivery failure and retry path", async () =
       assert.equal(detail.body.case.operationLog.some((entry: { operationType: string }) => entry.operationType === "delivery-retry-requested"), true);
     });
   } finally {
-    rmSync(tempDir, { recursive: true, force: true });
+    await cleanupTempDir(tempDir);
   }
 });
 
@@ -1054,12 +1165,16 @@ test("artifact payloads are persisted and retrievable across sqlite restarts", a
       assert.equal(typeof qcArtifact.retrievalUrl, "string");
       assert.equal(qcArtifact.storageUri, qcArtifact.retrievalUrl);
 
-      const overlayResponse = await fetch(`${baseUrl}${overlayArtifact.retrievalUrl}`);
+      const overlayResponse = await fetch(`${baseUrl}${overlayArtifact.retrievalUrl}`, {
+        headers: { "x-api-key": DEFAULT_OPERATOR_API_TOKEN },
+      });
       assert.equal(overlayResponse.status, 200);
       assert.equal(overlayResponse.headers.get("content-type"), "image/png");
       assert.equal(Buffer.from(await overlayResponse.arrayBuffer()).toString("utf-8"), "PNG-DEMO-ARTIFACT");
 
-      const qcResponse = await fetch(`${baseUrl}${qcArtifact.retrievalUrl}`);
+      const qcResponse = await fetch(`${baseUrl}${qcArtifact.retrievalUrl}`, {
+        headers: { "x-api-key": DEFAULT_OPERATOR_API_TOKEN },
+      });
       assert.equal(qcResponse.status, 200);
       assert.equal(qcResponse.headers.get("content-type"), "application/json");
       assert.deepEqual(JSON.parse(await qcResponse.text()), { summary: "qc-ok", checks: 1 });
@@ -1119,7 +1234,9 @@ test("postgres-backed cases retain artifact retrieval metadata after restart", a
       assert.equal(typeof artifact.retrievalUrl, "string");
       assert.equal(artifact.storageUri, artifact.retrievalUrl);
 
-      const artifactResponse = await fetch(`${baseUrl}${artifact.retrievalUrl}`);
+      const artifactResponse = await fetch(`${baseUrl}${artifact.retrievalUrl}`, {
+        headers: { "x-api-key": DEFAULT_OPERATOR_API_TOKEN },
+      });
       assert.equal(artifactResponse.status, 200);
       assert.equal(artifactResponse.headers.get("content-type"), "application/json");
       assert.deepEqual(JSON.parse(await artifactResponse.text()), { source: "postgres" });
@@ -1332,7 +1449,7 @@ test("dispatch routes reject replayed nonce", async () => {
         // Create a case so dispatch/claim has work to do
         const created = await fetch(`${baseUrl}/api/cases`, {
           method: "POST",
-          headers: { "content-type": "application/json" },
+          headers: { "content-type": "application/json", "x-api-key": DEFAULT_OPERATOR_API_TOKEN },
           body: JSON.stringify({
             patientAlias: "synthetic-patient-replay-001",
             studyUid: "1.2.840.replay.1",
@@ -1617,6 +1734,7 @@ test("malformed JSON returns a request-scoped invalid input response", async () 
         method: "POST",
         headers: {
           "content-type": "application/json",
+          "x-api-key": DEFAULT_OPERATOR_API_TOKEN,
         },
         body: '{"patientAlias":"broken-json"',
       });
@@ -1980,7 +2098,9 @@ test("python worker derives metadata-backed outputs from the dispatch execution 
         assert.notEqual(qcArtifact, undefined);
         assert.match(qcArtifact.storageUri, new RegExp(`/api/cases/${caseId}/artifacts/`));
 
-        const qcResponse = await fetch(`${baseUrl}${qcArtifact.storageUri}`);
+        const qcResponse = await fetch(`${baseUrl}${qcArtifact.storageUri}`, {
+          headers: { "x-api-key": DEFAULT_OPERATOR_API_TOKEN },
+        });
         assert.equal(qcResponse.status, 200);
         assert.match(qcResponse.headers.get("content-type") ?? "", /application\/json/);
         const qcBody = await qcResponse.json();
@@ -2083,7 +2203,9 @@ test("python worker performs a voxel-backed pass when a T1w volume URL is presen
           );
           assert.notEqual(overlayArtifact, undefined);
 
-          const overlayResponse = await fetch(`${baseUrl}${overlayArtifact.storageUri}`);
+          const overlayResponse = await fetch(`${baseUrl}${overlayArtifact.storageUri}`, {
+            headers: { "x-api-key": DEFAULT_OPERATOR_API_TOKEN },
+          });
           assert.equal(overlayResponse.status, 200);
           assert.match(overlayResponse.headers.get("content-type") ?? "", /image\/svg\+xml/);
           assert.match(await overlayResponse.text(), /<svg/i);
@@ -2174,6 +2296,83 @@ test("python worker records classified fallback metadata when a volume URL canno
         },
       );
     });
+  } finally {
+    rmSync(tempDir, { recursive: true, force: true });
+  }
+});
+
+test("python worker falls back without fetching when volume URL origin is not allowed", async () => {
+  const { tempDir, caseStoreFile } = createTestStoreFile();
+
+  try {
+    await withServer(
+      caseStoreFile,
+      async ({ baseUrl, jsonRequest }) => {
+        const created = await jsonRequest("/api/cases", {
+          method: "POST",
+          body: JSON.stringify({
+            patientAlias: "synthetic-python-worker-origin-guard-001",
+            studyUid: "1.2.840.python.worker.origin.guard.1",
+            sequenceInventory: ["T1w"],
+            indication: "worker fetch guard review",
+            studyContext: {
+              studyInstanceUid: "2.25.python.worker.origin.guard.study.001",
+              accessionNumber: "PY-WORKER-ORIGIN-GUARD-001",
+              studyDate: "2026-04-03",
+              sourceArchive: "external-fixture",
+              metadataSummary: ["Disallowed absolute volume URL should not be fetched"],
+              series: [
+                {
+                  seriesInstanceUid: "2.25.python.worker.origin.guard.study.001.1",
+                  seriesDescription: "Blocked external T1w",
+                  modality: "MR",
+                  sequenceLabel: "T1w",
+                  instanceCount: 1,
+                  volumeDownloadUrl: "https://example.test/blocked-volume.nii",
+                },
+              ],
+            },
+          }),
+        });
+
+        assert.equal(created.response.status, 201);
+        const caseId = created.body.case.caseId as string;
+
+        const worker = await runPythonWorker(baseUrl, {
+          MRI_WORKER_ID: "python-worker-origin-guard-001",
+          MRI_INTERNAL_API_TOKEN: DEFAULT_INTERNAL_API_TOKEN,
+        });
+
+        assert.equal(worker.exitCode, 0, `${worker.stderr}\n${worker.stdout}`);
+
+        const detail = await jsonRequest(`/api/cases/${caseId}`);
+        assert.equal(detail.response.status, 200);
+        assert.deepEqual(detail.body.case.structuralExecution.executionContext, {
+          computeMode: "metadata-fallback",
+          fallbackCode: "volume-download-failed",
+          fallbackDetail: "Volume download URL origin is not permitted for worker fetch.",
+          sourceSeriesInstanceUid: "2.25.python.worker.origin.guard.study.001.1",
+        });
+        assert.match(detail.body.case.reportSummary.processingSummary, /Metadata-derived draft/);
+
+        const report = await jsonRequest(`/api/cases/${caseId}/report`);
+        assert.equal(report.response.status, 200);
+        assert.deepEqual(report.body.report.executionContext, {
+          computeMode: "metadata-fallback",
+          fallbackCode: "volume-download-failed",
+          fallbackDetail: "Volume download URL origin is not permitted for worker fetch.",
+          sourceSeriesInstanceUid: "2.25.python.worker.origin.guard.study.001.1",
+        });
+        assert.equal(
+          report.body.report.issues.some((issue: string) => /origin is not permitted for worker fetch/i.test(issue)),
+          true,
+        );
+      },
+      {
+        internalApiToken: DEFAULT_INTERNAL_API_TOKEN,
+        hmacSecret: DEFAULT_HMAC_SECRET,
+      },
+    );
   } finally {
     rmSync(tempDir, { recursive: true, force: true });
   }
@@ -2609,6 +2808,9 @@ test("requeue-expired defaults maxClaimAgeMs when the request body is empty", as
     await withServer(caseStoreFile, async ({ baseUrl, jsonRequest }) => {
       const requeueResponse = await fetch(`${baseUrl}/api/internal/inference-jobs/requeue-expired`, {
         method: "POST",
+        headers: {
+          authorization: `Bearer ${DEFAULT_INTERNAL_API_TOKEN}`,
+        },
       });
       const requeueBody = await requeueResponse.json();
 
@@ -2993,10 +3195,10 @@ test("stale worker claim returns null over HTTP instead of surfacing a store con
     const jsonRequest = async (baseUrl: string, path: string, init?: RequestInit) => {
       const response = await fetch(`${baseUrl}${path}`, {
         ...init,
-        headers: {
+        headers: withImplicitAuth(path, {
           "content-type": "application/json",
           ...(init?.headers ?? {}),
-        },
+        }),
       });
       const bodyText = await response.text();
       const body = bodyText.length > 0 ? JSON.parse(bodyText) : null;
@@ -3109,9 +3311,7 @@ test("review cannot run before inference finishes", async () => {
 
       const reviewAttempt = await jsonRequest(`/api/cases/${caseId}/review`, {
         method: "POST",
-        body: JSON.stringify({
-          reviewerId: "clinician-02",
-        }),
+        body: JSON.stringify({}),
       });
 
       assert.equal(reviewAttempt.response.status, 409);
@@ -3336,9 +3536,7 @@ test("delivery callback marks finalized cases as delivered", async () => {
 
       await jsonRequest(`/api/cases/${caseId}/review`, {
         method: "POST",
-        body: JSON.stringify({
-          reviewerId: "clinician-03",
-        }),
+        body: JSON.stringify({}),
       });
 
       const finalized = await jsonRequest(`/api/cases/${caseId}/finalize`, {
@@ -3403,7 +3601,7 @@ test("duplicate delivery callback is treated as a safe replay", async () => {
 
       await jsonRequest(`/api/cases/${caseId}/review`, {
         method: "POST",
-        body: JSON.stringify({ reviewerId: "clinician-03b" }),
+        body: JSON.stringify({}),
       });
 
       await jsonRequest(`/api/cases/${caseId}/finalize`, {
@@ -3544,9 +3742,9 @@ test("malformed JSON body is normalized into the API error envelope", async () =
     try {
       const response = await fetch(`${baseUrl}/api/cases`, {
         method: "POST",
-        headers: {
+        headers: withImplicitAuth("/api/cases", {
           "content-type": "application/json",
-        },
+        }),
         body: "{bad-json",
       });
 
@@ -3623,7 +3821,7 @@ test("read-side endpoints expose case detail, report, and summary shapes", async
 
       await jsonRequest(`/api/cases/${caseId}/review`, {
         method: "POST",
-        body: JSON.stringify({ reviewerId: "clinician-shape" }),
+        body: JSON.stringify({}),
       });
 
       await jsonRequest(`/api/cases/${caseId}/finalize`, {
@@ -3742,8 +3940,6 @@ test("deterministic synthetic demo flow covers intake through delivered state", 
       const reviewed = await jsonRequest(`/api/cases/${caseId}/review`, {
         method: "POST",
         body: JSON.stringify({
-          reviewerId: "demo-clinician",
-          reviewerRole: "neuroradiologist",
           finalImpression: "Synthetic demo reviewed and accepted.",
         }),
       });
@@ -4077,7 +4273,9 @@ test("report-preview artifact is persisted and retrievable with correct MIME typ
       assert.equal(typeof reportPreviewArtifact.retrievalUrl, "string", "report-preview must have a retrievalUrl");
 
       // Retrieve the artifact content via API
-      const rpResponse = await fetch(`${baseUrl}${reportPreviewArtifact.retrievalUrl}`);
+      const rpResponse = await fetch(`${baseUrl}${reportPreviewArtifact.retrievalUrl}`, {
+        headers: { "x-api-key": DEFAULT_OPERATOR_API_TOKEN },
+      });
       assert.equal(rpResponse.status, 200);
       assert.equal(rpResponse.headers.get("content-type"), "text/html");
       const rpContent = await rpResponse.text();
@@ -4288,8 +4486,6 @@ test("archive truth is preserved through review, finalize, and report surfaces",
       await jsonRequest(`/api/cases/${caseId}/review`, {
         method: "POST",
         body: JSON.stringify({
-          reviewerId: "clinician-3b-at",
-          reviewerRole: "neuroradiologist",
           finalImpression: "Archive truth confirmed during review.",
         }),
       });
@@ -4500,8 +4696,6 @@ test("Wave 4: DICOM SR export returns structurally valid envelope for finalized 
       await jsonRequest(`/api/cases/${caseId}/review`, {
         method: "POST",
         body: JSON.stringify({
-          reviewerId: "dr-export-test",
-          reviewerRole: "neuroradiologist",
           finalImpression: "Normal structural MRI",
         }),
       });
@@ -4602,8 +4796,6 @@ test("Wave 4: FHIR DiagnosticReport export returns valid R4 resource for finaliz
       await jsonRequest(`/api/cases/${caseId}/review`, {
         method: "POST",
         body: JSON.stringify({
-          reviewerId: "dr-fhir-test",
-          reviewerRole: "neuroradiologist",
           finalImpression: "Mild left hippocampal volume reduction noted",
         }),
       });
@@ -4769,6 +4961,252 @@ test("Wave 4: export endpoints return 404 after review until finalization locks 
       assert.equal(fhirExport.response.status, 404, "FHIR export must reject reviewed-but-unfinalized report");
       assert.ok(fhirExport.body.code, "reviewed rejection must include error code");
     });
+  } finally {
+    rmSync(tempDir, { recursive: true, force: true });
+  }
+});
+
+test("bearer-jwt review uses authenticated reviewer identity instead of request-body identity", async () => {
+  const { tempDir, caseStoreFile } = createTestStoreFile();
+
+  try {
+    await withServer(
+      caseStoreFile,
+      async ({ jsonRequest }) => {
+        const created = await jsonRequest("/api/cases", {
+          method: "POST",
+          body: JSON.stringify({
+            patientAlias: "secure-review-patient-001",
+            studyUid: "1.2.840.secure.review.1",
+            sequenceInventory: ["T1w", "FLAIR"],
+          }),
+        });
+        const caseId = created.body.case.caseId as string;
+
+        await jsonRequest("/api/internal/inference-callback", {
+          method: "POST",
+          body: JSON.stringify({
+            caseId,
+            qcDisposition: "pass",
+            findings: ["Secure review draft ready."],
+            measurements: [{ label: "whole_brain_ml", value: 1112 }],
+            artifacts: ["artifact://qc", "artifact://report"],
+          }),
+        });
+
+        const reviewed = await jsonRequest(`/api/cases/${caseId}/review`, {
+          method: "POST",
+          headers: createReviewerAuthHeaders("token-clinician-01", "neuroradiologist"),
+          body: JSON.stringify({
+            comments: "Authenticated review completed.",
+            finalImpression: "Authenticated final impression.",
+          }),
+        });
+
+        assert.equal(reviewed.response.status, 200);
+        assert.equal(reviewed.body.case.status, "REVIEWED");
+        assert.equal(reviewed.body.case.review.reviewerId, "token-clinician-01");
+        assert.equal(reviewed.body.case.review.reviewerRole, "neuroradiologist");
+      },
+      {
+        reviewerJwtSecret: DEFAULT_REVIEWER_JWT_SECRET,
+      },
+    );
+  } finally {
+    rmSync(tempDir, { recursive: true, force: true });
+  }
+});
+
+test("bearer-jwt review rejects missing auth and finalize rejects public delivery override", async () => {
+  const { tempDir, caseStoreFile } = createTestStoreFile();
+
+  try {
+    await withServer(
+      caseStoreFile,
+      async ({ jsonRequest }) => {
+        const created = await jsonRequest("/api/cases", {
+          method: "POST",
+          body: JSON.stringify({
+            patientAlias: "secure-review-patient-002",
+            studyUid: "1.2.840.secure.review.2",
+            sequenceInventory: ["T1w", "FLAIR"],
+          }),
+        });
+        const caseId = created.body.case.caseId as string;
+
+        await jsonRequest("/api/internal/inference-callback", {
+          method: "POST",
+          body: JSON.stringify({
+            caseId,
+            qcDisposition: "pass",
+            findings: ["Secure finalize draft ready."],
+            measurements: [{ label: "whole_brain_ml", value: 1113 }],
+            artifacts: ["artifact://qc", "artifact://report"],
+          }),
+        });
+
+        const unauthenticatedReview = await jsonRequest(`/api/cases/${caseId}/review`, {
+          method: "POST",
+          headers: {
+            authorization: "",
+          },
+          body: JSON.stringify({ comments: "Missing auth." }),
+        });
+
+        assert.equal(unauthenticatedReview.response.status, 401);
+        assert.equal(unauthenticatedReview.body.code, "UNAUTHORIZED");
+
+        const reviewed = await jsonRequest(`/api/cases/${caseId}/review`, {
+          method: "POST",
+          headers: createReviewerAuthHeaders("token-clinician-02", "neuroradiologist"),
+          body: JSON.stringify({ comments: "Authenticated review." }),
+        });
+
+        assert.equal(reviewed.response.status, 200);
+
+        const invalidFinalize = await jsonRequest(`/api/cases/${caseId}/finalize`, {
+          method: "POST",
+          headers: createReviewerAuthHeaders("token-clinician-02", "neuroradiologist"),
+          body: JSON.stringify({
+            finalSummary: "Ready for outbound delivery.",
+            deliveryOutcome: "failed",
+          }),
+        });
+
+        assert.equal(invalidFinalize.response.status, 400);
+        assert.equal(invalidFinalize.body.code, "INVALID_INPUT");
+
+        const finalized = await jsonRequest(`/api/cases/${caseId}/finalize`, {
+          method: "POST",
+          headers: createReviewerAuthHeaders("token-clinician-02", "neuroradiologist"),
+          body: JSON.stringify({ finalSummary: "Ready for outbound delivery." }),
+        });
+
+        assert.equal(finalized.response.status, 200);
+        assert.equal(finalized.body.case.status, "DELIVERY_PENDING");
+      },
+      {
+        reviewerJwtSecret: DEFAULT_REVIEWER_JWT_SECRET,
+      },
+    );
+  } finally {
+    rmSync(tempDir, { recursive: true, force: true });
+  }
+});
+
+test("bearer-jwt review and finalize require an allowed reviewer role", async () => {
+  const { tempDir, caseStoreFile } = createTestStoreFile();
+
+  try {
+    await withServer(
+      caseStoreFile,
+      async ({ jsonRequest }) => {
+        const created = await jsonRequest("/api/cases", {
+          method: "POST",
+          body: JSON.stringify({
+            patientAlias: "secure-review-patient-003",
+            studyUid: "1.2.840.secure.review.3",
+            sequenceInventory: ["T1w", "FLAIR"],
+          }),
+        });
+        const caseId = created.body.case.caseId as string;
+
+        await jsonRequest("/api/internal/inference-callback", {
+          method: "POST",
+          body: JSON.stringify({
+            caseId,
+            qcDisposition: "pass",
+            findings: ["Secure role-gated review draft ready."],
+            measurements: [{ label: "whole_brain_ml", value: 1114 }],
+            artifacts: ["artifact://qc", "artifact://report"],
+          }),
+        });
+
+        const missingRoleReview = await jsonRequest(`/api/cases/${caseId}/review`, {
+          method: "POST",
+          headers: createReviewerAuthHeaders("token-clinician-03"),
+          body: JSON.stringify({ comments: "Missing role claim." }),
+        });
+
+        assert.equal(missingRoleReview.response.status, 403);
+        assert.equal(missingRoleReview.body.code, "FORBIDDEN");
+
+        const unauthorizedRoleReview = await jsonRequest(`/api/cases/${caseId}/review`, {
+          method: "POST",
+          headers: createReviewerAuthHeaders("token-clinician-03", "technician"),
+          body: JSON.stringify({ comments: "Unauthorized role claim." }),
+        });
+
+        assert.equal(unauthorizedRoleReview.response.status, 403);
+        assert.equal(unauthorizedRoleReview.body.code, "FORBIDDEN");
+
+        const reviewed = await jsonRequest(`/api/cases/${caseId}/review`, {
+          method: "POST",
+          headers: createReviewerAuthHeaders("token-clinician-03", "neuroradiologist"),
+          body: JSON.stringify({ comments: "Authorized reviewer role." }),
+        });
+
+        assert.equal(reviewed.response.status, 200);
+
+        const unauthorizedFinalize = await jsonRequest(`/api/cases/${caseId}/finalize`, {
+          method: "POST",
+          headers: createReviewerAuthHeaders("token-clinician-03", "technician"),
+          body: JSON.stringify({ finalSummary: "Unauthorized finalization attempt." }),
+        });
+
+        assert.equal(unauthorizedFinalize.response.status, 403);
+        assert.equal(unauthorizedFinalize.body.code, "FORBIDDEN");
+
+        const finalized = await jsonRequest(`/api/cases/${caseId}/finalize`, {
+          method: "POST",
+          headers: createReviewerAuthHeaders("token-clinician-03", "neuroradiologist"),
+          body: JSON.stringify({ finalSummary: "Authorized reviewer finalization." }),
+        });
+
+        assert.equal(finalized.response.status, 200);
+        assert.equal(finalized.body.case.status, "DELIVERY_PENDING");
+      },
+      {
+        reviewerJwtSecret: DEFAULT_REVIEWER_JWT_SECRET,
+      },
+    );
+  } finally {
+    rmSync(tempDir, { recursive: true, force: true });
+  }
+});
+
+test("operator auth rejects requests without x-api-key on protected routes", async () => {
+  const { tempDir, caseStoreFile } = createTestStoreFile();
+
+  try {
+    await withServer(
+      caseStoreFile,
+      async ({ baseUrl }) => {
+        const paths = [
+          { path: "/api/cases", method: "GET" },
+          { path: "/api/cases", method: "POST" },
+          { path: "/api/operations/summary", method: "GET" },
+        ];
+
+        for (const { path, method } of paths) {
+          const response = await fetch(`${baseUrl}${path}`, {
+            method,
+            headers: { "content-type": "application/json" },
+          });
+          assert.equal(
+            response.status,
+            401,
+            `Expected 401 for ${method} ${path} without x-api-key but got ${response.status}`,
+          );
+        }
+
+        const healthResponse = await fetch(`${baseUrl}/healthz`);
+        assert.equal(healthResponse.status, 200, "Health probe should remain unauthenticated");
+      },
+      {
+        operatorApiToken: DEFAULT_OPERATOR_API_TOKEN,
+      },
+    );
   } finally {
     rmSync(tempDir, { recursive: true, force: true });
   }

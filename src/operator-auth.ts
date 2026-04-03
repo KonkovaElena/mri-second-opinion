@@ -3,12 +3,12 @@ import type express from "express";
 import { WorkflowError } from "./case-contracts";
 import type { AppConfig } from "./config";
 
-const AUTHORIZATION_SCHEME = "bearer";
+const API_KEY_HEADER = "x-api-key";
 
-export function createInternalAuthMiddleware(
-  config: Pick<AppConfig, "internalApiToken" | "nodeEnv">,
+export function createOperatorAuthMiddleware(
+  config: Pick<AppConfig, "operatorApiToken" | "nodeEnv">,
 ): express.RequestHandler {
-  const expectedToken = config.internalApiToken;
+  const expectedToken = config.operatorApiToken;
 
   return (req, _res, next) => {
     if (!expectedToken) {
@@ -17,32 +17,19 @@ export function createInternalAuthMiddleware(
         return;
       }
 
-      next(new WorkflowError(503, "Internal API authentication is not configured for this environment", "SERVICE_CONFIG_ERROR"));
+      next(new WorkflowError(503, "Operator API authentication is not configured for this environment", "SERVICE_CONFIG_ERROR"));
       return;
     }
 
-    const providedToken = extractBearerToken(req.get("authorization"));
+    const providedToken = req.get(API_KEY_HEADER)?.trim();
 
     if (!providedToken || !tokensEqual(providedToken, expectedToken)) {
-      next(new WorkflowError(401, "Internal API bearer token is missing or invalid", "UNAUTHORIZED"));
+      next(new WorkflowError(401, "Operator API key is missing or invalid", "UNAUTHORIZED"));
       return;
     }
 
     next();
   };
-}
-
-function extractBearerToken(authorizationHeader: string | undefined) {
-  if (!authorizationHeader) {
-    return undefined;
-  }
-
-  const parts = authorizationHeader.trim().split(/\s+/);
-  if (parts.length !== 2 || parts[0].toLowerCase() !== AUTHORIZATION_SCHEME) {
-    return undefined;
-  }
-
-  return parts[1];
 }
 
 function tokensEqual(providedToken: string, expectedToken: string) {

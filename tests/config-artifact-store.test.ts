@@ -2,6 +2,8 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import { getConfig } from "../src/config";
 
+const DEFAULT_REVIEWER_JWT_SECRET = "reviewer-jwt-secret-0123456789abcdef";
+
 function withEnv(overrides: Record<string, string | undefined>, run: () => void) {
   const original = new Map<string, string | undefined>();
 
@@ -33,6 +35,7 @@ function withEnv(overrides: Record<string, string | undefined>, run: () => void)
 test("getConfig parses s3-compatible artifact storage settings", () => {
   withEnv(
     {
+      MRI_REVIEWER_JWT_HS256_SECRET: DEFAULT_REVIEWER_JWT_SECRET,
       MRI_ARTIFACT_STORE_PROVIDER: "s3-compatible",
       MRI_ARTIFACT_STORE_BASE_PATH: "cases-derived",
       MRI_ARTIFACT_STORE_ENDPOINT: "https://minio.example.test",
@@ -52,6 +55,7 @@ test("getConfig parses s3-compatible artifact storage settings", () => {
 test("getConfig parses explicit CORS allowlist origins", () => {
   withEnv(
     {
+      MRI_REVIEWER_JWT_HS256_SECRET: DEFAULT_REVIEWER_JWT_SECRET,
       MRI_CORS_ALLOWED_ORIGINS: "https://viewer.example.test, http://127.0.0.1:4173",
     },
     () => {

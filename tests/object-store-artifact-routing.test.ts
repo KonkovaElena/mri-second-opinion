@@ -9,6 +9,32 @@ import { pathToFileURL } from "node:url";
 import { createApp } from "../src/app";
 import { createArtifactStore, type ArtifactStore } from "../src/case-artifact-storage";
 
+const DEFAULT_INTERNAL_API_TOKEN = "test-internal-token-secret-001";
+const DEFAULT_OPERATOR_API_TOKEN = "test-operator-token-secret-001";
+const DEFAULT_REVIEWER_JWT_SECRET = "reviewer-jwt-secret-0123456789abcdef";
+
+function isInternalProtectedPath(path: string) {
+  return /^\/api\/internal(\/|$)/.test(path);
+}
+
+function isOperatorProtectedPath(path: string) {
+  return /^\/api\/(cases|operations|delivery)(\/|$)/.test(path);
+}
+
+function withImplicitAuth(path: string, headers: HeadersInit | undefined) {
+  const normalizedHeaders = new Headers(headers ?? {});
+
+  if (isInternalProtectedPath(path) && !normalizedHeaders.has("authorization")) {
+    normalizedHeaders.set("authorization", `Bearer ${DEFAULT_INTERNAL_API_TOKEN}`);
+  }
+
+  if (isOperatorProtectedPath(path) && !normalizedHeaders.has("x-api-key")) {
+    normalizedHeaders.set("x-api-key", DEFAULT_OPERATOR_API_TOKEN);
+  }
+
+  return normalizedHeaders;
+}
+
 function createTestStoreFile() {
   const tempDir = mkdtempSync(join(tmpdir(), "mri-second-opinion-object-store-"));
   return {
@@ -34,8 +60,11 @@ async function withServer(
       artifactStoreRegion: "us-east-1",
       artifactStoreForcePathStyle: false,
       artifactStorePresignTtlSeconds: 900,
+      internalApiToken: DEFAULT_INTERNAL_API_TOKEN,
+      operatorApiToken: DEFAULT_OPERATOR_API_TOKEN,
       persistenceMode: "snapshot",
-      reviewerIdentitySource: "request-body",
+      reviewerJwtSecret: DEFAULT_REVIEWER_JWT_SECRET,
+      reviewerAllowedRoles: ["clinician", "radiologist", "neuroradiologist"],
       jsonBodyLimit: "1mb",
       publicApiRateLimitWindowMs: 900000,
       publicApiRateLimitMaxRequests: 300,
@@ -100,9 +129,9 @@ test("artifact route redirects to a presigned URL for object-store-backed artifa
     await withServer(caseStoreFile, fakeStore, async ({ baseUrl }) => {
       const created = await fetch(`${baseUrl}/api/cases`, {
         method: "POST",
-        headers: {
+        headers: withImplicitAuth("/api/cases", {
           "content-type": "application/json",
-        },
+        }),
         body: JSON.stringify({
           patientAlias: "synthetic-patient-object-store-001",
           studyUid: "1.2.840.object-store.1",
@@ -115,9 +144,9 @@ test("artifact route redirects to a presigned URL for object-store-backed artifa
       const caseId = createdBody.case.caseId as string;
       const inferred = await fetch(`${baseUrl}/api/internal/inference-callback`, {
         method: "POST",
-        headers: {
+        headers: withImplicitAuth("/api/internal/inference-callback", {
           "content-type": "application/json",
-        },
+        }),
         body: JSON.stringify({
           caseId,
           qcDisposition: "pass",
@@ -137,7 +166,9 @@ test("artifact route redirects to a presigned URL for object-store-backed artifa
 
       assert.equal(inferred.status, 200);
 
-      const detail = await fetch(`${baseUrl}/api/cases/${caseId}`);
+      const detail = await fetch(`${baseUrl}/api/cases/${caseId}`, {
+        headers: withImplicitAuth(`/api/cases/${caseId}`, undefined),
+      });
       const detailBody = await detail.json();
       assert.equal(detail.status, 200);
 
@@ -145,6 +176,7 @@ test("artifact route redirects to a presigned URL for object-store-backed artifa
       assert.equal(artifact.storageUri, `/api/cases/${caseId}/artifacts/${artifact.artifactId}`);
 
       const download = await fetch(`${baseUrl}${artifact.storageUri}`, {
+        headers: withImplicitAuth(artifact.storageUri, undefined),
         redirect: "manual",
       });
 
@@ -175,9 +207,9 @@ test("artifact route rejects local-file artifact refs outside the configured art
       async ({ baseUrl }) => {
         const created = await fetch(`${baseUrl}/api/cases`, {
           method: "POST",
-          headers: {
+          headers: withImplicitAuth("/api/cases", {
             "content-type": "application/json",
-          },
+          }),
           body: JSON.stringify({
             patientAlias: "synthetic-patient-local-boundary-001",
             studyUid: "1.2.840.local-boundary.1",
@@ -190,9 +222,9 @@ test("artifact route rejects local-file artifact refs outside the configured art
         const caseId = createdBody.case.caseId as string;
         const inferred = await fetch(`${baseUrl}/api/internal/inference-callback`, {
           method: "POST",
-          headers: {
+          headers: withImplicitAuth("/api/internal/inference-callback", {
             "content-type": "application/json",
-          },
+          }),
           body: JSON.stringify({
             caseId,
             qcDisposition: "pass",
@@ -205,14 +237,18 @@ test("artifact route rejects local-file artifact refs outside the configured art
 
         assert.equal(inferred.status, 200);
 
-        const detail = await fetch(`${baseUrl}/api/cases/${caseId}`);
+        const detail = await fetch(`${baseUrl}/api/cases/${caseId}`, {
+          headers: withImplicitAuth(`/api/cases/${caseId}`, undefined),
+        });
         const detailBody = await detail.json();
         assert.equal(detail.status, 200);
 
         const artifact = detailBody.case.artifactManifest[0];
         assert.equal(artifact.storageUri, `/api/cases/${caseId}/artifacts/${artifact.artifactId}`);
 
-        const download = await fetch(`${baseUrl}${artifact.storageUri}`);
+        const download = await fetch(`${baseUrl}${artifact.storageUri}`, {
+          headers: withImplicitAuth(artifact.storageUri, undefined),
+        });
         const downloadBody = await download.json();
 
         assert.equal(download.status, 404);
@@ -244,9 +280,9 @@ test("artifact route rejects object-store refs outside the configured base path"
       async ({ baseUrl }) => {
         const created = await fetch(`${baseUrl}/api/cases`, {
           method: "POST",
-          headers: {
+          headers: withImplicitAuth("/api/cases", {
             "content-type": "application/json",
-          },
+          }),
           body: JSON.stringify({
             patientAlias: "synthetic-patient-object-boundary-001",
             studyUid: "1.2.840.object-boundary.1",
@@ -259,9 +295,9 @@ test("artifact route rejects object-store refs outside the configured base path"
         const caseId = createdBody.case.caseId as string;
         const inferred = await fetch(`${baseUrl}/api/internal/inference-callback`, {
           method: "POST",
-          headers: {
+          headers: withImplicitAuth("/api/internal/inference-callback", {
             "content-type": "application/json",
-          },
+          }),
           body: JSON.stringify({
             caseId,
             qcDisposition: "pass",
@@ -274,7 +310,9 @@ test("artifact route rejects object-store refs outside the configured base path"
 
         assert.equal(inferred.status, 200);
 
-        const detail = await fetch(`${baseUrl}/api/cases/${caseId}`);
+        const detail = await fetch(`${baseUrl}/api/cases/${caseId}`, {
+          headers: withImplicitAuth(`/api/cases/${caseId}`, undefined),
+        });
         const detailBody = await detail.json();
         assert.equal(detail.status, 200);
 
@@ -282,6 +320,7 @@ test("artifact route rejects object-store refs outside the configured base path"
         assert.equal(artifact.storageUri, `/api/cases/${caseId}/artifacts/${artifact.artifactId}`);
 
         const download = await fetch(`${baseUrl}${artifact.storageUri}`, {
+          headers: withImplicitAuth(artifact.storageUri, undefined),
           redirect: "manual",
         });
         const downloadBody = await download.json();

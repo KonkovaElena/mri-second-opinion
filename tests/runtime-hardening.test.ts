@@ -8,6 +8,32 @@ import { tmpdir } from "node:os";
 import { createApp } from "../src/app";
 import { applyServerHardening } from "../src/http-runtime";
 
+const DEFAULT_INTERNAL_API_TOKEN = "test-internal-token-secret-001";
+const DEFAULT_OPERATOR_API_TOKEN = "test-operator-token-secret-001";
+const DEFAULT_REVIEWER_JWT_SECRET = "reviewer-jwt-secret-0123456789abcdef";
+
+function isInternalProtectedPath(path: string) {
+  return /^\/api\/internal(\/|$)/.test(path);
+}
+
+function isOperatorProtectedPath(path: string) {
+  return /^\/api\/(cases|operations|delivery)(\/|$)/.test(path);
+}
+
+function withProtectedRouteAuth(path: string, headers: HeadersInit | undefined) {
+  const normalizedHeaders = new Headers(headers ?? {});
+
+  if (isInternalProtectedPath(path) && !normalizedHeaders.has("authorization")) {
+    normalizedHeaders.set("authorization", `Bearer ${DEFAULT_INTERNAL_API_TOKEN}`);
+  }
+
+  if (isOperatorProtectedPath(path) && !normalizedHeaders.has("x-api-key")) {
+    normalizedHeaders.set("x-api-key", DEFAULT_OPERATOR_API_TOKEN);
+  }
+
+  return normalizedHeaders;
+}
+
 function createTestStoreFile() {
   const tempDir = mkdtempSync(join(tmpdir(), "mri-second-opinion-runtime-"));
   return {
@@ -25,6 +51,10 @@ async function startServer(
     port: 0,
     caseStoreFile,
     caseStoreMode: "sqlite",
+    internalApiToken: DEFAULT_INTERNAL_API_TOKEN,
+    operatorApiToken: DEFAULT_OPERATOR_API_TOKEN,
+    reviewerJwtSecret: DEFAULT_REVIEWER_JWT_SECRET,
+    reviewerAllowedRoles: ["clinician", "radiologist", "neuroradiologist"],
     ...configOverrides,
   });
   const server = createServer(app);
@@ -77,7 +107,9 @@ test("metrics endpoint exposes Prometheus-formatted registry output", async () =
 
   try {
     await withServer(caseStoreFile, async ({ baseUrl }) => {
-      const casesResponse = await fetch(`${baseUrl}/api/cases`);
+      const casesResponse = await fetch(`${baseUrl}/api/cases`, {
+        headers: withProtectedRouteAuth("/api/cases", undefined),
+      });
       assert.equal(casesResponse.status, 200);
 
       const metricsResponse = await fetch(`${baseUrl}/metrics`);
@@ -133,10 +165,14 @@ test("public API rate limiting returns 429 while internal routes stay exempt", a
     await withServer(
       caseStoreFile,
       async ({ baseUrl }) => {
-        const firstPublic = await fetch(`${baseUrl}/api/cases`);
+        const firstPublic = await fetch(`${baseUrl}/api/cases`, {
+          headers: withProtectedRouteAuth("/api/cases", undefined),
+        });
         assert.equal(firstPublic.status, 200);
 
-        const limitedPublic = await fetch(`${baseUrl}/api/cases`);
+        const limitedPublic = await fetch(`${baseUrl}/api/cases`, {
+          headers: withProtectedRouteAuth("/api/cases", undefined),
+        });
         const limitedBody = await limitedPublic.json();
         assert.equal(limitedPublic.status, 429);
         assert.equal(limitedBody.code, "RATE_LIMITED");
@@ -144,9 +180,9 @@ test("public API rate limiting returns 429 while internal routes stay exempt", a
 
         const internal = await fetch(`${baseUrl}/api/internal/ingest`, {
           method: "POST",
-          headers: {
+          headers: withProtectedRouteAuth("/api/internal/ingest", {
             "content-type": "application/json",
-          },
+          }),
           body: JSON.stringify({
             patientAlias: "synthetic-patient-rate-limit-001",
             studyUid: "1.2.840.rate-limit.1",
@@ -311,9 +347,9 @@ test("oversized JSON requests fail with a typed 413 response", async () => {
       async ({ baseUrl }) => {
         const response = await fetch(`${baseUrl}/api/cases`, {
           method: "POST",
-          headers: {
+          headers: withProtectedRouteAuth("/api/cases", {
             "content-type": "application/json",
-          },
+          }),
           body: JSON.stringify({
             patientAlias: "synthetic-patient-payload-001",
             studyUid: "1.2.840.payload.1",
@@ -342,6 +378,9 @@ test("server hardening applies configured timeout and keep-alive settings", () =
     port: 0,
     caseStoreFile: join(tmpdir(), "mri-second-opinion-hardening.sqlite"),
     caseStoreMode: "sqlite",
+    internalApiToken: DEFAULT_INTERNAL_API_TOKEN,
+    operatorApiToken: DEFAULT_OPERATOR_API_TOKEN,
+    reviewerJwtSecret: DEFAULT_REVIEWER_JWT_SECRET,
   });
   const server = createServer(app);
 
@@ -355,7 +394,7 @@ test("server hardening applies configured timeout and keep-alive settings", () =
       replayStoreTtlMs: 120_000,
       replayStoreMaxEntries: 10_000,
       persistenceMode: "snapshot",
-      reviewerIdentitySource: "request-body",
+      reviewerJwtSecret: DEFAULT_REVIEWER_JWT_SECRET,
       jsonBodyLimit: "1mb",
       publicApiRateLimitWindowMs: 900_000,
       publicApiRateLimitMaxRequests: 300,
@@ -398,7 +437,9 @@ test("unhandled errors produce structured JSON log with event and requestId", as
           throw new Error("simulated unexpected storage failure");
         };
 
-        const response = await fetch(`${baseUrl}/api/cases/any-id`);
+        const response = await fetch(`${baseUrl}/api/cases/any-id`, {
+          headers: withProtectedRouteAuth("/api/cases/any-id", undefined),
+        });
         const body = await response.json();
 
         assert.equal(response.status, 500);
@@ -420,6 +461,80 @@ test("unhandled errors produce structured JSON log with event and requestId", as
       server.close();
       await app.locals.caseService.close();
     }
+  } finally {
+    rmSync(tempDir, { recursive: true, force: true });
+  }
+});
+
+test("operator routes fail closed when operator auth is not configured outside development", async () => {
+  const { tempDir, caseStoreFile } = createTestStoreFile();
+
+  try {
+    await withServer(
+      caseStoreFile,
+      async ({ baseUrl }) => {
+        const response = await fetch(`${baseUrl}/api/cases`);
+        const body = await response.json();
+
+        assert.equal(response.status, 503);
+        assert.equal(body.code, "SERVICE_CONFIG_ERROR");
+        assert.match(body.error, /Operator API authentication is not configured/);
+      },
+      {
+        operatorApiToken: undefined,
+      },
+    );
+  } finally {
+    rmSync(tempDir, { recursive: true, force: true });
+  }
+});
+
+test("internal routes fail closed when internal auth is not configured outside development", async () => {
+  const { tempDir, caseStoreFile } = createTestStoreFile();
+
+  try {
+    await withServer(
+      caseStoreFile,
+      async ({ baseUrl }) => {
+        const response = await fetch(`${baseUrl}/api/internal/inference-jobs`);
+        const body = await response.json();
+
+        assert.equal(response.status, 503);
+        assert.equal(body.code, "SERVICE_CONFIG_ERROR");
+        assert.match(body.error, /Internal API authentication is not configured/);
+      },
+      {
+        internalApiToken: undefined,
+      },
+    );
+  } finally {
+    rmSync(tempDir, { recursive: true, force: true });
+  }
+});
+
+test("development mode keeps protected routes open when auth tokens are unset", async () => {
+  const { tempDir, caseStoreFile } = createTestStoreFile();
+
+  try {
+    await withServer(
+      caseStoreFile,
+      async ({ baseUrl }) => {
+        const publicResponse = await fetch(`${baseUrl}/api/cases`);
+        const publicBody = await publicResponse.json();
+        const internalResponse = await fetch(`${baseUrl}/api/internal/inference-jobs`);
+        const internalBody = await internalResponse.json();
+
+        assert.equal(publicResponse.status, 200);
+        assert.equal(Array.isArray(publicBody.cases), true);
+        assert.equal(internalResponse.status, 200);
+        assert.equal(Array.isArray(internalBody.jobs), true);
+      },
+      {
+        nodeEnv: "development",
+        operatorApiToken: undefined,
+        internalApiToken: undefined,
+      },
+    );
   } finally {
     rmSync(tempDir, { recursive: true, force: true });
   }
