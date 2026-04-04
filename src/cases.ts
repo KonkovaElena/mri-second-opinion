@@ -112,6 +112,7 @@ function createOperationLogEntry(input: Omit<OperationLogEntry, "operationId" | 
   return {
     operationId: randomUUID(),
     at: nowIso(),
+    actorId: null,
     ...input,
   };
 }
@@ -463,6 +464,7 @@ export class MemoryCaseService {
         caseId: record.caseId,
         operationType: "clinician-reviewed",
         actorType: "clinician",
+        actorId: normalized.reviewerId,
         source: "public-review",
         outcome: "completed",
         detail: `Reviewed by ${normalized.reviewerId}.`,
@@ -494,9 +496,12 @@ export class MemoryCaseService {
         caseId: record.caseId,
         operationType: "case-finalized",
         actorType: "clinician",
+        actorId: input.finalizerId ?? null,
         source: "public-finalize",
         outcome: "completed",
-        detail: "Final review state locked for release.",
+        detail: input.finalizerId
+          ? `Final review state locked by ${input.finalizerId}.`
+          : "Final review state locked for release.",
       });
       this.transition(record, "DELIVERY_PENDING", "Report queued for outbound delivery");
       this.appendOperation(record, {

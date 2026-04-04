@@ -51,7 +51,7 @@ The current workflow system should protect:
 | stale writer on queue claim | partially mitigated on the tested local path | duplicate or misleading background work attribution |
 | duplicate inference callback replay | mitigated by callback replay guards | repeated case mutation or state confusion |
 | premature delivery callback after queue loss | mitigated by active delivery-job guard | incorrect delivery completion state |
-| machine impersonation of clinician actions | open gap | review or finalize actions are still recorded as request data rather than authenticated clinician proof |
+| machine impersonation of clinician actions | partially mitigated | review and finalize operations now record the authenticated reviewer identity (`actorId`) from JWT claims in the operation log; request-body reviewer fields are overridden by JWT-verified identity |
 | public object access without actor-scoped authorization | open gap | unauthorized callers can reach case, report, export, or artifact surfaces more broadly than a stronger deployment posture would allow |
 | public-supplied worker fetch target | open gap | a caller can influence worker-side URL fetching through study payload fields, creating the current SSRF-class boundary |
 | clinician finalization coupled to delivery mutation | open gap | public finalize can simulate delivery success or failure instead of leaving that truth to delivery-plane actors |
@@ -75,12 +75,13 @@ The repository already has meaningful baseline mitigations.
 9. archive-lookup HTTP client enforces a 10-second `AbortSignal.timeout` to bound external-service latency
 10. browser-origin access is strict by default: cross-origin reads require explicit `MRI_CORS_ALLOWED_ORIGINS` allowlisting on selected public routes, while internal browser preflights remain unapproved
 11. internal bearer and HMAC protections currently apply only to internal routes and do not yet authenticate public clinician, report, export, or artifact access paths
+12. reviewer JWT verification (HS256) with deny-by-default role allowlist gates review and finalize mutations; authenticated reviewer identity is captured as `actorId` in the operation log, closing the clinician impersonation vector for workflow mutations
 
 ## Open Gaps
 
 The highest-value security gaps that still remain are:
 
-1. authenticated clinician identity and stronger operator authorization semantics
+1. ~~authenticated clinician identity~~ — partially closed: reviewer JWT with role allowlist gates review and finalize; `actorId` from JWT claims is recorded in the operation log; remaining gap is object-level authorization for read paths and stronger operator authorization semantics
 2. object-level authorization for public case, report, export, and artifact surfaces
 3. worker egress allowlisting and SSRF-resistant handling for public-to-worker volume references
 4. separation of clinician finalization from delivery-outcome mutation authority
@@ -108,7 +109,7 @@ This document must not be read as proof of:
 1. production-grade API hardening
 2. hospital deployment readiness
 3. regulated cybersecurity-file completion
-4. authenticated multi-actor clinical operations
+4. ~~authenticated multi-actor clinical operations~~ — partially addressed: reviewer JWT with `actorId` audit trail is now wired for review and finalize; full multi-actor RBAC and object-level authorization remain future work
 5. closed object-level authorization or worker-egress policy
 
 ## Interaction With Other Docs

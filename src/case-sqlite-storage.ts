@@ -217,12 +217,18 @@ export function normalizeStoredCaseRecord(parsed: CaseRecord): CaseRecord {
         artifactIds: normalizedArtifactManifest.map((artifact) => artifact.artifactId),
       });
 
+  const operationLog = (parsed.operationLog ?? []).map((entry) => ({
+    ...entry,
+    actorId: entry.actorId ?? null,
+  }));
+
   return {
     ...parsed,
     studyContext,
     structuralExecution,
     artifactManifest: normalizedArtifactManifest,
     report,
+    operationLog,
     lastInferenceFingerprint: parsed.lastInferenceFingerprint ?? null,
     review,
   };

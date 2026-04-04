@@ -348,9 +348,13 @@ export function createApp(config: AppConfig, options: CreateAppOptions = {}) {
 
   app.post("/api/cases/:caseId/finalize", async (req, res) => {
     try {
-      resolveAuthorizedReviewer(req, config, "finalize");
+      const reviewer = resolveAuthorizedReviewer(req, config, "finalize");
 
-      const updated = await caseService.finalizeCase(req.params.caseId, parsePublicFinalizeCaseInput(req.body));
+      const updated = await caseService.finalizeCase(req.params.caseId, {
+        ...parsePublicFinalizeCaseInput(req.body),
+        finalizerId: reviewer.reviewerId,
+        finalizerRole: reviewer.reviewerRole,
+      });
 
       res.json({ case: updated });
     } catch (error) {

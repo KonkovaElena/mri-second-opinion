@@ -66,6 +66,8 @@ export interface ReviewCaseInput {
 export interface FinalizeCaseInput {
   finalSummary?: string;
   deliveryOutcome?: DeliveryOutcome;
+  finalizerId?: string;
+  finalizerRole?: string;
 }
 
 export interface DeliveryCallbackInput {
@@ -104,6 +106,7 @@ export interface OperationLogEntry {
   caseId: string;
   operationType: string;
   actorType: "system" | "clinician" | "integration";
+  actorId?: string | null;
   source:
     | "public-api"
     | "internal-ingest"
