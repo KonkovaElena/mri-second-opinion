@@ -7,6 +7,7 @@ services:
       PORT: ${PORT:-4010}
       MRI_CASE_STORE_MODE: ${MRI_CASE_STORE_MODE:-sqlite}
       MRI_CASE_STORE_FILE: /data/cases.sqlite
+      MRI_REVIEWER_JWT_HS256_SECRET: ${MRI_REVIEWER_JWT_HS256_SECRET:-compose-dev-reviewer-secret-0123456789abcdef}
     ports:
       - "${PORT:-4010}:${PORT:-4010}"
     healthcheck:
