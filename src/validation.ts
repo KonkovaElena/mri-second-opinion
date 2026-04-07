@@ -165,6 +165,8 @@ const studyContextSchema = z.preprocess(
 
 const createCaseInputSchema = z.object({
   patientAlias: requiredTrimmedString("patientAlias", MAX_ID),
+  tenantId: z.string().trim().max(MAX_ID).nullable().optional(),
+  assignedReviewerId: z.string().trim().max(MAX_ID).nullable().optional(),
   studyUid: requiredTrimmedString("studyUid", MAX_ID),
   sequenceInventory: stringArrayField("sequenceInventory", {
     requireNonEmpty: true,
@@ -339,6 +341,8 @@ export function parseCreateCaseInput(body: unknown): CreateCaseInput {
   const parsed = parseWithSchema(body, createCaseInputSchema);
   return {
     patientAlias: parsed.patientAlias,
+    tenantId: parsed.tenantId ?? undefined,
+    assignedReviewerId: parsed.assignedReviewerId ?? undefined,
     studyUid: parsed.studyUid,
     sequenceInventory: parsed.sequenceInventory,
     indication: parsed.indication as string | undefined,

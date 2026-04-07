@@ -52,7 +52,7 @@ The current workflow system should protect:
 | duplicate inference callback replay | mitigated by callback replay guards | repeated case mutation or state confusion |
 | premature delivery callback after queue loss | mitigated by active delivery-job guard | incorrect delivery completion state |
 | machine impersonation of clinician actions | partially mitigated | review and finalize operations now record the authenticated reviewer identity (`actorId`) from JWT claims in the operation log; request-body reviewer fields are overridden by JWT-verified identity |
-| public object access without actor-scoped authorization | open gap | unauthorized callers can reach case, report, export, or artifact surfaces more broadly than a stronger deployment posture would allow |
+| public object access without actor-scoped authorization | partially mitigated | tenant-scoped isolation (`x-tenant-id` header) filters list results and denies cross-tenant access to case, report, export, and artifact surfaces with 403; reviewer-scoped authorization denies access to cases assigned to a different reviewer on review and finalize mutations; remaining gap is cryptographic tenant identity binding (current header is not yet backed by a signed tenant token) |
 | public-supplied worker fetch target | partially mitigated | a caller can still provide the field, but worker-side absolute fetches are now restricted to MRI API same-origin or explicit allowlisted origins instead of broad absolute-origin acceptance |
 | clinician finalization coupled to delivery mutation | open gap | public finalize can simulate delivery success or failure instead of leaving that truth to delivery-plane actors |
 | internal route replay or signature spoofing | mitigated | namespace bearer protection gates all `/api/internal/*` routes; HMAC-SHA256 request signing with nonce replay enforcement protects `/api/internal/dispatch/*` |
@@ -77,13 +77,15 @@ The repository already has meaningful baseline mitigations.
 11. internal bearer and HMAC protections currently apply only to internal routes and do not yet authenticate public clinician, report, export, or artifact access paths
 12. reviewer JWT verification (HS256) with deny-by-default role allowlist gates review and finalize mutations; authenticated reviewer identity is captured as `actorId` in the operation log, closing the clinician impersonation vector for workflow mutations
 13. persisted payload-backed artifacts now record SHA-256 and byte-size integrity metadata in the derived-artifact manifest, so case detail and report surfaces can trace each stored artifact back to a concrete content digest instead of only a storage URI
+14. tenant-scoped object isolation: cases created with a `tenantId` are invisible to other tenants on list, detail, report, export, and artifact routes; cross-tenant access returns 403; unscoped operator access still sees all cases (backward compatible)
+15. reviewer-scoped object authorization: cases created with an `assignedReviewerId` restrict review and finalize mutations to the assigned reviewer; mismatched JWT `sub` returns 403
 
 ## Open Gaps
 
 The highest-value security gaps that still remain are:
 
-1. ~~authenticated clinician identity~~ — partially closed: reviewer JWT with role allowlist gates review and finalize; `actorId` from JWT claims is recorded in the operation log; remaining gap is object-level authorization for read paths and stronger operator authorization semantics
-2. object-level authorization for public case, report, export, and artifact surfaces
+1. ~~authenticated clinician identity~~ — partially closed: reviewer JWT with role allowlist gates review and finalize; `actorId` from JWT claims is recorded in the operation log; tenant and reviewer scoping are now wired for read and mutation paths; remaining gap is cryptographic tenant identity (signed tenant token) and full RBAC beyond reviewer/operator
+2. ~~object-level authorization for public case, report, export, and artifact surfaces~~ — partially closed: tenant-scoped isolation and reviewer-scoped mutation authorization are wired and tested; remaining gap is cryptographic binding of tenant identity to a verifiable token rather than a trust-the-header model
 3. stronger API-side provenance and tighter deployment policy for public-to-worker volume references beyond the current worker-side same-origin or explicit-origin allowlist
 4. separation of clinician finalization from delivery-outcome mutation authority
 5. ~~nonce replay enforcement~~ — closed: replay store is now wired into dispatch middleware (see mitigations 6–7)
@@ -110,8 +112,9 @@ This document must not be read as proof of:
 1. production-grade API hardening
 2. hospital deployment readiness
 3. regulated cybersecurity-file completion
-4. ~~authenticated multi-actor clinical operations~~ — partially addressed: reviewer JWT with `actorId` audit trail is now wired for review and finalize; full multi-actor RBAC and object-level authorization remain future work
-5. closed object-level authorization or worker-egress policy
+4. ~~authenticated multi-actor clinical operations~~ — partially addressed: reviewer JWT with `actorId` audit trail is now wired for review and finalize; tenant and reviewer object-scoped authorization are wired for read and mutation paths; full multi-actor RBAC remains future work
+5. ~~closed object-level authorization~~ — partially addressed: tenant isolation and reviewer-scoped mutations are wired and tested (see mitigations 14-15); cryptographic tenant binding and full RBAC beyond the current model remain future work
+6. closed worker-egress policy — partially addressed: same-origin or explicit-allowlist enforcement is wired on worker side
 
 ## Interaction With Other Docs
 

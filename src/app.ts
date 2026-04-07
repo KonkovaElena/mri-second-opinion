@@ -45,6 +45,11 @@ export interface CreateAppOptions {
   artifactStore?: ArtifactStore;
 }
 
+function resolveAccessScope(req: express.Request): { tenantId?: string } {
+  const tenantId = req.get("x-tenant-id")?.trim();
+  return { tenantId: tenantId && tenantId.length > 0 ? tenantId : undefined };
+}
+
 export function createApp(config: AppConfig, options: CreateAppOptions = {}) {
   const app = express();
   const publicApiRateLimiter = createPublicApiRateLimiter(config);
@@ -376,8 +381,9 @@ export function createApp(config: AppConfig, options: CreateAppOptions = {}) {
     }
   });
 
-  app.get("/api/cases", async (_req, res) => {
-    const cases = (await caseService.listCases()).map((caseRecord) => presentCaseListItem(caseRecord));
+  app.get("/api/cases", async (req, res) => {
+    const scope = resolveAccessScope(req);
+    const cases = (await caseService.listCases(scope)).map((caseRecord) => presentCaseListItem(caseRecord));
     res.json({
       cases,
       meta: {
@@ -388,7 +394,8 @@ export function createApp(config: AppConfig, options: CreateAppOptions = {}) {
 
   app.get("/api/cases/:caseId", async (req, res) => {
     try {
-      res.json({ case: presentCaseDetail(await caseService.getCase(req.params.caseId)) });
+      const scope = resolveAccessScope(req);
+      res.json({ case: presentCaseDetail(await caseService.getCase(req.params.caseId, scope)) });
     } catch (error) {
       handleError(res, error);
     }
@@ -425,7 +432,8 @@ export function createApp(config: AppConfig, options: CreateAppOptions = {}) {
 
   app.get("/api/cases/:caseId/report", async (req, res) => {
     try {
-      res.json({ report: presentReport(await caseService.getReport(req.params.caseId)) });
+      const scope = resolveAccessScope(req);
+      res.json({ report: presentReport(await caseService.getReport(req.params.caseId, scope)) });
     } catch (error) {
       handleError(res, error);
     }
@@ -433,7 +441,8 @@ export function createApp(config: AppConfig, options: CreateAppOptions = {}) {
 
   app.get("/api/cases/:caseId/exports/dicom-sr", async (req, res) => {
     try {
-      const report = await caseService.getFinalizedReport(req.params.caseId);
+      const scope = resolveAccessScope(req);
+      const report = await caseService.getFinalizedReport(req.params.caseId, scope);
       res.json({ dicomSr: buildDicomSrExport(report) });
     } catch (error) {
       handleError(res, error);
@@ -442,8 +451,9 @@ export function createApp(config: AppConfig, options: CreateAppOptions = {}) {
 
   app.get("/api/cases/:caseId/exports/fhir-diagnostic-report", async (req, res) => {
     try {
-      const record = await caseService.getCase(req.params.caseId);
-      const report = await caseService.getFinalizedReport(req.params.caseId);
+      const scope = resolveAccessScope(req);
+      const record = await caseService.getCase(req.params.caseId, scope);
+      const report = await caseService.getFinalizedReport(req.params.caseId, scope);
       res.json({ diagnosticReport: buildFhirDiagnosticReport(report, record.patientAlias) });
     } catch (error) {
       handleError(res, error);
@@ -452,7 +462,8 @@ export function createApp(config: AppConfig, options: CreateAppOptions = {}) {
 
   app.get("/api/cases/:caseId/artifacts/:artifactId", async (req, res) => {
     try {
-      const artifact = await caseService.getArtifact(req.params.caseId, req.params.artifactId);
+      const scope = resolveAccessScope(req);
+      const artifact = await caseService.getArtifact(req.params.caseId, req.params.artifactId, scope);
 
       if ("redirectUrl" in artifact && typeof artifact.redirectUrl === "string") {
         res.redirect(302, artifact.redirectUrl);

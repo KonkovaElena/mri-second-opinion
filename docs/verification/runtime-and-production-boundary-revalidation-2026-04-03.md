@@ -1,8 +1,8 @@
 ---
 title: "Runtime And Production Boundary Revalidation"
 status: "active"
-version: "1.0.1"
-last_updated: "2026-04-03"
+version: "1.1.0"
+last_updated: "2026-04-07"
 tags: [verification, audit, security, runtime, publication]
 role: evidence
 ---
@@ -35,11 +35,13 @@ The current local rerun confirmed the following:
 
 1. editor diagnostics on `src` and `tests` are clean
 2. the full `npm test` rerun is currently green on the working tree
-3. current test result is `166 total`, `165 passing`, `0 failing`, `1 skipped`
+3. current test result is `177 total`, `176 passing`, `0 failing`, `1 skipped`
 4. review and finalize mutations now enforce a deny-by-default reviewer-role allowlist on top of reviewer JWT identity
 5. internal and operator middleware now fail closed outside development when their route-auth secrets are unset
 6. `worker/main.py` now blocks disallowed absolute `volumeDownloadUrl` origins before any network fetch, allowing only MRI API same-origin or explicitly allowlisted origins before falling back to metadata mode instead
 7. persisted payload-backed derived artifacts now carry SHA-256 and byte-size integrity metadata across case-detail and report surfaces
+8. tenant-scoped object isolation is now wired: cases created with a `tenantId` are filtered from cross-tenant list and denied on detail, report, export, and artifact routes with 403
+9. reviewer-scoped mutation authorization is now wired: cases created with an `assignedReviewerId` restrict review and finalize mutations to the assigned reviewer
 
 ## Executive Verdict
 
@@ -108,25 +110,26 @@ Runtime proof:
 
 ## Current Findings
 
-### High 1. Authorization is still route-gated, not actor-scoped or object-scoped
+### High 1. Authorization is now partially actor-scoped and object-scoped
 
-The repository now authenticates more surfaces than it did before, but authorization semantics remain shallow.
+The repository now provides tenant-scoped object isolation and reviewer-scoped mutation authorization in addition to route-level protection.
 
 Code proof:
 
-1. `src/operator-auth.ts` protects operator routes with one static shared `x-api-key`
-2. `src/reviewer-auth.ts` verifies JWT integrity and extracts `sub` plus optional role metadata
-3. current route handling does not enforce case relationship, tenant boundary, object ownership, or role whitelist logic before read-side or finalize-side access
+1. `src/app.ts` extracts `x-tenant-id` from requests via `resolveAccessScope()` and passes it through to all case, report, export, and artifact route handlers
+2. `src/cases.ts` enforces tenant and reviewer scope checks in `requireCase()`, returning 403 on cross-tenant or cross-reviewer access
+3. `src/case-contracts.ts` defines `AccessScope` with `tenantId` and `reviewerId` dimensions
+4. `tests/workflow-api.test.ts` proves: (a) tenant isolation on list filtering, (b) cross-tenant 403 on detail, report, export, and artifact routes, (c) cross-reviewer 403 on review and finalize mutations
 
-Why this matters:
+Remaining gap:
 
-1. OWASP Authorization guidance distinguishes authentication from authorization
-2. OWASP explicitly recommends validating permissions on every request for the specific object, not just the route type
-3. access to one case/report/export/artifact route does not imply access to every case/report/export/artifact of the same type
+1. `x-tenant-id` is a plain header, not backed by a cryptographically signed tenant token; the current model trusts the header value
+2. object authorization is opt-in via `tenantId`/`assignedReviewerId` at case creation time; cases created without these fields remain globally visible
+3. full RBAC beyond the current reviewer/operator model is still future work
 
 Interpretation:
 
-The repository now proves route protection and explicit reviewer role allowlisting, but it still does not prove deployment-grade object authorization.
+The repository now proves object-scoped authorization for tenant and reviewer dimensions, which materially closes the previously open gap. The remaining work is cryptographic identity binding and mandatory multi-tenant enforcement.
 
 ### Medium 2. Worker fetch policy is now bounded, but not yet provenance-strong
 
@@ -195,17 +198,18 @@ This repository is aligned with those expectations in one important way: it now 
 
 It remains misaligned in other ways that matter for stronger claims:
 
-1. object authorization is not yet demonstrated
-2. reviewer authorization is still role-scoped only; it is not yet relationship-based or case-scoped
+1. object authorization is now partially demonstrated (tenant isolation + reviewer-scoped mutations), but cryptographic tenant identity binding is not yet present
+2. reviewer authorization now extends beyond role allowlisting to case-scoped relationship-based policy for assigned reviewers
 3. worker input provenance is not yet reduced to signed internal object-store references or equivalent API-side policy
 4. hosted evidence still lags the current local runtime truth
 
 ## Recommendations
 
-1. replace shared-secret route gating with actor-aware and object-aware authorization for case, report, export, and artifact surfaces
-2. extend reviewer authorization from role allowlisting to relationship-based or case-scoped policy where the deployment model requires it
-3. tighten worker input provenance further by preferring signed internal object-store URLs or API-side allowlist validation instead of caller-supplied URL surfaces
-4. refresh the hosted evidence packet on the current green local head
+1. ~~replace shared-secret route gating with actor-aware and object-aware authorization~~ — partially closed: tenant and reviewer object-scoped authorization are now wired for case, report, export, and artifact surfaces
+2. ~~extend reviewer authorization from role allowlisting to relationship-based policy~~ — closed: reviewer-scoped case assignment is now enforced on review and finalize mutations
+3. bind tenant identity to a cryptographically signed token instead of trusting the `x-tenant-id` header value alone
+4. tighten worker input provenance further by preferring signed internal object-store URLs or API-side allowlist validation instead of caller-supplied URL surfaces
+5. refresh the hosted evidence packet on the current green local head
 
 ## Bottom Line
 
@@ -218,9 +222,10 @@ Two previously central findings are no longer current runtime truth:
 
 The remaining blockers are now narrower and more important:
 
-1. object authorization
-2. relationship-based reviewer authorization
+1. ~~object authorization~~ — partially closed via tenant and reviewer scoping; cryptographic binding remains
+2. ~~relationship-based reviewer authorization~~ — closed via `assignedReviewerId` enforcement
 3. stronger input provenance for worker volume fetch
 4. hosted-evidence hygiene
+5. cryptographic tenant identity binding (signed tenant tokens vs plain headers)
 
 Those are the boundaries that now determine whether the project can ever justify claims stronger than `PUBLIC_GITHUB_READY`.

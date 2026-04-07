@@ -226,6 +226,8 @@ export function normalizeStoredCaseRecord(parsed: CaseRecord): CaseRecord {
 
   return {
     ...parsed,
+    tenantId: parsed.tenantId ?? undefined,
+    assignedReviewerId: parsed.assignedReviewerId ?? undefined,
     studyContext,
     structuralExecution,
     artifactManifest: normalizedArtifactManifest,

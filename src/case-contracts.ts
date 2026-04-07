@@ -50,12 +50,17 @@ export class WorkflowError extends Error {
 
 export interface CreateCaseInput {
   patientAlias: string;
+  tenantId?: string;
+  assignedReviewerId?: string;
   studyUid: string;
   sequenceInventory: string[];
   indication?: string;
   studyContext?: StudyContextInput;
 }
-
+export interface AccessScope {
+  tenantId?: string;
+  reviewerId?: string;
+}
 export interface ReviewCaseInput {
   reviewerId: string;
   reviewerRole?: string;
@@ -285,6 +290,8 @@ export interface ReportPayload {
 export interface CaseRecord {
   caseId: string;
   patientAlias: string;
+  tenantId?: string;
+  assignedReviewerId?: string;
   studyUid: string;
   workflowFamily: WorkflowFamily;
   status: CaseStatus;

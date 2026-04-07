@@ -28,6 +28,7 @@ import {
 import {
   CASE_STATUSES,
   WorkflowError,
+  type AccessScope,
   type CaseRecord,
   type CaseStatus,
   type CreateCaseInput,
@@ -232,12 +233,13 @@ export class MemoryCaseService {
     });
   }
 
-  async listCases() {
-    return this.repository.list();
+  async listCases(scope?: AccessScope) {
+    const list = await this.repository.list();
+    return scope?.tenantId ? list.filter(c => c.tenantId === scope.tenantId) : list;
   }
 
-  async getCase(caseId: string) {
-    return cloneCase(await this.requireCase(caseId));
+  async getCase(caseId: string, scope?: AccessScope) {
+    return cloneCase(await this.requireCase(caseId, scope));
   }
 
   async listDeliveryJobs() {
@@ -421,7 +423,7 @@ export class MemoryCaseService {
   }
 
   async reviewCase(caseId: string, input: ReviewCaseInput) {
-    const record = await this.requireCase(caseId);
+    const record = await this.requireCase(caseId, { reviewerId: input.reviewerId });
     return this.persistExistingCase(record, async () => {
       this.assertStatus(record, ["AWAITING_REVIEW"]);
 
@@ -476,7 +478,7 @@ export class MemoryCaseService {
   }
 
   async finalizeCase(caseId: string, input: FinalizeCaseInput = {}) {
-    const record = await this.requireCase(caseId);
+    const record = await this.requireCase(caseId, { reviewerId: input.finalizerId });
     return this.persistExistingCase(record, async () => {
       this.assertStatus(record, ["REVIEWED"]);
 
@@ -920,8 +922,8 @@ export class MemoryCaseService {
     });
   }
 
-  async getReport(caseId: string) {
-    const record = await this.requireCase(caseId);
+  async getReport(caseId: string, scope?: AccessScope) {
+    const record = await this.requireCase(caseId, scope);
 
     if (!record.report) {
       throw new WorkflowError(404, "Report is not available for this case", "REPORT_NOT_READY");
@@ -935,8 +937,8 @@ export class MemoryCaseService {
     ) as ReportPayload;
   }
 
-  async getFinalizedReport(caseId: string) {
-    const record = await this.requireCase(caseId);
+  async getFinalizedReport(caseId: string, scope?: AccessScope) {
+    const record = await this.requireCase(caseId, scope);
 
     if (!record.report) {
       throw new WorkflowError(404, "Finalized report is not available for this case", "REPORT_NOT_READY");
@@ -954,8 +956,8 @@ export class MemoryCaseService {
     ) as ReportPayload;
   }
 
-  async getArtifact(caseId: string, artifactId: string) {
-    const record = await this.requireCase(caseId);
+  async getArtifact(caseId: string, artifactId: string, scope?: AccessScope) {
+    const record = await this.requireCase(caseId, scope);
     const artifact = record.artifactManifest.find((entry) => entry.artifactId === artifactId);
 
     if (!artifact) {
@@ -1045,6 +1047,8 @@ export class MemoryCaseService {
       sequenceInventory,
       indication,
       studyContext: input.studyContext,
+      tenantId: typeof input.tenantId === "string" && input.tenantId.trim().length > 0 ? input.tenantId.trim() : undefined,
+      assignedReviewerId: typeof input.assignedReviewerId === "string" && input.assignedReviewerId.trim().length > 0 ? input.assignedReviewerId.trim() : undefined,
     };
   }
 
@@ -1136,6 +1140,8 @@ export class MemoryCaseService {
     const record: CaseRecord = {
       caseId,
       patientAlias: input.patientAlias,
+      tenantId: input.tenantId,
+      assignedReviewerId: input.assignedReviewerId,
       studyUid: input.studyUid,
       workflowFamily: "brain-structural",
       status: initialStatus,
@@ -1188,11 +1194,20 @@ export class MemoryCaseService {
     return record;
   }
 
-  private async requireCase(caseId: string) {
+  private async requireCase(caseId: string, scope?: AccessScope) {
     const caseRecord = await this.repository.get(caseId);
     if (!caseRecord) {
       throw new WorkflowError(404, `Case ${caseId} not found`, "CASE_NOT_FOUND");
     }
+
+    if (scope?.tenantId && caseRecord.tenantId && caseRecord.tenantId !== scope.tenantId) {
+      throw new WorkflowError(403, `Not authorized to access case for tenant ${caseRecord.tenantId}`, "FORBIDDEN");
+    }
+
+    if (scope?.reviewerId && caseRecord.assignedReviewerId && caseRecord.assignedReviewerId !== scope.reviewerId) {
+      throw new WorkflowError(403, `Not authorized to access case assigned to another reviewer`, "FORBIDDEN");
+    }
+
     return caseRecord;
   }
 

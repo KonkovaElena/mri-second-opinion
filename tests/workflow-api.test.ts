@@ -5419,3 +5419,230 @@ test("operator auth rejects requests without x-api-key on protected routes", asy
     rmSync(tempDir, { recursive: true, force: true });
   }
 });
+test("tenant objects are isolated between tenants on operator endpoints", async () => {
+  const { tempDir, caseStoreFile } = createTestStoreFile();
+
+  try {
+    await withServer(caseStoreFile, async ({ jsonRequest }) => {
+      // Create unassigned case (no tenantId)
+      const casePublic = await jsonRequest("/api/cases", {
+        method: "POST",
+        body: JSON.stringify({
+          patientAlias: "PublicPatient",
+          studyUid: "1.2.3.public",
+          sequenceInventory: ["T1w"],
+        }),
+      });
+      assert.equal(casePublic.response.status, 201);
+
+      // Create TenantA case
+      const caseA = await jsonRequest("/api/cases", {
+        method: "POST",
+        body: JSON.stringify({
+          patientAlias: "PatientA",
+          studyUid: "1.2.3.t.A",
+          sequenceInventory: ["T1w"],
+          tenantId: "tenant_A",
+        }),
+      });
+      assert.equal(caseA.response.status, 201);
+      const caseAId = caseA.body.case.caseId as string;
+
+      // Create TenantB case
+      const caseB = await jsonRequest("/api/cases", {
+        method: "POST",
+        body: JSON.stringify({
+          patientAlias: "PatientB",
+          studyUid: "1.2.3.t.B",
+          sequenceInventory: ["T1w"],
+          tenantId: "tenant_B",
+        }),
+      });
+      assert.equal(caseB.response.status, 201);
+
+      // Operator reading without x-tenant-id gets all 3 cases
+      const allCases = await jsonRequest("/api/cases");
+      assert.equal(allCases.body.cases.length, 3);
+
+      // Operator reading as tenant_A gets only tenant_A cases
+      const aCases = await jsonRequest("/api/cases", {
+        headers: { "x-tenant-id": "tenant_A" },
+      });
+      assert.equal(aCases.body.cases.length, 1);
+      assert.equal(aCases.body.cases[0].patientAlias, "PatientA");
+
+      // Operator reading caseA with tenant_B scope gets 403
+      const bReadA = await jsonRequest(`/api/cases/${caseAId}`, {
+        headers: { "x-tenant-id": "tenant_B" },
+      });
+      assert.equal(bReadA.response.status, 403);
+      assert.equal(bReadA.body.code, "FORBIDDEN");
+    });
+  } finally {
+    rmSync(tempDir, { recursive: true, force: true });
+  }
+});
+
+test("tenant scope enforcement extends to report, export, and artifact routes", async () => {
+  const { tempDir, caseStoreFile } = createTestStoreFile();
+
+  try {
+    await withServer(caseStoreFile, async ({ jsonRequest }) => {
+      // Create a tenant-scoped case and push it through inference
+      const created = await jsonRequest("/api/cases", {
+        method: "POST",
+        body: JSON.stringify({
+          patientAlias: "TenantScopeDeep-001",
+          studyUid: "1.2.840.tenant.scope.deep.1",
+          sequenceInventory: ["T1w", "FLAIR"],
+          tenantId: "tenant_deep_A",
+        }),
+      });
+      assert.equal(created.response.status, 201);
+      const caseId = created.body.case.caseId as string;
+
+      await jsonRequest("/api/internal/inference-callback", {
+        method: "POST",
+        body: JSON.stringify({
+          caseId,
+          qcDisposition: "pass",
+          findings: ["Tenant scope deep test."],
+          measurements: [{ label: "brain_volume_ml", value: 1050 }],
+          artifacts: ["artifact://qc-summary"],
+          artifactPayloads: [
+            {
+              artifactRef: "artifact://qc-summary",
+              contentType: "application/json",
+              contentBase64: Buffer.from(JSON.stringify({ summary: "ok" }), "utf-8").toString("base64"),
+            },
+          ],
+          generatedSummary: "Tenant scope enforcement draft.",
+        }),
+      });
+
+      // Correct tenant can access report
+      const correctReport = await jsonRequest(`/api/cases/${caseId}/report`, {
+        headers: { "x-tenant-id": "tenant_deep_A" },
+      });
+      assert.equal(correctReport.response.status, 200);
+
+      // Wrong tenant gets 403 on report
+      const wrongReport = await jsonRequest(`/api/cases/${caseId}/report`, {
+        headers: { "x-tenant-id": "tenant_deep_B" },
+      });
+      assert.equal(wrongReport.response.status, 403);
+      assert.equal(wrongReport.body.code, "FORBIDDEN");
+
+      // Wrong tenant gets 403 on artifact
+      const detail = await jsonRequest(`/api/cases/${caseId}`, {
+        headers: { "x-tenant-id": "tenant_deep_A" },
+      });
+      const artifact = detail.body.case.artifactManifest[0];
+      const wrongArtifact = await jsonRequest(
+        `/api/cases/${caseId}/artifacts/${artifact.artifactId}`,
+        { headers: { "x-tenant-id": "tenant_deep_B" } },
+      );
+      assert.equal(wrongArtifact.response.status, 403);
+
+      // Wrong tenant gets 403 on DICOM SR export (need review + finalize first)
+      await jsonRequest(`/api/cases/${caseId}/review`, {
+        method: "POST",
+        body: JSON.stringify({ finalImpression: "Tenant scope confirmed." }),
+      });
+      await jsonRequest(`/api/cases/${caseId}/finalize`, {
+        method: "POST",
+        body: JSON.stringify({ finalSummary: "Tenant scope finalized." }),
+      });
+
+      const wrongExport = await jsonRequest(`/api/cases/${caseId}/exports/dicom-sr`, {
+        headers: { "x-tenant-id": "tenant_deep_B" },
+      });
+      assert.equal(wrongExport.response.status, 403);
+
+      const wrongFhir = await jsonRequest(`/api/cases/${caseId}/exports/fhir-diagnostic-report`, {
+        headers: { "x-tenant-id": "tenant_deep_B" },
+      });
+      assert.equal(wrongFhir.response.status, 403);
+    });
+  } finally {
+    rmSync(tempDir, { recursive: true, force: true });
+  }
+});
+
+test("reviewer-scoped authorization denies access to cases assigned to a different reviewer", async () => {
+  const { tempDir, caseStoreFile } = createTestStoreFile();
+
+  try {
+    await withServer(caseStoreFile, async ({ jsonRequest }) => {
+      // Create a case assigned to reviewer-alpha
+      const created = await jsonRequest("/api/cases", {
+        method: "POST",
+        body: JSON.stringify({
+          patientAlias: "ReviewerScope-001",
+          studyUid: "1.2.840.reviewer.scope.1",
+          sequenceInventory: ["T1w"],
+          assignedReviewerId: "reviewer-alpha",
+        }),
+      });
+      assert.equal(created.response.status, 201);
+      const caseId = created.body.case.caseId as string;
+
+      // Push through inference to reach AWAITING_REVIEW
+      await jsonRequest("/api/internal/inference-callback", {
+        method: "POST",
+        body: JSON.stringify({
+          caseId,
+          qcDisposition: "pass",
+          findings: ["Reviewer scope test."],
+          measurements: [{ label: "brain_volume_ml", value: 1060 }],
+          artifacts: ["artifact://qc-summary"],
+          artifactPayloads: [
+            {
+              artifactRef: "artifact://qc-summary",
+              contentType: "application/json",
+              contentBase64: Buffer.from(JSON.stringify({ summary: "ok" }), "utf-8").toString("base64"),
+            },
+          ],
+          generatedSummary: "Reviewer scope draft.",
+        }),
+      });
+
+      // reviewer-alpha can review (JWT with sub=reviewer-alpha, role=radiologist)
+      const alphaJwt = createReviewerJwt({ reviewerId: "reviewer-alpha", reviewerRole: "radiologist" });
+      const alphaReview = await jsonRequest(`/api/cases/${caseId}/review`, {
+        method: "POST",
+        headers: {
+          authorization: `Bearer ${alphaJwt}`,
+        },
+        body: JSON.stringify({ finalImpression: "Alpha reviewed." }),
+      });
+      assert.equal(alphaReview.response.status, 200);
+
+      // reviewer-beta attempting to finalize gets 403 (case assigned to reviewer-alpha)
+      const betaJwt = createReviewerJwt({ reviewerId: "reviewer-beta", reviewerRole: "radiologist" });
+      const betaFinalize = await jsonRequest(`/api/cases/${caseId}/finalize`, {
+        method: "POST",
+        headers: {
+          authorization: `Bearer ${betaJwt}`,
+        },
+        body: JSON.stringify({ finalSummary: "Beta trying to finalize." }),
+      });
+      assert.equal(betaFinalize.response.status, 403);
+      assert.equal(betaFinalize.body.code, "FORBIDDEN");
+
+      // reviewer-alpha can finalize
+      const alphaFinalize = await jsonRequest(`/api/cases/${caseId}/finalize`, {
+        method: "POST",
+        headers: {
+          authorization: `Bearer ${alphaJwt}`,
+        },
+        body: JSON.stringify({ finalSummary: "Alpha finalized." }),
+      });
+      assert.equal(alphaFinalize.response.status, 200);
+    });
+  } finally {
+    rmSync(tempDir, { recursive: true, force: true });
+  }
+});
+
+
