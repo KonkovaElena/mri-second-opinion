@@ -101,7 +101,68 @@ export function createApp(config: AppConfig, options: CreateAppOptions = {}) {
     artifactStore,
   });
   const runtimeState: RuntimeState = { isShuttingDown: false };
+  const inferenceLeaseRecoveryIntervalMs = config.inferenceLeaseRecoveryIntervalMs ?? 0;
+  const inferenceLeaseRecoveryMaxClaimAgeMs = config.inferenceLeaseRecoveryMaxClaimAgeMs ?? 5 * 60 * 1000;
+  let inferenceLeaseRecoveryTimer: NodeJS.Timeout | null = null;
+  let inferenceLeaseRecoveryInFlight = false;
   const workbenchRoot = resolve(__dirname, "..", "public", "workbench");
+
+  const recoverExpiredInferenceLeases = async () => {
+    if (runtimeState.isShuttingDown || inferenceLeaseRecoveryInFlight) {
+      return;
+    }
+
+    inferenceLeaseRecoveryInFlight = true;
+
+    try {
+      const requeuedJobs = await caseService.requeueExpiredInferenceJobs(inferenceLeaseRecoveryMaxClaimAgeMs);
+
+      if (requeuedJobs.length > 0) {
+        console.info(
+          JSON.stringify({
+            level: "info",
+            event: "inference_lease_recovery_requeued",
+            count: requeuedJobs.length,
+            maxClaimAgeMs: inferenceLeaseRecoveryMaxClaimAgeMs,
+            timestamp: new Date().toISOString(),
+          }),
+        );
+      }
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+
+      console.error(
+        JSON.stringify({
+          level: "error",
+          event: "inference_lease_recovery_failed",
+          message,
+          timestamp: new Date().toISOString(),
+        }),
+      );
+    } finally {
+      inferenceLeaseRecoveryInFlight = false;
+    }
+  };
+
+  if (inferenceLeaseRecoveryIntervalMs > 0) {
+    inferenceLeaseRecoveryTimer = setInterval(() => {
+      void recoverExpiredInferenceLeases();
+    }, inferenceLeaseRecoveryIntervalMs);
+    inferenceLeaseRecoveryTimer.unref?.();
+  }
+
+  const closeCaseService = caseService.close.bind(caseService);
+  caseService.close = async () => {
+    runtimeState.isShuttingDown = true;
+
+    if (inferenceLeaseRecoveryTimer) {
+      clearInterval(inferenceLeaseRecoveryTimer);
+      inferenceLeaseRecoveryTimer = null;
+    }
+
+    await closeCaseService();
+  };
+
   app.locals.caseService = caseService;
   app.locals.runtimeState = runtimeState;
 

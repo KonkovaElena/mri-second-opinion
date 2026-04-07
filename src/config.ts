@@ -7,6 +7,8 @@ export interface AppConfig {
   port: number;
   caseStoreFile: string;
   caseStoreMode: CaseStoreMode;
+  inferenceLeaseRecoveryIntervalMs?: number;
+  inferenceLeaseRecoveryMaxClaimAgeMs?: number;
   corsAllowedOrigins: string[];
   artifactStoreProvider: ArtifactStoreProvider;
   artifactStoreBasePath: string;
@@ -48,6 +50,16 @@ function parsePositiveInteger(value: string, name: string) {
 
   if (!Number.isInteger(parsed) || parsed <= 0) {
     throw new Error(`${name} must be a positive integer`);
+  }
+
+  return parsed;
+}
+
+function parseNonNegativeInteger(value: string, name: string) {
+  const parsed = Number(value);
+
+  if (!Number.isInteger(parsed) || parsed < 0) {
+    throw new Error(`${name} must be a non-negative integer`);
   }
 
   return parsed;
@@ -109,6 +121,14 @@ export function getConfig(): AppConfig {
 
   const caseStoreMode = rawCaseStoreMode as CaseStoreMode;
   const corsAllowedOrigins = parseOriginAllowlist(process.env.MRI_CORS_ALLOWED_ORIGINS);
+  const inferenceLeaseRecoveryIntervalMs = parseNonNegativeInteger(
+    process.env.MRI_INFERENCE_LEASE_RECOVERY_INTERVAL_MS ?? "30000",
+    "MRI_INFERENCE_LEASE_RECOVERY_INTERVAL_MS",
+  );
+  const inferenceLeaseRecoveryMaxClaimAgeMs = parsePositiveInteger(
+    process.env.MRI_INFERENCE_LEASE_RECOVERY_MAX_CLAIM_AGE_MS ?? "300000",
+    "MRI_INFERENCE_LEASE_RECOVERY_MAX_CLAIM_AGE_MS",
+  );
   const defaultCaseStoreFile =
     caseStoreMode === "sqlite" || caseStoreMode === "postgres"
       ? resolve(__dirname, "..", ".mri-data", "cases.sqlite")
@@ -240,6 +260,8 @@ export function getConfig(): AppConfig {
     port,
     caseStoreFile,
     caseStoreMode,
+    inferenceLeaseRecoveryIntervalMs,
+    inferenceLeaseRecoveryMaxClaimAgeMs,
     corsAllowedOrigins,
     artifactStoreProvider,
     artifactStoreBasePath,

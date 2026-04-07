@@ -1321,18 +1321,42 @@ export class MemoryCaseService {
   }
 
   private async findExpiredClaimedInferenceJobs(maxClaimAgeMs: number) {
+    const forceRequeueAllClaimedJobs = maxClaimAgeMs === 0;
+    const now = Date.now();
     const cutoff = Date.now() - maxClaimAgeMs;
 
     return (await this.repository.listInferenceJobs())
       .filter((job) => {
-        if (job.status !== "claimed" || !job.claimedAt) {
+        if (job.status !== "claimed") {
+          return false;
+        }
+
+        if (forceRequeueAllClaimedJobs) {
+          return true;
+        }
+
+        if (job.leaseExpiresAt) {
+          const leaseExpiresAtMs = Date.parse(job.leaseExpiresAt);
+          return Number.isFinite(leaseExpiresAtMs) && leaseExpiresAtMs <= now;
+        }
+
+        if (!job.claimedAt) {
           return false;
         }
 
         const claimedAtMs = Date.parse(job.claimedAt);
         return Number.isFinite(claimedAtMs) && claimedAtMs <= cutoff;
       })
-      .sort((left, right) => left.claimedAt!.localeCompare(right.claimedAt!));
+      .sort((left, right) => {
+        const leftLeaseExpiry = left.leaseExpiresAt ? Date.parse(left.leaseExpiresAt) : Number.NaN;
+        const rightLeaseExpiry = right.leaseExpiresAt ? Date.parse(right.leaseExpiresAt) : Number.NaN;
+
+        if (Number.isFinite(leftLeaseExpiry) && Number.isFinite(rightLeaseExpiry)) {
+          return leftLeaseExpiry - rightLeaseExpiry;
+        }
+
+        return (left.claimedAt ?? "").localeCompare(right.claimedAt ?? "");
+      });
   }
 
   private async persistNewCase(caseRecord: CaseRecord) {

@@ -320,6 +320,46 @@ test("expired claimed inference jobs are requeued in snapshot mode", async () =>
   }
 });
 
+test("active claimed inference leases are not requeued by claim age alone", async () => {
+  const { tempDir, caseStoreFile } = createStorePath();
+  const services: MemoryCaseService[] = [];
+
+  try {
+    const service = new MemoryCaseService({
+      snapshotFilePath: caseStoreFile,
+      storageMode: "snapshot",
+    });
+    services.push(service);
+
+    await service.createCase({
+      patientAlias: "snapshot-inference-active-lease",
+      studyUid: "1.2.3.snapshot.inference.active.lease",
+      sequenceInventory: ["T1w", "FLAIR"],
+    });
+
+    const claimed = await service.claimNextInferenceJob("active-lease-worker");
+    assert.notEqual(claimed, null);
+    assert.equal(claimed?.status, "claimed");
+    assert.equal(typeof claimed?.leaseExpiresAt, "string");
+
+    await new Promise((resolve) => setTimeout(resolve, 10));
+
+    const requeued = await service.requeueExpiredInferenceJobs(1);
+    assert.equal(requeued.length, 0);
+
+    const jobs = await service.listInferenceJobs();
+    assert.equal(jobs.length, 1);
+    assert.equal(jobs[0].jobId, claimed?.jobId);
+    assert.equal(jobs[0].status, "claimed");
+    assert.equal(jobs[0].workerId, "active-lease-worker");
+  } finally {
+    for (const service of services) {
+      await service.close();
+    }
+    rmSync(tempDir, { recursive: true, force: true });
+  }
+});
+
 test("stale sqlite delivery claim reloads instead of surfacing a store conflict", async () => {
   const { tempDir, caseStoreFile } = createStorePath();
   const services: MemoryCaseService[] = [];

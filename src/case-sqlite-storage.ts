@@ -174,6 +174,8 @@ export function normalizeStoredCaseRecord(parsed: CaseRecord): CaseRecord {
         : artifact.storageUri.startsWith("file://")
           ? `/api/cases/${parsed.caseId}/artifacts/${artifact.artifactId}`
           : null,
+    contentSha256: typeof artifact.contentSha256 === "string" ? artifact.contentSha256 : null,
+    byteSize: typeof artifact.byteSize === "number" ? artifact.byteSize : null,
     producingPackageId: artifact.producingPackageId ?? selectedPackageManifest?.packageId ?? null,
     producingPackageVersion: artifact.producingPackageVersion ?? selectedPackageManifest?.packageVersion ?? null,
     workflowFamily: artifact.workflowFamily ?? (selectedPackageManifest?.workflowFamily ?? "brain-structural"),

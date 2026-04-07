@@ -83,4 +83,29 @@ test("object-store artifact descriptors expose stable API retrieval URLs", () =>
   assert.equal(descriptors.length, 1);
   assert.equal(descriptors[0].storageUri, "object-store://case-artifacts/case-artifacts-1/qc-summary.json");
   assert.equal(descriptors[0].retrievalUrl, "/api/cases/case-artifacts-1/artifacts/case-artifacts-1-artifact-1");
+  assert.equal(descriptors[0].contentSha256, null);
+  assert.equal(descriptors[0].byteSize, null);
+});
+
+test("artifact storage overrides preserve checksum and size in derived descriptors", () => {
+  const descriptors = createDerivedArtifactDescriptors({
+    caseId: "case-artifacts-1",
+    studyUid: "2.25.case-artifacts.1",
+    artifactRefs: ["artifact://qc-summary"],
+    studyContext,
+    generatedAt: "2026-03-31T12:00:00.000Z",
+    artifactStorageOverrides: [
+      {
+        artifactRef: "artifact://qc-summary",
+        storageUri: "file:///var/tmp/mri/case-artifacts-1/qc-summary.json",
+        mimeType: "application/json",
+        contentSha256: "abc123",
+        byteSize: 42,
+      },
+    ],
+  });
+
+  assert.equal(descriptors.length, 1);
+  assert.equal(descriptors[0].contentSha256, "abc123");
+  assert.equal(descriptors[0].byteSize, 42);
 });

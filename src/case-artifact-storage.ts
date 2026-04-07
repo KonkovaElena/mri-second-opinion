@@ -1,5 +1,6 @@
 import { GetObjectCommand, PutObjectCommand, S3Client } from "@aws-sdk/client-s3";
 import { getSignedUrl } from "@aws-sdk/s3-request-presigner";
+import { createHash } from "node:crypto";
 import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { dirname, isAbsolute, posix, relative, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -135,6 +136,8 @@ class LocalFileArtifactStore implements ArtifactStore {
         artifactRef: artifactPayload.artifactRef,
         storageUri: canonicalizeArtifactReference(filePath),
         mimeType: artifactPayload.contentType.trim() || target.mimeType,
+        contentSha256: createHash("sha256").update(bytes).digest("hex"),
+        byteSize: bytes.byteLength,
       };
     });
   }
@@ -222,6 +225,8 @@ class S3CompatibleArtifactStore implements ArtifactStore {
         artifactRef: artifactPayload.artifactRef,
         storageUri: toObjectStoreUri(key),
         mimeType: artifactPayload.contentType.trim() || target.mimeType,
+        contentSha256: createHash("sha256").update(bytes).digest("hex"),
+        byteSize: bytes.byteLength,
       });
     }
 

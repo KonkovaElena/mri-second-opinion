@@ -1,7 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import { spawn, spawnSync } from "node:child_process";
-import { createHmac } from "node:crypto";
+import { createHash, createHmac } from "node:crypto";
 import { createServer, type Server } from "node:http";
 import type { AddressInfo } from "node:net";
 import { mkdtempSync, rmSync } from "node:fs";
@@ -62,6 +62,10 @@ async function cleanupTempDir(tempDir: string) {
   }
 
   rmSync(tempDir, { recursive: true, force: true });
+}
+
+async function sleep(ms: number) {
+  await new Promise((resolve) => setTimeout(resolve, ms));
 }
 
 async function withPostgresAdminPool<T>(
@@ -2125,6 +2129,8 @@ test("python worker performs a voxel-backed pass when a T1w volume URL is presen
 
   try {
     await withBinaryFixtureServer(niftiFixture, async (volumeDownloadUrl) => {
+      const allowedOrigin = new URL(volumeDownloadUrl).origin;
+
       await withServer(
         caseStoreFile,
         async ({ baseUrl, jsonRequest }) => {
@@ -2161,6 +2167,7 @@ test("python worker performs a voxel-backed pass when a T1w volume URL is presen
           const worker = await runPythonWorker(baseUrl, {
             MRI_WORKER_ID: "python-worker-volume-001",
             MRI_INTERNAL_API_TOKEN: DEFAULT_INTERNAL_API_TOKEN,
+            MRI_WORKER_ALLOWED_VOLUME_ORIGINS: allowedOrigin,
           });
 
           assert.equal(worker.exitCode, 0, `${worker.stderr}\n${worker.stdout}`);
@@ -2227,6 +2234,8 @@ test("python worker records classified fallback metadata when a volume URL canno
 
   try {
     await withBinaryFixtureServer(invalidFixture, async (volumeDownloadUrl) => {
+      const allowedOrigin = new URL(volumeDownloadUrl).origin;
+
       await withServer(
         caseStoreFile,
         async ({ baseUrl, jsonRequest }) => {
@@ -2263,6 +2272,7 @@ test("python worker records classified fallback metadata when a volume URL canno
           const worker = await runPythonWorker(baseUrl, {
             MRI_WORKER_ID: "python-worker-fallback-001",
             MRI_INTERNAL_API_TOKEN: DEFAULT_INTERNAL_API_TOKEN,
+            MRI_WORKER_ALLOWED_VOLUME_ORIGINS: allowedOrigin,
           });
 
           assert.equal(worker.exitCode, 0, `${worker.stderr}\n${worker.stdout}`);
@@ -2289,6 +2299,73 @@ test("python worker records classified fallback metadata when a volume URL canno
             report.body.report.issues.some((issue: string) => /fell back to metadata-only mode/i.test(issue)),
             true,
           );
+        },
+        {
+          internalApiToken: DEFAULT_INTERNAL_API_TOKEN,
+          hmacSecret: DEFAULT_HMAC_SECRET,
+        },
+      );
+    });
+  } finally {
+    rmSync(tempDir, { recursive: true, force: true });
+  }
+});
+
+test("python worker blocks non-same-origin loopback volume URLs unless the origin is explicitly allowlisted", async () => {
+  const { tempDir, caseStoreFile } = createTestStoreFile();
+  const niftiFixture = createTinyNifti1Buffer([0, 0, 1, 2, 3, 4, 5, 6]);
+
+  try {
+    await withBinaryFixtureServer(niftiFixture, async (volumeDownloadUrl) => {
+      await withServer(
+        caseStoreFile,
+        async ({ baseUrl, jsonRequest }) => {
+          const created = await jsonRequest("/api/cases", {
+            method: "POST",
+            body: JSON.stringify({
+              patientAlias: "synthetic-python-worker-loopback-guard-001",
+              studyUid: "1.2.840.python.worker.loopback.guard.1",
+              sequenceInventory: ["T1w"],
+              indication: "loopback allowlist review",
+              studyContext: {
+                studyInstanceUid: "2.25.python.worker.loopback.guard.study.001",
+                accessionNumber: "PY-WORKER-LOOPBACK-GUARD-001",
+                studyDate: "2026-04-07",
+                sourceArchive: "fixture-http",
+                metadataSummary: ["Loopback absolute URL now requires explicit allowlisting"],
+                series: [
+                  {
+                    seriesInstanceUid: "2.25.python.worker.loopback.guard.study.001.1",
+                    seriesDescription: "Loopback Fixture T1w",
+                    modality: "MR",
+                    sequenceLabel: "T1w",
+                    instanceCount: 1,
+                    volumeDownloadUrl,
+                  },
+                ],
+              },
+            }),
+          });
+
+          assert.equal(created.response.status, 201);
+          const caseId = created.body.case.caseId as string;
+
+          const worker = await runPythonWorker(baseUrl, {
+            MRI_WORKER_ID: "python-worker-loopback-guard-001",
+            MRI_INTERNAL_API_TOKEN: DEFAULT_INTERNAL_API_TOKEN,
+          });
+
+          assert.equal(worker.exitCode, 0, `${worker.stderr}\n${worker.stdout}`);
+
+          const detail = await jsonRequest(`/api/cases/${caseId}`);
+          assert.equal(detail.response.status, 200);
+          assert.deepEqual(detail.body.case.structuralExecution.executionContext, {
+            computeMode: "metadata-fallback",
+            fallbackCode: "volume-download-failed",
+            fallbackDetail: "Volume download URL origin is not permitted for worker fetch.",
+            sourceSeriesInstanceUid: "2.25.python.worker.loopback.guard.study.001.1",
+          });
+          assert.match(detail.body.case.reportSummary.processingSummary, /Metadata-derived draft/);
         },
         {
           internalApiToken: DEFAULT_INTERNAL_API_TOKEN,
@@ -2830,6 +2907,117 @@ test("requeue-expired defaults maxClaimAgeMs when the request body is empty", as
       assert.equal(reclaimed.body.job.workerId, "fresh-empty-body-worker");
       assert.equal(reclaimed.body.job.attemptCount, 2);
     });
+  } finally {
+    rmSync(tempDir, { recursive: true, force: true });
+  }
+});
+
+test("automatic inference lease recovery only requeues jobs after lease expiry", async () => {
+  const { tempDir, caseStoreFile } = createTestStoreFile();
+
+  try {
+    let caseId = "";
+    let jobId = "";
+    const { app, server, baseUrl } = await startServer(caseStoreFile, {
+      inferenceLeaseRecoveryIntervalMs: 10,
+      inferenceLeaseRecoveryMaxClaimAgeMs: 25,
+    });
+
+    const jsonRequest = async (path: string, init?: RequestInit) => {
+      const response = await fetch(`${baseUrl}${path}`, {
+        ...init,
+        headers: withImplicitAuth(path, {
+          "content-type": "application/json",
+          ...(init?.headers ?? {}),
+        }),
+      });
+      const bodyText = await response.text();
+      const body = bodyText.length > 0 ? JSON.parse(bodyText) : null;
+      return { response, body };
+    };
+
+    try {
+      const created = await jsonRequest("/api/cases", {
+        method: "POST",
+        body: JSON.stringify({
+          patientAlias: "synthetic-patient-inference-auto-recovery",
+          studyUid: "1.2.840.0.queue.inference.auto-recovery",
+          sequenceInventory: ["T1w", "FLAIR"],
+        }),
+      });
+
+      assert.equal(created.response.status, 201);
+      caseId = created.body.case.caseId;
+
+      const claim = await jsonRequest("/api/internal/inference-jobs/claim-next", {
+        method: "POST",
+        body: JSON.stringify({ workerId: "auto-recovery-worker" }),
+      });
+      assert.equal(claim.response.status, 200);
+      assert.equal(claim.body.job.caseId, caseId);
+      assert.equal(claim.body.job.status, "claimed");
+
+      jobId = claim.body.job.jobId as string;
+
+      await sleep(80);
+
+      const jobsBeforeExpiry = await jsonRequest("/api/internal/inference-jobs");
+      assert.equal(jobsBeforeExpiry.response.status, 200);
+      assert.equal(jobsBeforeExpiry.body.jobs.length, 1);
+      assert.equal(jobsBeforeExpiry.body.jobs[0].jobId, jobId);
+      assert.equal(jobsBeforeExpiry.body.jobs[0].status, "claimed");
+      assert.equal(jobsBeforeExpiry.body.jobs[0].workerId, "auto-recovery-worker");
+
+      const liveRepository = (app.locals.caseService as any).repository as {
+        setInferenceJob: (job: Record<string, unknown>) => void;
+      };
+      const currentJob = (await app.locals.caseService.listInferenceJobs()).find(
+        (job: { jobId: string }) => job.jobId === jobId,
+      );
+      assert.notEqual(currentJob, undefined);
+
+      liveRepository.setInferenceJob({
+        ...currentJob,
+        leaseExpiresAt: new Date(Date.now() - 60_000).toISOString(),
+        updatedAt: new Date().toISOString(),
+      });
+
+      let requeuedJob: Record<string, unknown> | null = null;
+
+      for (let attempt = 0; attempt < 20; attempt += 1) {
+        const jobs = await jsonRequest("/api/internal/inference-jobs");
+        assert.equal(jobs.response.status, 200);
+
+        const matched = jobs.body.jobs.find((job: { jobId: string }) => job.jobId === jobId);
+        if (matched?.status === "queued") {
+          requeuedJob = matched;
+          break;
+        }
+
+        await sleep(25);
+      }
+
+      assert.notEqual(requeuedJob, null);
+      assert.equal(requeuedJob?.caseId, caseId);
+      assert.equal(requeuedJob?.status, "queued");
+      assert.equal(requeuedJob?.workerId, null);
+      assert.equal(requeuedJob?.claimedAt, null);
+      assert.match(String(requeuedJob?.lastError ?? ""), /claim expired/i);
+
+      const reclaimed = await jsonRequest("/api/internal/inference-jobs/claim-next", {
+        method: "POST",
+        body: JSON.stringify({ workerId: "fresh-auto-recovery-worker" }),
+      });
+      assert.equal(reclaimed.response.status, 200);
+      assert.equal(reclaimed.body.job.caseId, caseId);
+      assert.equal(reclaimed.body.job.status, "claimed");
+      assert.equal(reclaimed.body.job.workerId, "fresh-auto-recovery-worker");
+      assert.equal(reclaimed.body.job.attemptCount, 2);
+    } finally {
+      await stopServer(server, async () => {
+        await app.locals.caseService.close();
+      });
+    }
   } finally {
     rmSync(tempDir, { recursive: true, force: true });
   }
@@ -4288,6 +4476,16 @@ test("report-preview artifact is persisted and retrievable with correct MIME typ
 
 test("artifact provenance chain traces back to producing package and archive", async () => {
   const { tempDir, caseStoreFile } = createTestStoreFile();
+  const overlayPayload = Buffer.from("PROV-TEST-OVERLAY", "utf-8");
+  const qcPayload = Buffer.from(JSON.stringify({ summary: "pass" }), "utf-8");
+  const expectedDigestsByType = new Map([
+    ["overlay-preview", createHash("sha256").update(overlayPayload).digest("hex")],
+    ["qc-summary", createHash("sha256").update(qcPayload).digest("hex")],
+  ]);
+  const expectedByteSizesByType = new Map([
+    ["overlay-preview", overlayPayload.byteLength],
+    ["qc-summary", qcPayload.byteLength],
+  ]);
 
   try {
     await withServer(caseStoreFile, async ({ jsonRequest }) => {
@@ -4338,12 +4536,12 @@ test("artifact provenance chain traces back to producing package and archive", a
             {
               artifactRef: "artifact://overlay-preview",
               contentType: "image/png",
-              contentBase64: Buffer.from("PROV-TEST-OVERLAY", "utf-8").toString("base64"),
+              contentBase64: overlayPayload.toString("base64"),
             },
             {
               artifactRef: "artifact://qc-summary",
               contentType: "application/json",
-              contentBase64: Buffer.from(JSON.stringify({ summary: "pass" }), "utf-8").toString("base64"),
+              contentBase64: qcPayload.toString("base64"),
             },
           ],
           generatedSummary: "Provenance chain draft.",
@@ -4381,6 +4579,12 @@ test("artifact provenance chain traces back to producing package and archive", a
           `artifact ${artifact.artifactId} must have generatedAt timestamp`);
         assert.ok(!Number.isNaN(Date.parse(artifact.generatedAt)),
           `artifact ${artifact.artifactId} generatedAt must be a valid ISO date`);
+        assert.equal(typeof artifact.contentSha256, "string",
+          `artifact ${artifact.artifactId} must expose contentSha256`);
+        assert.equal(artifact.contentSha256, expectedDigestsByType.get(artifact.artifactType),
+          `artifact ${artifact.artifactId} must preserve checksum by artifact type`);
+        assert.equal(artifact.byteSize, expectedByteSizesByType.get(artifact.artifactType),
+          `artifact ${artifact.artifactId} must preserve byteSize by artifact type`);
       }
 
       // Verify report provenance chain as well
@@ -4630,6 +4834,10 @@ test("report derivedArtifacts carry full provenance and are not lossy copies", a
           `producingPackageVersion must survive report surface for ${da.artifactId}`);
         assert.equal(ra.generatedAt, da.generatedAt,
           `generatedAt must survive report surface for ${da.artifactId}`);
+        assert.equal(ra.contentSha256, da.contentSha256,
+          `contentSha256 must survive report surface for ${da.artifactId}`);
+        assert.equal(ra.byteSize, da.byteSize,
+          `byteSize must survive report surface for ${da.artifactId}`);
 
         // Archive locator must not be lost
         assert.deepEqual(ra.archiveLocator, da.archiveLocator,

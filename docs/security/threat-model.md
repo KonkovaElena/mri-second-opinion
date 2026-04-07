@@ -53,10 +53,10 @@ The current workflow system should protect:
 | premature delivery callback after queue loss | mitigated by active delivery-job guard | incorrect delivery completion state |
 | machine impersonation of clinician actions | partially mitigated | review and finalize operations now record the authenticated reviewer identity (`actorId`) from JWT claims in the operation log; request-body reviewer fields are overridden by JWT-verified identity |
 | public object access without actor-scoped authorization | open gap | unauthorized callers can reach case, report, export, or artifact surfaces more broadly than a stronger deployment posture would allow |
-| public-supplied worker fetch target | open gap | a caller can influence worker-side URL fetching through study payload fields, creating the current SSRF-class boundary |
+| public-supplied worker fetch target | partially mitigated | a caller can still provide the field, but worker-side absolute fetches are now restricted to MRI API same-origin or explicit allowlisted origins instead of broad absolute-origin acceptance |
 | clinician finalization coupled to delivery mutation | open gap | public finalize can simulate delivery success or failure instead of leaving that truth to delivery-plane actors |
 | internal route replay or signature spoofing | mitigated | namespace bearer protection gates all `/api/internal/*` routes; HMAC-SHA256 request signing with nonce replay enforcement protects `/api/internal/dispatch/*` |
-| artifact tampering after generation | open gap | report and derived artifacts do not yet have checksum verification |
+| artifact tampering after generation | partially mitigated | persisted artifact manifests now carry SHA-256 and byte-size integrity metadata for stored payload-backed artifacts, but download-time verification and stronger attestation are not yet enforced |
 | inference-worker crash and silent work loss | open gap | stronger lease recovery and scheduler-driven liveness are absent |
 | vulnerable dependency introduction | partially mitigated | dependency risk can still enter between updates without explicit inventory and triage |
 
@@ -76,6 +76,7 @@ The repository already has meaningful baseline mitigations.
 10. browser-origin access is strict by default: cross-origin reads require explicit `MRI_CORS_ALLOWED_ORIGINS` allowlisting on selected public routes, while internal browser preflights remain unapproved
 11. internal bearer and HMAC protections currently apply only to internal routes and do not yet authenticate public clinician, report, export, or artifact access paths
 12. reviewer JWT verification (HS256) with deny-by-default role allowlist gates review and finalize mutations; authenticated reviewer identity is captured as `actorId` in the operation log, closing the clinician impersonation vector for workflow mutations
+13. persisted payload-backed artifacts now record SHA-256 and byte-size integrity metadata in the derived-artifact manifest, so case detail and report surfaces can trace each stored artifact back to a concrete content digest instead of only a storage URI
 
 ## Open Gaps
 
@@ -83,10 +84,10 @@ The highest-value security gaps that still remain are:
 
 1. ~~authenticated clinician identity~~ — partially closed: reviewer JWT with role allowlist gates review and finalize; `actorId` from JWT claims is recorded in the operation log; remaining gap is object-level authorization for read paths and stronger operator authorization semantics
 2. object-level authorization for public case, report, export, and artifact surfaces
-3. worker egress allowlisting and SSRF-resistant handling for public-to-worker volume references
+3. stronger API-side provenance and tighter deployment policy for public-to-worker volume references beyond the current worker-side same-origin or explicit-origin allowlist
 4. separation of clinician finalization from delivery-outcome mutation authority
 5. ~~nonce replay enforcement~~ — closed: replay store is now wired into dispatch middleware (see mitigations 6–7)
-6. artifact checksum persistence and verification
+6. artifact checksum verification at retrieval time plus stronger signed-attestation or immutable provenance beyond stored manifest hashes
 7. stronger lease recovery for inference work after crash or network interruption
 8. a formal vulnerability-intake and remediation SOP tied to release evidence
 

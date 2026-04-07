@@ -30,6 +30,76 @@ test("getConfig defaults to snapshot persistence when DATABASE_URL is absent", (
   }
 });
 
+test("getConfig enables automatic inference lease recovery by default", () => {
+  const previousPort = process.env.PORT;
+  const previousJwtSecret = process.env.MRI_REVIEWER_JWT_HS256_SECRET;
+  const previousRecoveryInterval = process.env.MRI_INFERENCE_LEASE_RECOVERY_INTERVAL_MS;
+  const previousRecoveryMaxAge = process.env.MRI_INFERENCE_LEASE_RECOVERY_MAX_CLAIM_AGE_MS;
+
+  process.env.PORT = "4010";
+  process.env.MRI_REVIEWER_JWT_HS256_SECRET = "test-reviewer-jwt-secret-0123456789";
+  delete process.env.MRI_INFERENCE_LEASE_RECOVERY_INTERVAL_MS;
+  delete process.env.MRI_INFERENCE_LEASE_RECOVERY_MAX_CLAIM_AGE_MS;
+
+  try {
+    const config = getConfig();
+    assert.equal(config.inferenceLeaseRecoveryIntervalMs, 30_000);
+    assert.equal(config.inferenceLeaseRecoveryMaxClaimAgeMs, 300_000);
+  } finally {
+    process.env.PORT = previousPort;
+    if (previousJwtSecret === undefined) {
+      delete process.env.MRI_REVIEWER_JWT_HS256_SECRET;
+    } else {
+      process.env.MRI_REVIEWER_JWT_HS256_SECRET = previousJwtSecret;
+    }
+    if (previousRecoveryInterval === undefined) {
+      delete process.env.MRI_INFERENCE_LEASE_RECOVERY_INTERVAL_MS;
+    } else {
+      process.env.MRI_INFERENCE_LEASE_RECOVERY_INTERVAL_MS = previousRecoveryInterval;
+    }
+    if (previousRecoveryMaxAge === undefined) {
+      delete process.env.MRI_INFERENCE_LEASE_RECOVERY_MAX_CLAIM_AGE_MS;
+    } else {
+      process.env.MRI_INFERENCE_LEASE_RECOVERY_MAX_CLAIM_AGE_MS = previousRecoveryMaxAge;
+    }
+  }
+});
+
+test("getConfig allows disabling automatic inference lease recovery", () => {
+  const previousPort = process.env.PORT;
+  const previousJwtSecret = process.env.MRI_REVIEWER_JWT_HS256_SECRET;
+  const previousRecoveryInterval = process.env.MRI_INFERENCE_LEASE_RECOVERY_INTERVAL_MS;
+  const previousRecoveryMaxAge = process.env.MRI_INFERENCE_LEASE_RECOVERY_MAX_CLAIM_AGE_MS;
+
+  process.env.PORT = "4010";
+  process.env.MRI_REVIEWER_JWT_HS256_SECRET = "test-reviewer-jwt-secret-0123456789";
+  process.env.MRI_INFERENCE_LEASE_RECOVERY_INTERVAL_MS = "0";
+  process.env.MRI_INFERENCE_LEASE_RECOVERY_MAX_CLAIM_AGE_MS = "45000";
+
+  try {
+    const config = getConfig();
+    assert.equal(config.inferenceLeaseRecoveryIntervalMs, 0);
+    assert.equal(config.inferenceLeaseRecoveryMaxClaimAgeMs, 45_000);
+  } finally {
+    process.env.PORT = previousPort;
+    if (previousJwtSecret === undefined) {
+      delete process.env.MRI_REVIEWER_JWT_HS256_SECRET;
+    } else {
+      process.env.MRI_REVIEWER_JWT_HS256_SECRET = previousJwtSecret;
+    }
+    if (previousRecoveryInterval === undefined) {
+      delete process.env.MRI_INFERENCE_LEASE_RECOVERY_INTERVAL_MS;
+    } else {
+      process.env.MRI_INFERENCE_LEASE_RECOVERY_INTERVAL_MS = previousRecoveryInterval;
+    }
+    if (previousRecoveryMaxAge === undefined) {
+      delete process.env.MRI_INFERENCE_LEASE_RECOVERY_MAX_CLAIM_AGE_MS;
+    } else {
+      process.env.MRI_INFERENCE_LEASE_RECOVERY_MAX_CLAIM_AGE_MS = previousRecoveryMaxAge;
+    }
+  }
+});
+
 test("getConfig switches to postgres persistence when DATABASE_URL is present", () => {
   const previousPort = process.env.PORT;
   const previousDatabaseUrl = process.env.DATABASE_URL;

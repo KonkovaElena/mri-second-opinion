@@ -178,9 +178,16 @@ def normalize_origin(url: str) -> str | None:
     return f"{parsed_url.scheme.lower()}://{parsed_url.netloc.lower()}"
 
 
-def is_loopback_hostname(hostname: str | None) -> bool:
-    normalized = (hostname or "").strip().lower()
-    return normalized in {"127.0.0.1", "localhost", "::1"}
+def parse_allowed_volume_download_origins() -> set[str]:
+    raw_value = os.environ.get("MRI_WORKER_ALLOWED_VOLUME_ORIGINS", "")
+    origins: set[str] = set()
+
+    for value in raw_value.split(","):
+        origin = normalize_origin(value.strip())
+        if origin:
+            origins.add(origin)
+
+    return origins
 
 
 def is_permitted_volume_download_url(base_url: str, download_url: str) -> bool:
@@ -198,8 +205,8 @@ def is_permitted_volume_download_url(base_url: str, download_url: str) -> bool:
     if download_origin and base_origin and download_origin == base_origin:
         return True
 
-    base_hostname = parse.urlparse(base_url).hostname
-    if is_loopback_hostname(base_hostname) and is_loopback_hostname(parsed_download_url.hostname):
+    allowed_origins = parse_allowed_volume_download_origins()
+    if download_origin and download_origin in allowed_origins:
         return True
 
     return False

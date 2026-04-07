@@ -38,7 +38,8 @@ The current local rerun confirmed the following:
 3. current test result is `166 total`, `165 passing`, `0 failing`, `1 skipped`
 4. review and finalize mutations now enforce a deny-by-default reviewer-role allowlist on top of reviewer JWT identity
 5. internal and operator middleware now fail closed outside development when their route-auth secrets are unset
-6. `worker/main.py` now blocks disallowed absolute `volumeDownloadUrl` origins before any network fetch and falls back to metadata mode instead
+6. `worker/main.py` now blocks disallowed absolute `volumeDownloadUrl` origins before any network fetch, allowing only MRI API same-origin or explicitly allowlisted origins before falling back to metadata mode instead
+7. persisted payload-backed derived artifacts now carry SHA-256 and byte-size integrity metadata across case-detail and report surfaces
 
 ## Executive Verdict
 
@@ -49,7 +50,7 @@ This working tree should not currently be used as evidence for stronger deployme
 The dominant blockers are now:
 
 1. object and relationship authorization semantics rather than raw route existence
-2. provenance strength rather than raw worker reachability
+2. stronger input and output provenance rather than raw worker reachability alone
 3. hosted-evidence lag rather than local test failure
 
 ## Closed Since The 2026-04-02 Boundary Audit
@@ -134,20 +135,41 @@ The worker no longer performs arbitrary absolute-origin fetches for `studyContex
 Code proof:
 
 1. `src/validation.ts` still accepts `studyContext.series[].volumeDownloadUrl`
-2. `worker/main.py` now rejects non-relative absolute URLs unless they are same-origin to `MRI_API_BASE_URL` or loopback-local for the bounded test path
+2. `worker/main.py` now rejects non-relative absolute URLs unless they are same-origin to `MRI_API_BASE_URL` or explicitly present in `MRI_WORKER_ALLOWED_VOLUME_ORIGINS`
 3. `tests/workflow-api.test.ts` now proves both the allowed voxel-backed path and the blocked-origin metadata fallback path
 
 Why this matters:
 
 1. this closes the arbitrary external-origin fetch path that previously created the strongest SSRF-class concern
 2. input provenance is still not signed or object-store-bound by contract
-3. API-side validation still allows callers to present the field even though the worker now refuses disallowed origins at runtime
+3. API-side validation still allows callers to present the field even though the worker now refuses non-same-origin absolute URLs unless they are explicitly allowlisted at runtime
 
 Interpretation:
 
 This boundary is materially better than before, but the long-term target should still be signed internal object-store URLs or API-side allowlist enforcement.
 
-### Medium 3. Current local proof is stronger than hosted evidence on the same date
+### Medium 3. Artifact integrity is stronger, but not yet verification-complete
+
+Persisted payload-backed derived artifacts now expose SHA-256 and byte-size metadata through the artifact manifest and report surfaces.
+
+Code proof:
+
+1. `src/case-artifact-storage.ts` now computes SHA-256 and byte-size values from decoded payload bytes at persistence time
+2. `src/case-artifacts.ts` now carries those values through derived artifact descriptors
+3. `src/case-sqlite-storage.ts` normalizes the new fields for persisted records and older reload paths
+4. `tests/workflow-api.test.ts` now proves that checksum and size survive through both case-detail and report artifact surfaces
+
+Why this matters:
+
+1. this closes the earlier state where stored artifacts had only location and MIME metadata, which made post-persistence tampering harder to reason about
+2. downstream reviewers and future export adapters now have a stable integrity field to compare against
+3. this is still weaker than signed attestations, immutable audit trails, or retrieval-time verification of the stored bytes
+
+Interpretation:
+
+Artifact provenance is materially stronger than it was on 2026-04-03, but the repository still does not prove full deployment-grade integrity attestation.
+
+### Medium 4. Current local proof is stronger than hosted evidence on the same date
 
 The current local working tree now has a green full-suite rerun, but the latest hosted-validated head still trails that state.
 

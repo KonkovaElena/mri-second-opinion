@@ -30,6 +30,8 @@ export interface DerivedArtifactDescriptor {
   storageUri: string;
   retrievalUrl: string | null;
   mimeType: string;
+  contentSha256: string | null;
+  byteSize: number | null;
   producingPackageId: string | null;
   producingPackageVersion: string | null;
   workflowFamily: "brain-structural";
@@ -52,6 +54,8 @@ export interface ArtifactStorageOverride {
   artifactRef: string;
   storageUri: string;
   mimeType?: string;
+  contentSha256?: string | null;
+  byteSize?: number | null;
 }
 
 const FILE_SCHEME_PREFIX = "file://";
@@ -330,6 +334,8 @@ export function createDerivedArtifactDescriptors(input: {
         ? `/api/cases/${input.caseId}/artifacts/${artifactId}`
         : null,
       mimeType: storageOverride?.mimeType ?? mimeTypeForArtifactType(artifactType),
+      contentSha256: storageOverride?.contentSha256 ?? null,
+      byteSize: storageOverride?.byteSize ?? null,
       producingPackageId: input.packageManifest?.packageId ?? null,
       producingPackageVersion: input.packageManifest?.packageVersion ?? null,
       workflowFamily: input.packageManifest?.workflowFamily ?? "brain-structural",
