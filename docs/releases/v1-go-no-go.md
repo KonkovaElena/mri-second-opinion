@@ -19,14 +19,13 @@ Only these verdicts are allowed:
 
 The seven launch gates in `../launch-readiness-checklist.md` remain satisfied for the conservative public-publication posture: the repository is independently buildable, the bounded workflow slice is locally verified, the built-in review workbench and synthetic demo path are real, public repository hygiene is hosted-proof-backed on the latest fully hosted-validated head, and documentation honesty is aligned to current runtime truth. The latest fully hosted-validated head is now `04cb0a57d1e64f8a5cf03a22b4a5c60d37dffc3a`, which closes Wave 1.5 for the current platform-sensitive and release-evidence baseline. The earlier runtime-bearing head `f6021ecdb45f4ecf5aece2c52cc0e6f462361d49` remains the Wave 2A artifact-persistence milestone, and `1e340b978bfa35a2ed339adcdb0d2add56cc08c3` remains the prior full hosted-validation milestone. Later docs-only evidence refresh commits do not reopen Wave 1.5 or the publication verdict unless they change platform-sensitive runtime behavior or GitHub workflow surfaces. Remaining gaps are still real, and they belong to higher product-maturity work rather than to safe public GitHub publication.
 
-The 2026-04-03 independent runtime revalidation plus follow-on auth hardening sharpens that boundary further and corrects older findings that no longer match current runtime truth. Reviewer identity is now derived from reviewer JWTs, review and finalize mutations enforce an explicit reviewer-role allowlist, internal and operator routes now fail closed outside development when auth secrets are unset, and the public finalize route now rejects `deliveryOutcome` overrides. The latest local full-suite rerun is green at 166 total tests, 165 passing, 0 failing, and 1 skipped.
+The 2026-04-08 object-scoped authorization hardening implements tenant-scoped isolation (x-tenant-id enforcement across all case/report/export/artifact routes), reviewer-scoped mutation authorization (assignedReviewerId matching on review/finalize), and closes the try/catch gaps on the list and operations-summary routes. The latest local full-suite rerun is green at 177 total tests, 176 passing, 0 failing, and 1 skipped.
 
 The remaining blockers for stronger claims are:
 
-1. public case, report, export, and artifact surfaces still lack actor-scoped and object-scoped authorization proof beyond route-level shared secrets
-2. reviewer JWTs now enforce an explicit role allowlist, but current review/finalize handling still does not prove relationship-based or case-scoped authorization policy
-3. worker fetch control is materially stronger than before, but the long-term target is still signed or API-allowlisted input provenance rather than caller-supplied URL surfaces
-4. the latest hosted evidence still lags the current green local head
+1. x-tenant-id isolation relies on a plain header rather than a cryptographically signed tenant token
+2. worker fetch control is materially stronger than before, but the long-term target is still signed or API-allowlisted input provenance rather than caller-supplied URL surfaces
+3. the latest hosted evidence still lags the current green local head
 
 These are real blockers for production, clinical, and stronger security-readiness claims.
 

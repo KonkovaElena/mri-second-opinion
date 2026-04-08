@@ -26,7 +26,6 @@ import { getRequestId, requestContextMiddleware, requestLoggingMiddleware } from
 import { resolveAuthorizedReviewer } from "./reviewer-auth";
 import {
   parseClaimJobInput,
-  type parseCreateCaseInput as parseCreateCaseInputType,
   parseAuthenticatedReviewCaseInput,
   parseCreateCaseInput,
   parseDeliveryCallbackInput,
@@ -382,14 +381,18 @@ export function createApp(config: AppConfig, options: CreateAppOptions = {}) {
   });
 
   app.get("/api/cases", async (req, res) => {
-    const scope = resolveAccessScope(req);
-    const cases = (await caseService.listCases(scope)).map((caseRecord) => presentCaseListItem(caseRecord));
-    res.json({
-      cases,
-      meta: {
-        totalCases: cases.length,
-      },
-    });
+    try {
+      const scope = resolveAccessScope(req);
+      const cases = (await caseService.listCases(scope)).map((caseRecord) => presentCaseListItem(caseRecord));
+      res.json({
+        cases,
+        meta: {
+          totalCases: cases.length,
+        },
+      });
+    } catch (error) {
+      handleError(res, error);
+    }
   });
 
   app.get("/api/cases/:caseId", async (req, res) => {
@@ -479,7 +482,11 @@ export function createApp(config: AppConfig, options: CreateAppOptions = {}) {
   });
 
   app.get("/api/operations/summary", async (_req, res) => {
-    res.json({ summary: presentOperationsSummary(await caseService.getOperationsSummary()) });
+    try {
+      res.json({ summary: presentOperationsSummary(await caseService.getOperationsSummary()) });
+    } catch (error) {
+      handleError(res, error);
+    }
   });
 
   app.post("/api/delivery/:caseId/retry", async (req, res) => {

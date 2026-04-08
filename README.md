@@ -343,6 +343,7 @@ npm test
 | `postgres-bootstrap.test.ts` | PostgreSQL initialization |
 | `postgres-case-service.test.ts` | PostgreSQL persistence |
 | `postgres-integration.test.ts` | End-to-end PostgreSQL lifecycle and persistence flow |
+| `actor-context.test.ts` | Tenant isolation, reviewer-scoped authorization, and actorId audit trail |
 
 ---
 
@@ -377,7 +378,7 @@ mri-second-opinion/
 │   ├── main.py                   # Inference + delivery worker
 │   ├── requirements.txt          # stdlib only — no external deps
 │   └── README.md                 # Worker documentation
-├── tests/                        # Test suite (15 files, ~7,100 LOC)
+├── tests/                        # Test suite (16 files, ~7,500 LOC)
 ├── public/workbench/             # Built-in review UI
 ├── docs/                         # Documentation (90+ files)
 │   ├── academic/                 # Research and analysis

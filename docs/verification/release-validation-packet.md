@@ -24,11 +24,11 @@ It satisfies Wave 5 exit gate 3: evidence ledger links runtime version, docs ver
 
 | Metric | Value |
 |--------|-------|
-| Total tests | 166 |
-| Passing | 165 |
+| Total tests | 177 |
+| Passing | 176 |
 | Failing | 0 |
 | Skipped | 1 |
-| Duration | ~4.2 s |
+| Duration | ~5.2 s |
 | Runner | `npm test` (`node --import tsx --test tests/**/*.test.ts`) |
 
 ### Test Coverage By Wave
@@ -51,6 +51,7 @@ It satisfies Wave 5 exit gate 3: evidence ledger links runtime version, docs ver
 | Browser-origin hardening | `MRI_CORS_ALLOWED_ORIGINS` parsing, deny-by-default cross-origin reads, allowlisted public preflights, and rejection of internal authorization-header browser preflights | 154 |
 | Reviewer-role authorization | reviewer allowlist parsing plus deny-by-default role enforcement on review/finalize mutations | 163 |
 | Route-auth fail-closed hardening | fail-closed internal/operator middleware behavior outside development, protected-route test-helper alignment, and auth-regression reconciliation | 166 |
+| Object-scoped authorization | tenant isolation (x-tenant-id), reviewer-scoped mutation denial, cross-tenant 403 enforcement across report/export/artifact routes, try/catch hardening on list and operations-summary routes | 177 |
 
 ## TypeScript Compilation
 
@@ -112,7 +113,7 @@ Status: clean (`npm run build` -> `tsc -p tsconfig.json`)
 
 | Validation dimension | Artifact | Status |
 |---------------------|----------|--------|
-| Functional correctness | 166 tests, 165 pass, 0 fail, 1 skipped | Complete |
+| Functional correctness | 177 tests, 176 pass, 0 fail, 1 skipped | Complete |
 | Type safety | `npm run build` clean | Complete |
 | Interoperability | DICOM SR + FHIR R4 exports validated | Complete |
 | Regulatory readiness | 5-document governance pack | Complete |

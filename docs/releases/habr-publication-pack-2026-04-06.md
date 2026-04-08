@@ -52,7 +52,7 @@
 - The repository includes a bounded Python worker with metadata-fallback and voxel-backed paths.
 - The workflow state model is explicit and persisted.
 - DICOM SR and FHIR R4 export surfaces exist.
-- Local validation on 2026-04-06 is green: `npm test` -> 168 total, 167 pass, 0 fail, 1 skipped; `npm run build` -> green.
+- Local validation on 2026-04-08 is green: `npm test` -> 177 total, 176 pass, 0 fail, 1 skipped; `npm run build` -> green.
 
 ### Target Direction
 
