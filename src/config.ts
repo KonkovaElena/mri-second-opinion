@@ -1,6 +1,9 @@
 import type { ArtifactStoreProvider } from "./case-artifact-storage";
+import type { ArchiveLookupMode } from "./archive-lookup";
 import type { CaseStoreMode } from "./case-repository";
 import { dirname, resolve } from "node:path";
+
+const MAX_CLOCK_SKEW_TOLERANCE_MS = 60 * 60 * 1000;
 
 export interface AppConfig {
   nodeEnv: string;
@@ -19,6 +22,7 @@ export interface AppConfig {
   artifactStorePresignTtlSeconds: number;
   archiveLookupBaseUrl?: string;
   archiveLookupSource?: string;
+  archiveLookupMode: ArchiveLookupMode;
   caseStoreDatabaseUrl?: string;
   caseStoreSchema?: string;
   databaseUrl?: string;
@@ -31,6 +35,9 @@ export interface AppConfig {
   persistenceMode: "snapshot" | "postgres";
   reviewerJwtSecret: string;
   reviewerAllowedRoles: string[];
+  reviewerJwksUrl?: string;
+  reviewerJwksIssuer?: string;
+  reviewerJwksAudience?: string;
   jsonBodyLimit: string;
   publicApiRateLimitWindowMs: number;
   publicApiRateLimitMaxRequests: number;
@@ -159,6 +166,11 @@ export function getConfig(): AppConfig {
   );
   const archiveLookupBaseUrl = process.env.MRI_ARCHIVE_LOOKUP_BASE_URL?.trim() || undefined;
   const archiveLookupSource = process.env.MRI_ARCHIVE_LOOKUP_SOURCE?.trim() || undefined;
+  const rawArchiveLookupMode = process.env.MRI_ARCHIVE_LOOKUP_MODE?.trim() || "custom";
+  if (rawArchiveLookupMode !== "custom" && rawArchiveLookupMode !== "dicomweb") {
+    throw new Error(`Invalid MRI_ARCHIVE_LOOKUP_MODE value: ${rawArchiveLookupMode}`);
+  }
+  const archiveLookupMode = rawArchiveLookupMode as ArchiveLookupMode;
   const databaseUrl = process.env.DATABASE_URL?.trim() || undefined;
   const caseStoreDatabaseUrl = process.env.MRI_CASE_STORE_DATABASE_URL?.trim() || databaseUrl;
   const caseStoreSchema = process.env.MRI_CASE_STORE_SCHEMA?.trim() || "public";
@@ -167,6 +179,9 @@ export function getConfig(): AppConfig {
   const operatorApiToken = process.env.MRI_OPERATOR_API_TOKEN?.trim() || undefined;
   const reviewerJwtSecret = process.env.MRI_REVIEWER_JWT_HS256_SECRET?.trim() || "";
   const reviewerAllowedRoles = parseReviewerAllowedRoles(process.env.MRI_REVIEWER_ALLOWED_ROLES);
+  const reviewerJwksUrl = process.env.MRI_REVIEWER_JWKS_URL?.trim() || undefined;
+  const reviewerJwksIssuer = process.env.MRI_REVIEWER_JWKS_ISSUER?.trim() || undefined;
+  const reviewerJwksAudience = process.env.MRI_REVIEWER_JWKS_AUDIENCE?.trim() || undefined;
   const clockSkewToleranceMs = Number(process.env.MRI_CLOCK_SKEW_TOLERANCE_MS ?? "60000");
   const replayStoreTtlMs = Number(process.env.MRI_REPLAY_STORE_TTL_MS ?? "120000");
   const replayStoreMaxEntries = Number(process.env.MRI_REPLAY_STORE_MAX_ENTRIES ?? "10000");
@@ -221,8 +236,12 @@ export function getConfig(): AppConfig {
     throw new Error("MRI_ARTIFACT_STORE_BUCKET is required for s3-compatible artifact storage");
   }
 
-  if (!reviewerJwtSecret) {
-    throw new Error("MRI_REVIEWER_JWT_HS256_SECRET is required");
+  if (!reviewerJwtSecret && !reviewerJwksUrl) {
+    throw new Error("MRI_REVIEWER_JWT_HS256_SECRET or MRI_REVIEWER_JWKS_URL is required");
+  }
+
+  if (reviewerJwtSecret && Buffer.byteLength(reviewerJwtSecret, "utf-8") < 32) {
+    throw new Error("MRI_REVIEWER_JWT_HS256_SECRET must be at least 32 bytes");
   }
 
   if (jsonBodyLimit.length === 0) {
@@ -235,6 +254,10 @@ export function getConfig(): AppConfig {
 
   if (!Number.isFinite(clockSkewToleranceMs) || clockSkewToleranceMs < 0) {
     throw new Error("MRI_CLOCK_SKEW_TOLERANCE_MS must be a non-negative number");
+  }
+
+  if (clockSkewToleranceMs > MAX_CLOCK_SKEW_TOLERANCE_MS) {
+    throw new Error("MRI_CLOCK_SKEW_TOLERANCE_MS must be at most 3600000ms");
   }
 
   if (!Number.isFinite(replayStoreTtlMs) || replayStoreTtlMs <= 0) {
@@ -272,6 +295,7 @@ export function getConfig(): AppConfig {
     artifactStorePresignTtlSeconds,
     archiveLookupBaseUrl,
     archiveLookupSource,
+    archiveLookupMode,
     caseStoreDatabaseUrl,
     caseStoreSchema,
     databaseUrl,
@@ -284,6 +308,9 @@ export function getConfig(): AppConfig {
     persistenceMode,
     reviewerJwtSecret,
     reviewerAllowedRoles,
+    reviewerJwksUrl,
+    reviewerJwksIssuer,
+    reviewerJwksAudience,
     jsonBodyLimit,
     publicApiRateLimitWindowMs,
     publicApiRateLimitMaxRequests,

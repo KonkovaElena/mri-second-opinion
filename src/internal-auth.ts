@@ -1,35 +1,19 @@
-import { timingSafeEqual } from "node:crypto";
 import type express from "express";
-import { WorkflowError } from "./case-contracts";
 import type { AppConfig } from "./config";
+import { createTokenAuthMiddleware } from "./token-auth";
 
 const AUTHORIZATION_SCHEME = "bearer";
 
 export function createInternalAuthMiddleware(
   config: Pick<AppConfig, "internalApiToken" | "nodeEnv">,
 ): express.RequestHandler {
-  const expectedToken = config.internalApiToken;
-
-  return (req, _res, next) => {
-    if (!expectedToken) {
-      if (config.nodeEnv === "development") {
-        next();
-        return;
-      }
-
-      next(new WorkflowError(503, "Internal API authentication is not configured for this environment", "SERVICE_CONFIG_ERROR"));
-      return;
-    }
-
-    const providedToken = extractBearerToken(req.get("authorization"));
-
-    if (!providedToken || !tokensEqual(providedToken, expectedToken)) {
-      next(new WorkflowError(401, "Internal API bearer token is missing or invalid", "UNAUTHORIZED"));
-      return;
-    }
-
-    next();
-  };
+  return createTokenAuthMiddleware({
+    expectedToken: config.internalApiToken,
+    nodeEnv: config.nodeEnv,
+    extractToken: (req) => extractBearerToken(req.get("authorization")),
+    unconfiguredLabel: "Internal API authentication",
+    invalidLabel: "Internal API bearer token",
+  });
 }
 
 function extractBearerToken(authorizationHeader: string | undefined) {
@@ -43,15 +27,4 @@ function extractBearerToken(authorizationHeader: string | undefined) {
   }
 
   return parts[1];
-}
-
-function tokensEqual(providedToken: string, expectedToken: string) {
-  const providedBuffer = Buffer.from(providedToken, "utf-8");
-  const expectedBuffer = Buffer.from(expectedToken, "utf-8");
-
-  if (providedBuffer.length !== expectedBuffer.length) {
-    return false;
-  }
-
-  return timingSafeEqual(providedBuffer, expectedBuffer);
 }

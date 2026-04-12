@@ -170,9 +170,9 @@ What remains next-wave direction rather than current runtime proof:
 
 | Layer | Technology | Purpose |
 |---|---|---|
-| **Runtime** | Node.js ≥ 22, TypeScript 5.8 | API server and workflow engine |
-| **Framework** | Express 4.21 | HTTP routing and middleware |
-| **Validation** | Zod 3.25 | Schema validation for all API inputs |
+| **Runtime** | Node.js ≥ 24, TypeScript 6.x | API server and workflow engine |
+| **Framework** | Express 5.x | HTTP routing and middleware |
+| **Validation** | Zod 4.x | Schema validation for all API inputs |
 | **Auth** | HMAC-SHA256 + Bearer tokens | Worker authentication (timing-safe) |
 | **Metrics** | prom-client 15.1 | Prometheus-compatible metrics |
 | **Rate Limiting** | express-rate-limit 8.3 | Public API protection |
@@ -670,9 +670,9 @@ Python-воркер (`worker/main.py`) работает по принципу pu
 
 | Уровень | Технология | Назначение |
 |---|---|---|
-| **Среда** | Node.js ≥ 24, TypeScript 5.8 | API-сервер и движок рабочего процесса |
-| **Фреймворк** | Express 4.21 | HTTP-маршрутизация и middleware |
-| **Валидация** | Zod 3.25 | Валидация схем для всех входных данных |
+| **Среда** | Node.js ≥ 24, TypeScript 6.x | API-сервер и движок рабочего процесса |
+| **Фреймворк** | Express 5.x | HTTP-маршрутизация и middleware |
+| **Валидация** | Zod 4.x | Валидация схем для всех входных данных |
 | **Авторизация** | HMAC-SHA256 + Bearer/JWT + `x-api-key` | Аутентификация воркеров, reviewer JWT и операторский доступ |
 | **Метрики** | prom-client 15.1 | Prometheus-совместимые метрики |
 | **Ограничение** | express-rate-limit 8.3 | Защита публичного API |

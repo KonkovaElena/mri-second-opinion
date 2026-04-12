@@ -129,7 +129,7 @@ export function createHmacAuthMiddleware(
   config: Pick<AppConfig, "hmacSecret" | "clockSkewToleranceMs">,
   replayStore?: ReplayStore,
 ): express.RequestHandler {
-  return (req, _res, next) => {
+  return async (req, _res, next) => {
     const hmacSecret = config.hmacSecret;
 
     if (!hmacSecret) {
@@ -158,13 +158,16 @@ export function createHmacAuthMiddleware(
       const timestamp = req.headers[HMAC_HEADER_TIMESTAMP] as string;
       const requestTimeMs = new Date(timestamp).getTime();
 
-      replayStore.checkAndRecord(nonce, requestTimeMs).then((isReplay) => {
+      try {
+        const isReplay = await replayStore.checkAndRecord(nonce, requestTimeMs);
         if (isReplay) {
           next(new WorkflowError(401, "Nonce already consumed", "HMAC_VERIFICATION_FAILED"));
           return;
         }
         next();
-      }).catch(next);
+      } catch (error) {
+        next(error);
+      }
       return;
     }
 

@@ -190,3 +190,6 @@ jobs:
               print('\n'.join(missing))
               sys.exit(1)
           PY
+
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true

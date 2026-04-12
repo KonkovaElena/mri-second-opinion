@@ -27,7 +27,10 @@ const MAX_SERIES = 1_000;
 const MAX_METADATA_SUMMARY = 200;
 const MAX_ISSUES = 100;
 const MAX_CAPABILITIES = 50;
+const MAX_JSON_OBJECT_BYTES = 1_000_000;
 
+// Intentionally permissive at the top level so the field-specific strict schemas below
+// produce the actionable validation errors. Structural strictness happens per request schema.
 const jsonObjectSchema = z.object({}).passthrough();
 
 function invalidInput(message: string) {
@@ -38,6 +41,18 @@ function parseJsonObject(body: unknown) {
   const result = jsonObjectSchema.safeParse(body);
   if (!result.success) {
     throw invalidInput("JSON object body is required");
+  }
+
+  let approximateSize = 0;
+
+  try {
+    approximateSize = Buffer.byteLength(JSON.stringify(result.data), "utf-8");
+  } catch {
+    throw invalidInput("JSON object body must be JSON serializable");
+  }
+
+  if (approximateSize > MAX_JSON_OBJECT_BYTES) {
+    throw invalidInput(`JSON object body must be at most ${MAX_JSON_OBJECT_BYTES} bytes`);
   }
 
   return result.data as Record<string, unknown>;

@@ -166,17 +166,24 @@ test("getConfig exposes MRI_INTERNAL_API_TOKEN when configured", () => {
 test("getConfig requires MRI_REVIEWER_JWT_HS256_SECRET", () => {
   const previousPort = process.env.PORT;
   const previousJwtSecret = process.env.MRI_REVIEWER_JWT_HS256_SECRET;
+  const previousJwksUrl = process.env.MRI_REVIEWER_JWKS_URL;
 
   process.env.PORT = "4010";
   delete process.env.MRI_REVIEWER_JWT_HS256_SECRET;
+  delete process.env.MRI_REVIEWER_JWKS_URL;
 
   try {
     assert.throws(
       () => getConfig(),
-      /MRI_REVIEWER_JWT_HS256_SECRET is required/,
+      /MRI_REVIEWER_JWT_HS256_SECRET or MRI_REVIEWER_JWKS_URL is required/,
     );
   } finally {
     process.env.PORT = previousPort;
+    if (previousJwksUrl === undefined) {
+      delete process.env.MRI_REVIEWER_JWKS_URL;
+    } else {
+      process.env.MRI_REVIEWER_JWKS_URL = previousJwksUrl;
+    }
     if (previousJwtSecret === undefined) {
       delete process.env.MRI_REVIEWER_JWT_HS256_SECRET;
     } else {
@@ -201,6 +208,86 @@ test("getConfig accepts valid reviewer JWT secret", () => {
       delete process.env.MRI_REVIEWER_JWT_HS256_SECRET;
     } else {
       process.env.MRI_REVIEWER_JWT_HS256_SECRET = previousJwtSecret;
+    }
+  }
+});
+
+test("getConfig rejects reviewer JWT secret shorter than 32 bytes", () => {
+  const previousPort = process.env.PORT;
+  const previousJwtSecret = process.env.MRI_REVIEWER_JWT_HS256_SECRET;
+
+  process.env.PORT = "4010";
+  process.env.MRI_REVIEWER_JWT_HS256_SECRET = "short-reviewer-secret";
+
+  try {
+    assert.throws(
+      () => getConfig(),
+      /MRI_REVIEWER_JWT_HS256_SECRET must be at least 32 bytes/,
+    );
+  } finally {
+    process.env.PORT = previousPort;
+    if (previousJwtSecret === undefined) {
+      delete process.env.MRI_REVIEWER_JWT_HS256_SECRET;
+    } else {
+      process.env.MRI_REVIEWER_JWT_HS256_SECRET = previousJwtSecret;
+    }
+  }
+});
+
+test("getConfig rejects negative clock skew tolerance", () => {
+  const previousPort = process.env.PORT;
+  const previousJwtSecret = process.env.MRI_REVIEWER_JWT_HS256_SECRET;
+  const previousClockSkew = process.env.MRI_CLOCK_SKEW_TOLERANCE_MS;
+
+  process.env.PORT = "4010";
+  process.env.MRI_REVIEWER_JWT_HS256_SECRET = "reviewer-jwt-secret-0123456789abcdef";
+  process.env.MRI_CLOCK_SKEW_TOLERANCE_MS = "-1";
+
+  try {
+    assert.throws(
+      () => getConfig(),
+      /MRI_CLOCK_SKEW_TOLERANCE_MS must be a non-negative number/,
+    );
+  } finally {
+    process.env.PORT = previousPort;
+    if (previousJwtSecret === undefined) {
+      delete process.env.MRI_REVIEWER_JWT_HS256_SECRET;
+    } else {
+      process.env.MRI_REVIEWER_JWT_HS256_SECRET = previousJwtSecret;
+    }
+    if (previousClockSkew === undefined) {
+      delete process.env.MRI_CLOCK_SKEW_TOLERANCE_MS;
+    } else {
+      process.env.MRI_CLOCK_SKEW_TOLERANCE_MS = previousClockSkew;
+    }
+  }
+});
+
+test("getConfig rejects clock skew tolerance above one hour", () => {
+  const previousPort = process.env.PORT;
+  const previousJwtSecret = process.env.MRI_REVIEWER_JWT_HS256_SECRET;
+  const previousClockSkew = process.env.MRI_CLOCK_SKEW_TOLERANCE_MS;
+
+  process.env.PORT = "4010";
+  process.env.MRI_REVIEWER_JWT_HS256_SECRET = "reviewer-jwt-secret-0123456789abcdef";
+  process.env.MRI_CLOCK_SKEW_TOLERANCE_MS = "3600001";
+
+  try {
+    assert.throws(
+      () => getConfig(),
+      /MRI_CLOCK_SKEW_TOLERANCE_MS must be at most 3600000ms/,
+    );
+  } finally {
+    process.env.PORT = previousPort;
+    if (previousJwtSecret === undefined) {
+      delete process.env.MRI_REVIEWER_JWT_HS256_SECRET;
+    } else {
+      process.env.MRI_REVIEWER_JWT_HS256_SECRET = previousJwtSecret;
+    }
+    if (previousClockSkew === undefined) {
+      delete process.env.MRI_CLOCK_SKEW_TOLERANCE_MS;
+    } else {
+      process.env.MRI_CLOCK_SKEW_TOLERANCE_MS = previousClockSkew;
     }
   }
 });

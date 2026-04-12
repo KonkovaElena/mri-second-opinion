@@ -23,7 +23,12 @@ import { createHmacAuthMiddleware } from "./hmac-auth";
 import { createOperatorAuthMiddleware } from "./operator-auth";
 import { MemoryReplayStore } from "./replay-store";
 import { getRequestId, requestContextMiddleware, requestLoggingMiddleware } from "./request-context";
-import { resolveAuthorizedReviewer } from "./reviewer-auth";
+import { resolveAuthorizedReviewerAsync } from "./reviewer-auth";
+import {
+  buildReaderStudySummary,
+  parseBinaryPredictions,
+  parseMeasurementPairs,
+} from "./reader-study-metrics";
 import {
   parseClaimJobInput,
   parseAuthenticatedReviewCaseInput,
@@ -44,8 +49,23 @@ export interface CreateAppOptions {
   artifactStore?: ArtifactStore;
 }
 
+const TENANT_ID_PATTERN = /^[A-Za-z0-9_-]{1,64}$/;
+
 function resolveAccessScope(req: express.Request): { tenantId?: string } {
   const tenantId = req.get("x-tenant-id")?.trim();
+
+  if (!tenantId) {
+    return { tenantId: undefined };
+  }
+
+  if (!TENANT_ID_PATTERN.test(tenantId)) {
+    throw new WorkflowError(
+      400,
+      "x-tenant-id must contain only letters, numbers, underscores, or hyphens and be at most 64 characters",
+      "INVALID_INPUT",
+    );
+  }
+
   return { tenantId: tenantId && tenantId.length > 0 ? tenantId : undefined };
 }
 
@@ -83,6 +103,7 @@ export function createApp(config: AppConfig, options: CreateAppOptions = {}) {
   const archiveLookupClient = createArchiveLookupClient({
     archiveLookupBaseUrl: config.archiveLookupBaseUrl,
     archiveLookupSource: config.archiveLookupSource,
+    archiveLookupMode: config.archiveLookupMode,
   });
   const artifactStore =
     options.artifactStore ??
@@ -299,6 +320,23 @@ export function createApp(config: AppConfig, options: CreateAppOptions = {}) {
     });
   }
 
+  function parsePagination(query: express.Request["query"]) {
+    const limitRaw = query.limit;
+    const offsetRaw = query.offset;
+    const limit = typeof limitRaw === "string" && limitRaw.length > 0 ? Number(limitRaw) : 50;
+    const offset = typeof offsetRaw === "string" && offsetRaw.length > 0 ? Number(offsetRaw) : 0;
+
+    if (!Number.isInteger(limit) || limit < 1 || limit > 200) {
+      throw new WorkflowError(400, "limit must be an integer between 1 and 200", "INVALID_INPUT");
+    }
+
+    if (!Number.isInteger(offset) || offset < 0) {
+      throw new WorkflowError(400, "offset must be a non-negative integer", "INVALID_INPUT");
+    }
+
+    return { limit, offset };
+  }
+
   app.get("/", (_req, res) => {
     res.json({
       name: "mri-second-opinion",
@@ -320,6 +358,7 @@ export function createApp(config: AppConfig, options: CreateAppOptions = {}) {
           "GET /api/cases/:caseId/exports/fhir-diagnostic-report",
           "GET /api/cases/:caseId/artifacts/:artifactId",
           "GET /api/operations/summary",
+          "POST /api/reader-study/concordance",
           "POST /api/delivery/:caseId/retry",
         ],
         internal: [
@@ -383,11 +422,14 @@ export function createApp(config: AppConfig, options: CreateAppOptions = {}) {
   app.get("/api/cases", async (req, res) => {
     try {
       const scope = resolveAccessScope(req);
-      const cases = (await caseService.listCases(scope)).map((caseRecord) => presentCaseListItem(caseRecord));
+      const page = await caseService.listCasesPage(scope, parsePagination(req.query));
+      const cases = page.cases.map((caseRecord) => presentCaseListItem(caseRecord));
       res.json({
         cases,
         meta: {
-          totalCases: cases.length,
+          totalCases: page.totalCases,
+          limit: page.limit,
+          offset: page.offset,
         },
       });
     } catch (error) {
@@ -408,7 +450,7 @@ export function createApp(config: AppConfig, options: CreateAppOptions = {}) {
     try {
       const updated = await caseService.reviewCase(req.params.caseId, {
         ...parseAuthenticatedReviewCaseInput(req.body),
-        ...resolveAuthorizedReviewer(req, config, "review"),
+        ...await resolveAuthorizedReviewerAsync(req, config, "review"),
       });
 
       res.json({ case: updated });
@@ -419,13 +461,20 @@ export function createApp(config: AppConfig, options: CreateAppOptions = {}) {
 
   app.post("/api/cases/:caseId/finalize", async (req, res) => {
     try {
-      const reviewer = resolveAuthorizedReviewer(req, config, "finalize");
+      const reviewer = await resolveAuthorizedReviewerAsync(req, config, "finalize");
 
       const updated = await caseService.finalizeCase(req.params.caseId, {
         ...parsePublicFinalizeCaseInput(req.body),
         finalizerId: reviewer.reviewerId,
         finalizerRole: reviewer.reviewerRole,
       });
+
+      console.info(JSON.stringify({
+        event: "audit_case_finalized",
+        requestId: getRequestId(res),
+        caseId: updated.caseId,
+        reviewerId: reviewer.reviewerId,
+      }));
 
       res.json({ case: updated });
     } catch (error) {
@@ -446,6 +495,12 @@ export function createApp(config: AppConfig, options: CreateAppOptions = {}) {
     try {
       const scope = resolveAccessScope(req);
       const report = await caseService.getFinalizedReport(req.params.caseId, scope);
+      console.info(JSON.stringify({
+        event: "audit_report_exported",
+        requestId: getRequestId(res),
+        caseId: req.params.caseId,
+        format: "dicom-sr",
+      }));
       res.json({ dicomSr: buildDicomSrExport(report) });
     } catch (error) {
       handleError(res, error);
@@ -457,6 +512,12 @@ export function createApp(config: AppConfig, options: CreateAppOptions = {}) {
       const scope = resolveAccessScope(req);
       const record = await caseService.getCase(req.params.caseId, scope);
       const report = await caseService.getFinalizedReport(req.params.caseId, scope);
+      console.info(JSON.stringify({
+        event: "audit_report_exported",
+        requestId: getRequestId(res),
+        caseId: req.params.caseId,
+        format: "fhir-diagnostic-report",
+      }));
       res.json({ diagnosticReport: buildFhirDiagnosticReport(report, record.patientAlias) });
     } catch (error) {
       handleError(res, error);
@@ -489,9 +550,46 @@ export function createApp(config: AppConfig, options: CreateAppOptions = {}) {
     }
   });
 
+  // --- Reader-study concordance metrics (R-03, MRMC validation) ---
+
+  app.post("/api/reader-study/concordance", async (req, res) => {
+    try {
+      const body = req.body as Record<string, unknown>;
+      const binaryPredictions = body.predictions
+        ? parseBinaryPredictions(body.predictions)
+        : undefined;
+      const measurementPairs = body.measurements
+        ? parseMeasurementPairs(body.measurements)
+        : undefined;
+
+      if (!binaryPredictions && !measurementPairs) {
+        throw new WorkflowError(
+          400,
+          "At least one of predictions or measurements is required",
+          "INVALID_INPUT",
+        );
+      }
+
+      const summary = buildReaderStudySummary({
+        binaryPredictions,
+        measurementPairs,
+      });
+
+      res.json({ concordance: summary });
+    } catch (error) {
+      handleError(res, error);
+    }
+  });
+
   app.post("/api/delivery/:caseId/retry", async (req, res) => {
     try {
-      res.json({ case: await caseService.retryDelivery(req.params.caseId) });
+      const updated = await caseService.retryDelivery(req.params.caseId);
+      console.info(JSON.stringify({
+        event: "audit_delivery_retried",
+        requestId: getRequestId(res),
+        caseId: updated.caseId,
+      }));
+      res.json({ case: updated });
     } catch (error) {
       handleError(res, error);
     }

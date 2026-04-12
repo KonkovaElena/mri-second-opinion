@@ -1,6 +1,6 @@
 # Release-Linked Validation Packet
 
-Date: 2026-04-03
+Date: 2026-04-09
 
 ## Purpose
 
@@ -13,9 +13,9 @@ It satisfies Wave 5 exit gate 3: evidence ledger links runtime version, docs ver
 | Dimension | Value |
 |-----------|-------|
 | Repository | mri-second-opinion |
-| Repository base head | `aef1acba8f96ba489af912743a72fda55e00f2ac` |
-| Latest hosted-validated head | `04cb0a57d1e64f8a5cf03a22b4a5c60d37dffc3a` |
-| Local validation scope | finalized-only export gating, release-doc reconciliation, audit remediation, later validation plus persistence hardening (semantic payload-size limits, archive lookup graceful degradation, PostgreSQL payload round-trip preservation), the `s3-compatible` artifact backend plus post-A2 documentation reconciliation, artifact-boundary hardening for local-file and object-store retrieval, strict-by-default browser-origin hardening with explicit allowlist parsing plus public-route preflight enforcement, reviewer-role allowlisting for review/finalize mutations, local `dist` artifact cleanup, GitHub publication hardening with a Node 24 cross-platform install lane above the base head, and fail-closed internal/operator route-auth hardening with protected-route helper reconciliation |
+| Repository base head | `3f42a4b8d3f912f9eb84ca0f6bf3e1d56f932170` |
+| Latest hosted-validated head | `3f42a4b8d3f912f9eb84ca0f6bf3e1d56f932170` |
+| Local validation scope | finalized-only export gating, release-doc reconciliation, audit remediation, later validation plus persistence hardening (semantic payload-size limits, archive lookup graceful degradation, PostgreSQL payload round-trip preservation), the `s3-compatible` artifact backend plus post-A2 documentation reconciliation, artifact-boundary hardening for local-file and object-store retrieval, strict-by-default browser-origin hardening with explicit allowlist parsing plus public-route preflight enforcement, reviewer-role allowlisting for review/finalize mutations, local `dist` artifact cleanup, GitHub publication hardening with a Node 24 cross-platform install lane above the base head, fail-closed internal/operator route-auth hardening with protected-route helper reconciliation, and the 2026-04-09 rerun on the current local head with green `npm run build` and `npm test`. Public GitHub-hosted `ci` and `docs-governance` are now also green on the same repository head `3f42a4b8d3f912f9eb84ca0f6bf3e1d56f932170`. The environment-gated `verify:postgres-bootstrap` probe still fails closed without `MRI_CASE_STORE_DATABASE_URL` or `DATABASE_URL`, which matches the documented bootstrap contract rather than signaling a runtime regression. |
 | Node.js target | 24+ |
 | TypeScript target | ES2022 |
 | Test runner | `npm test` (`node --import tsx --test tests/**/*.test.ts`) |
@@ -28,7 +28,7 @@ It satisfies Wave 5 exit gate 3: evidence ledger links runtime version, docs ver
 | Passing | 176 |
 | Failing | 0 |
 | Skipped | 1 |
-| Duration | ~5.2 s |
+| Duration | ~5.1 s |
 | Runner | `npm test` (`node --import tsx --test tests/**/*.test.ts`) |
 
 ### Test Coverage By Wave
@@ -128,16 +128,17 @@ Status: clean (`npm run build` -> `tsc -p tsconfig.json`)
 1. Reader study not yet executed — protocol exists, no data collected
 2. Subgroup analysis not yet executed — plan operationalizes framework, no results available
 3. PMS program not yet active — activation criteria defined, none met yet
-4. Hosted GitHub Actions evidence is not yet refreshed for the current local validation snapshot on `aef1acba8f96ba489af912743a72fda55e00f2ac`, which now also includes fail-closed internal/operator route-auth hardening above the latest paired hosted-validated head `04cb0a57d1e64f8a5cf03a22b4a5c60d37dffc3a` in `docs/verification/launch-evidence-index.md`
+4. The current local audit reconciliation after the 2026-04-09 doc refresh is docs-only and has not yet been re-hosted as a new GitHub Actions run above `3f42a4b8d3f912f9eb84ca0f6bf3e1d56f932170`
 5. The current Node 24 Linux lane uses `npm install --omit=optional` rather than strict `npm ci` because the checked-in lockfile can reject optional CycloneDX validator branches on Linux; build, test, and SBOM generation still validate successfully with the active install path
 6. Skip count is 1 (one test intentionally skipped)
 7. Object-store hardening is still incomplete at production-grade level: retention, multipart upload, and MinIO verification remain follow-on work
 8. Hosted evidence still points to the last paired `ci` and `docs-governance` success below the current local reviewer-auth, `dist` cleanup, and fail-closed route-auth head
+9. PostgreSQL bootstrap verification is environment-gated by design; the current zero-config rerun confirms that the script still refuses to proceed without `MRI_CASE_STORE_DATABASE_URL` or `DATABASE_URL`
 
 ## Interpretation
 
 This validation packet establishes that the repository has a current local validation snapshot with clean build output, validated interoperability exports, a strengthened validation, persistence, artifact-boundary, browser-origin, reviewer-auth, and fail-closed route-auth regression net, and a documented regulatory and clinical evaluation path.
 
-The gaps are execution gaps, not specification gaps: the protocols and plans exist, the studies have not been run yet. Hosted workflow truth also still points to the last paired `ci` and `docs-governance` success on `04cb0a57d1e64f8a5cf03a22b4a5c60d37dffc3a`; the current local validation snapshot above that hosted head has not been re-hosted yet.
+The gaps are execution gaps, not specification gaps: the protocols and plans exist, the studies have not been run yet. Public GitHub-hosted workflow truth is current for repository head `3f42a4b8d3f912f9eb84ca0f6bf3e1d56f932170`, while the present local doc-only audit reconciliation sits above that head and has not been re-hosted yet. The PostgreSQL bootstrap probe remains a deliberate env-gated check rather than part of the zero-config baseline, and the 2026-04-09 rerun confirms that it still fails closed when the connection string is absent.
 
 This is the expected state for a pre-evaluation RUO system. The next milestone is reader study execution, which will populate the subgroup analysis and provide the first real clinical performance data.

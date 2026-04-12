@@ -5483,6 +5483,33 @@ test("tenant objects are isolated between tenants on operator endpoints", async 
   }
 });
 
+test("operator endpoints reject invalid x-tenant-id header values", async () => {
+  const { tempDir, caseStoreFile } = createTestStoreFile();
+
+  try {
+    await withServer(caseStoreFile, async ({ jsonRequest }) => {
+      const created = await jsonRequest("/api/cases", {
+        method: "POST",
+        body: JSON.stringify({
+          patientAlias: "TenantHeaderValidation-001",
+          studyUid: "1.2.840.tenant.invalid.1",
+          sequenceInventory: ["T1w"],
+          tenantId: "tenant_A",
+        }),
+      });
+      assert.equal(created.response.status, 201);
+
+      const invalidList = await jsonRequest("/api/cases", {
+        headers: { "x-tenant-id": "tenant bad;drop" },
+      });
+      assert.equal(invalidList.response.status, 400);
+      assert.equal(invalidList.body.code, "INVALID_INPUT");
+    });
+  } finally {
+    rmSync(tempDir, { recursive: true, force: true });
+  }
+});
+
 test("tenant scope enforcement extends to report, export, and artifact routes", async () => {
   const { tempDir, caseStoreFile } = createTestStoreFile();
 

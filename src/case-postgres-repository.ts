@@ -1,6 +1,6 @@
 import { Pool } from "pg";
 import type { CaseRecord, DeliveryJobRecord, InferenceJobRecord } from "./case-contracts";
-import { getRetryBackoffSeconds } from "./case-common";
+import { cloneCase, getRetryBackoffSeconds, MAX_INFERENCE_ATTEMPTS } from "./case-common";
 import {
   buildPostgresBootstrapStatements,
   type PostgresBootstrapConfig,
@@ -63,10 +63,6 @@ export interface PostgresFailInferenceJobResult {
   status: "updated" | "missing";
   job: InferenceJobRecord | null;
   requeued: boolean;
-}
-
-function cloneCase<T>(value: T): T {
-  return JSON.parse(JSON.stringify(value)) as T;
 }
 
 function quoteIdentifier(identifier: string) {
@@ -588,8 +584,10 @@ export class PostgresCaseRepository {
 
       const { inferenceJob } = parseStoredInferenceJobRecord(row);
       const updatedAt = new Date().toISOString();
+      const shouldRequeue =
+        input.failureClass === "transient" && inferenceJob.attemptCount < MAX_INFERENCE_ATTEMPTS;
       const updatedJob: InferenceJobRecord =
-        input.failureClass === "transient"
+        shouldRequeue
           ? {
               ...inferenceJob,
               status: "queued",
@@ -659,7 +657,7 @@ export class PostgresCaseRepository {
       return {
         status: "updated",
         job: cloneCase(updatedJob),
-        requeued: input.failureClass === "transient",
+        requeued: shouldRequeue,
       };
     } catch (error) {
       try {

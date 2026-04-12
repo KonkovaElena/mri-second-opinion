@@ -61,6 +61,12 @@ export interface AccessScope {
   tenantId?: string;
   reviewerId?: string;
 }
+
+export interface PaginationOptions {
+  limit: number;
+  offset: number;
+}
+
 export interface ReviewCaseInput {
   reviewerId: string;
   reviewerRole?: string;

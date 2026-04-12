@@ -1,4 +1,5 @@
 import type { CaseRecord, DeliveryJobRecord, InferenceJobRecord } from "./case-contracts";
+import { cloneCase } from "./case-common";
 import {
   loadPersistedCaseSnapshot,
   savePersistedCaseSnapshot,
@@ -51,10 +52,6 @@ export interface CaseRepositoryOptions {
 
 interface SnapshotCaseRepositoryOptions {
   snapshotFilePath?: string;
-}
-
-function cloneCase<T>(value: T): T {
-  return JSON.parse(JSON.stringify(value)) as T;
 }
 
 export function createCaseRepository(options: CaseRepositoryOptions = {}): CaseRepository {

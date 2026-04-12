@@ -1,13 +1,21 @@
 import { createHash, randomUUID } from "node:crypto";
 import {
-  ALLOWED_TRANSITIONS,
-  createStructuralExecutionEnvelope,
   createArtifactManifest,
   createDraftReport,
   createEvidenceCards,
   createPlanEnvelope,
+  createStructuralExecutionEnvelope,
+  ALLOWED_TRANSITIONS,
 } from "./case-planning";
-import { missingRequiredSequences, nowIso, type DispatchFailureClass, getRetryBackoffSeconds } from "./case-common";
+import {
+  cloneCase,
+  getRetryBackoffSeconds,
+  MAX_DELIVERY_ATTEMPTS,
+  MAX_INFERENCE_ATTEMPTS,
+  missingRequiredSequences,
+  nowIso,
+  type DispatchFailureClass,
+} from "./case-common";
 import {
   createCaseRepository,
   type CaseRepository,
@@ -38,6 +46,7 @@ import {
   type InferenceCallbackInput,
   type InferenceJobRecord,
   type OperationLogEntry,
+  type PaginationOptions,
   type PersistedCaseSnapshot,
   type ReportPayload,
   type ReviewCaseInput,
@@ -105,10 +114,6 @@ function assertStringArray(value: unknown, fieldName: string) {
   return normalized;
 }
 
-function cloneCase<T>(value: T): T {
-  return JSON.parse(JSON.stringify(value)) as T;
-}
-
 function createOperationLogEntry(input: Omit<OperationLogEntry, "operationId" | "at">): OperationLogEntry {
   return {
     operationId: randomUUID(),
@@ -118,14 +123,14 @@ function createOperationLogEntry(input: Omit<OperationLogEntry, "operationId" | 
   };
 }
 
-function createDeliveryJobRecord(caseId: string): DeliveryJobRecord {
+function createDeliveryJobRecord(caseId: string, previousAttemptCount = 0): DeliveryJobRecord {
   const createdAt = nowIso();
 
   return {
     jobId: randomUUID(),
     caseId,
     status: "queued",
-    attemptCount: 0,
+    attemptCount: previousAttemptCount,
     enqueuedAt: createdAt,
     availableAt: createdAt,
     updatedAt: createdAt,
@@ -235,7 +240,20 @@ export class MemoryCaseService {
 
   async listCases(scope?: AccessScope) {
     const list = await this.repository.list();
-    return scope?.tenantId ? list.filter(c => c.tenantId === scope.tenantId) : list;
+    return scope?.tenantId ? list.filter((caseRecord) => caseRecord.tenantId === scope.tenantId) : list;
+  }
+
+  async listCasesPage(scope?: AccessScope, pagination?: PaginationOptions) {
+    const list = await this.listCases(scope);
+    const limit = pagination?.limit ?? 50;
+    const offset = pagination?.offset ?? 0;
+
+    return {
+      cases: list.slice(offset, offset + limit),
+      totalCases: list.length,
+      limit,
+      offset,
+    };
   }
 
   async getCase(caseId: string, scope?: AccessScope) {
@@ -565,6 +583,16 @@ export class MemoryCaseService {
     const record = await this.requireCase(caseId);
     return this.persistExistingCase(record, async () => {
       this.assertStatus(record, ["DELIVERY_FAILED"]);
+      const latestJob = await this.findLatestDeliveryJob(record.caseId);
+
+      if (latestJob && latestJob.attemptCount >= MAX_DELIVERY_ATTEMPTS) {
+        throw new WorkflowError(
+          422,
+          `Maximum delivery attempts exceeded (${MAX_DELIVERY_ATTEMPTS})`,
+          "DELIVERY_ATTEMPTS_EXCEEDED",
+        );
+      }
+
       this.transition(record, "DELIVERY_PENDING", "Delivery retry requested");
       this.appendOperation(record, {
         caseId: record.caseId,
@@ -574,7 +602,7 @@ export class MemoryCaseService {
         outcome: "accepted",
         detail: "Delivery retry requested from public API.",
       });
-      this.repository.setDeliveryJob(createDeliveryJobRecord(record.caseId));
+      this.repository.setDeliveryJob(createDeliveryJobRecord(record.caseId, latestJob?.attemptCount ?? 0));
       record.evidenceCards = createEvidenceCards(record);
       return cloneCase(record);
     });
@@ -704,6 +732,23 @@ export class MemoryCaseService {
     const now = nowIso();
 
     if (input.failureClass === "transient") {
+      if (job.attemptCount >= MAX_INFERENCE_ATTEMPTS) {
+        return this.persistQueueMutation(async () => {
+          const failed: InferenceJobRecord = {
+            ...job,
+            status: "failed",
+            updatedAt: now,
+            completedAt: now,
+            lastError: `${errorMessage} (retry limit reached)`,
+            failureClass: "terminal",
+            leaseId: null,
+            leaseExpiresAt: null,
+          };
+          this.repository.setInferenceJob(failed);
+          return { failureClass: "terminal" as const, requeued: false, jobId: job.jobId };
+        });
+      }
+
       const backoffSeconds = getRetryBackoffSeconds("standard", job.attemptCount);
       const availableAt = new Date(Date.now() + backoffSeconds * 1000).toISOString();
 
@@ -757,6 +802,23 @@ export class MemoryCaseService {
       return this.persistQueueMutation(async () => {
         const requeuedAt = nowIso();
         const requeuedJobs = expiredJobs.map((job) => {
+          if (job.attemptCount >= MAX_INFERENCE_ATTEMPTS) {
+            const failedJob: InferenceJobRecord = {
+              ...job,
+              status: "failed",
+              updatedAt: requeuedAt,
+              completedAt: requeuedAt,
+              workerId: null,
+              claimedAt: null,
+              lastError: "Inference job claim expired after reaching retry limit.",
+              failureClass: "terminal",
+              leaseId: null,
+              leaseExpiresAt: null,
+            };
+            this.repository.setInferenceJob(failedJob);
+            return cloneCase(failedJob);
+          }
+
           const requeuedJob: InferenceJobRecord = {
             ...job,
             status: "queued",
@@ -1301,6 +1363,13 @@ export class MemoryCaseService {
     return (await this.repository
       .listDeliveryJobs())
       .filter((job) => job.caseId === caseId && (job.status === "queued" || job.status === "claimed"))
+      .sort((left, right) => right.updatedAt.localeCompare(left.updatedAt) || right.enqueuedAt.localeCompare(left.enqueuedAt))[0] ?? null;
+  }
+
+  private async findLatestDeliveryJob(caseId: string) {
+    return (await this.repository
+      .listDeliveryJobs())
+      .filter((job) => job.caseId === caseId)
       .sort((left, right) => right.updatedAt.localeCompare(left.updatedAt) || right.enqueuedAt.localeCompare(left.enqueuedAt))[0] ?? null;
   }
 

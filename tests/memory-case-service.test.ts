@@ -548,6 +548,138 @@ test("createCase is idempotent for the same study and rejects conflicting duplic
   }
 });
 
+test("finalizeCase rejects direct finalization before clinician review", async () => {
+  const { tempDir, caseStoreFile } = createStorePath();
+  const services: MemoryCaseService[] = [];
+
+  try {
+    const service = new MemoryCaseService({ snapshotFilePath: caseStoreFile });
+    services.push(service);
+
+    const created = await service.createCase({
+      patientAlias: "invalid-transition-finalize",
+      studyUid: "1.2.3.invalid.transition.finalize",
+      sequenceInventory: ["T1w", "FLAIR"],
+    });
+
+    await service.completeInference(created.caseId, {
+      qcDisposition: "pass",
+      findings: ["Draft is ready but not yet reviewed."],
+      measurements: [{ label: "brain_volume_ml", value: 1099 }],
+      artifacts: ["artifact://qc", "artifact://report"],
+      generatedSummary: "Awaiting clinician review.",
+    });
+
+    await assert.rejects(() => service.finalizeCase(created.caseId, { finalizerId: "reviewer-1" }), (error: unknown) => {
+      assert.equal(error instanceof Error, true);
+      assert.equal((error as { code?: string }).code, "INVALID_TRANSITION");
+      return true;
+    });
+  } finally {
+    for (const service of services) {
+      await service.close();
+    }
+    rmSync(tempDir, { recursive: true, force: true });
+  }
+});
+
+test("reviewCase rejects review after finalization has already completed", async () => {
+  const { tempDir, caseStoreFile } = createStorePath();
+  const services: MemoryCaseService[] = [];
+
+  try {
+    const service = new MemoryCaseService({ snapshotFilePath: caseStoreFile });
+    services.push(service);
+
+    const created = await service.createCase({
+      patientAlias: "invalid-transition-review",
+      studyUid: "1.2.3.invalid.transition.review",
+      sequenceInventory: ["T1w", "FLAIR"],
+    });
+
+    await service.completeInference(created.caseId, {
+      qcDisposition: "pass",
+      findings: ["Draft ready for state-machine test."],
+      measurements: [{ label: "brain_volume_ml", value: 1103 }],
+      artifacts: ["artifact://qc", "artifact://report"],
+      generatedSummary: "Review then finalize.",
+    });
+
+    await service.reviewCase(created.caseId, {
+      reviewerId: "reviewer-1",
+      comments: "Reviewed once.",
+    });
+    await service.finalizeCase(created.caseId, {
+      finalizerId: "reviewer-1",
+    });
+
+    await assert.rejects(() => service.reviewCase(created.caseId, { reviewerId: "reviewer-1", comments: "Second review" }), (error: unknown) => {
+      assert.equal(error instanceof Error, true);
+      assert.equal((error as { code?: string }).code, "INVALID_TRANSITION");
+      return true;
+    });
+  } finally {
+    for (const service of services) {
+      await service.close();
+    }
+    rmSync(tempDir, { recursive: true, force: true });
+  }
+});
+
+test("retryDelivery rejects requests after the delivery retry limit is exhausted", async () => {
+  const { tempDir, caseStoreFile } = createStorePath();
+  const services: MemoryCaseService[] = [];
+
+  try {
+    const service = new MemoryCaseService({ snapshotFilePath: caseStoreFile, storageMode: "snapshot" });
+    services.push(service);
+
+    const created = await service.createCase({
+      patientAlias: "retry-limit-delivery",
+      studyUid: "1.2.3.retry.limit.delivery",
+      sequenceInventory: ["T1w", "FLAIR"],
+    });
+
+    await service.completeInference(created.caseId, {
+      qcDisposition: "pass",
+      findings: ["Delivery retry limit test."],
+      measurements: [{ label: "brain_volume_ml", value: 1108 }],
+      artifacts: ["artifact://qc", "artifact://report"],
+      generatedSummary: "Delivery retry limit path.",
+    });
+    await service.reviewCase(created.caseId, {
+      reviewerId: "reviewer-1",
+      comments: "Ready for finalize.",
+    });
+    await service.finalizeCase(created.caseId, {
+      finalizerId: "reviewer-1",
+      deliveryOutcome: "failed",
+    });
+
+    for (let attempt = 0; attempt < 9; attempt += 1) {
+      const updated = await service.retryDelivery(created.caseId);
+      const claimed = await service.claimNextDeliveryJob(`delivery-worker-${attempt}`);
+      assert.notEqual(claimed, null);
+      await service.completeDelivery(created.caseId, {
+        deliveryStatus: "failed",
+        detail: `Failure ${attempt}`,
+      });
+      assert.equal(updated.caseId, created.caseId);
+    }
+
+    await assert.rejects(() => service.retryDelivery(created.caseId), (error: unknown) => {
+      assert.equal(error instanceof Error, true);
+      assert.equal((error as { code?: string }).code, "DELIVERY_ATTEMPTS_EXCEEDED");
+      return true;
+    });
+  } finally {
+    for (const service of services) {
+      await service.close();
+    }
+    rmSync(tempDir, { recursive: true, force: true });
+  }
+});
+
 test("blocked planning path does not require artifacts that cannot be produced", () => {
   const plan = createPlanEnvelope({
     caseId: "blocked-case",

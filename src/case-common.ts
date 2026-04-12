@@ -16,6 +16,9 @@ export interface RetryPolicy {
   backoffSeconds: number[];
 }
 
+export const MAX_INFERENCE_ATTEMPTS = 5;
+export const MAX_DELIVERY_ATTEMPTS = 10;
+
 const RETRY_POLICIES: Record<WorkflowRetryTier, RetryPolicy> = {
   standard: {
     maxAttempts: 3,
@@ -66,4 +69,8 @@ export function getRetryBackoffSeconds(retryTier: WorkflowRetryTier, attempt: nu
   }
 
   return policy.backoffSeconds[policy.backoffSeconds.length - 1] ?? 0;
+}
+
+export function cloneCase<T>(value: T): T {
+  return structuredClone(value);
 }
