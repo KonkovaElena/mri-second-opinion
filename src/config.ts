@@ -23,6 +23,7 @@ export interface AppConfig {
   archiveLookupBaseUrl?: string;
   archiveLookupSource?: string;
   archiveLookupMode: ArchiveLookupMode;
+  publicStudyContextAllowedOrigins?: string[];
   caseStoreDatabaseUrl?: string;
   caseStoreSchema?: string;
   databaseUrl?: string;
@@ -167,6 +168,9 @@ export function getConfig(): AppConfig {
   const archiveLookupBaseUrl = process.env.MRI_ARCHIVE_LOOKUP_BASE_URL?.trim() || undefined;
   const archiveLookupSource = process.env.MRI_ARCHIVE_LOOKUP_SOURCE?.trim() || undefined;
   const rawArchiveLookupMode = process.env.MRI_ARCHIVE_LOOKUP_MODE?.trim() || "custom";
+  const publicStudyContextAllowedOrigins = parseOriginAllowlist(
+    process.env.MRI_PUBLIC_STUDY_CONTEXT_ALLOWED_ORIGINS,
+  );
   if (rawArchiveLookupMode !== "custom" && rawArchiveLookupMode !== "dicomweb") {
     throw new Error(`Invalid MRI_ARCHIVE_LOOKUP_MODE value: ${rawArchiveLookupMode}`);
   }
@@ -296,6 +300,7 @@ export function getConfig(): AppConfig {
     archiveLookupBaseUrl,
     archiveLookupSource,
     archiveLookupMode,
+    publicStudyContextAllowedOrigins,
     caseStoreDatabaseUrl,
     caseStoreSchema,
     databaseUrl,

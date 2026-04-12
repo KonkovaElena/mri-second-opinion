@@ -372,6 +372,64 @@ test("getConfig rejects an explicitly empty reviewer role allowlist", () => {
   }
 });
 
+test("getConfig defaults public study-context allowed origins to an empty list", () => {
+  const previousPort = process.env.PORT;
+  const previousJwtSecret = process.env.MRI_REVIEWER_JWT_HS256_SECRET;
+  const previousAllowedOrigins = process.env.MRI_PUBLIC_STUDY_CONTEXT_ALLOWED_ORIGINS;
+
+  process.env.PORT = "4010";
+  process.env.MRI_REVIEWER_JWT_HS256_SECRET = "reviewer-jwt-secret-0123456789abcdef";
+  delete process.env.MRI_PUBLIC_STUDY_CONTEXT_ALLOWED_ORIGINS;
+
+  try {
+    const config = getConfig();
+    assert.deepEqual(config.publicStudyContextAllowedOrigins, []);
+  } finally {
+    process.env.PORT = previousPort;
+    if (previousJwtSecret === undefined) {
+      delete process.env.MRI_REVIEWER_JWT_HS256_SECRET;
+    } else {
+      process.env.MRI_REVIEWER_JWT_HS256_SECRET = previousJwtSecret;
+    }
+    if (previousAllowedOrigins === undefined) {
+      delete process.env.MRI_PUBLIC_STUDY_CONTEXT_ALLOWED_ORIGINS;
+    } else {
+      process.env.MRI_PUBLIC_STUDY_CONTEXT_ALLOWED_ORIGINS = previousAllowedOrigins;
+    }
+  }
+});
+
+test("getConfig parses public study-context allowed origins", () => {
+  const previousPort = process.env.PORT;
+  const previousJwtSecret = process.env.MRI_REVIEWER_JWT_HS256_SECRET;
+  const previousAllowedOrigins = process.env.MRI_PUBLIC_STUDY_CONTEXT_ALLOWED_ORIGINS;
+
+  process.env.PORT = "4010";
+  process.env.MRI_REVIEWER_JWT_HS256_SECRET = "reviewer-jwt-secret-0123456789abcdef";
+  process.env.MRI_PUBLIC_STUDY_CONTEXT_ALLOWED_ORIGINS =
+    " https://archive.example.test , http://127.0.0.1:8042 ";
+
+  try {
+    const config = getConfig();
+    assert.deepEqual(config.publicStudyContextAllowedOrigins, [
+      "https://archive.example.test",
+      "http://127.0.0.1:8042",
+    ]);
+  } finally {
+    process.env.PORT = previousPort;
+    if (previousJwtSecret === undefined) {
+      delete process.env.MRI_REVIEWER_JWT_HS256_SECRET;
+    } else {
+      process.env.MRI_REVIEWER_JWT_HS256_SECRET = previousJwtSecret;
+    }
+    if (previousAllowedOrigins === undefined) {
+      delete process.env.MRI_PUBLIC_STUDY_CONTEXT_ALLOWED_ORIGINS;
+    } else {
+      process.env.MRI_PUBLIC_STUDY_CONTEXT_ALLOWED_ORIGINS = previousAllowedOrigins;
+    }
+  }
+});
+
 test("getConfig rejects production mode without internal route auth", () => {
   const previousPort = process.env.PORT;
   const previousNodeEnv = process.env.NODE_ENV;

@@ -68,6 +68,16 @@ async function sleep(ms: number) {
   await new Promise((resolve) => setTimeout(resolve, ms));
 }
 
+const DEFAULT_PUBLIC_STUDY_CONTEXT_ALLOWED_ORIGINS = [
+  "https://demo.example.test",
+  "https://dicom.example.test",
+  "https://archive.example.test",
+  "https://archive.hospital.test",
+  "https://pacs.hospital.test",
+  "https://archive-primary.test",
+  "http://orthanc:8042",
+];
+
 async function withPostgresAdminPool<T>(
   store: ReturnType<typeof createPostgresTestStore>,
   run: (pool: Pool) => Promise<T>,
@@ -94,6 +104,7 @@ async function startServer(
     operatorApiToken: DEFAULT_OPERATOR_API_TOKEN,
     reviewerJwtSecret: DEFAULT_REVIEWER_JWT_SECRET,
     reviewerAllowedRoles: ["clinician", "radiologist", "neuroradiologist"],
+    publicStudyContextAllowedOrigins: DEFAULT_PUBLIC_STUDY_CONTEXT_ALLOWED_ORIGINS,
     ...configOverrides,
   });
   const server = createServer(app);
@@ -186,9 +197,13 @@ async function withBinaryFixtureServer(
 }
 
 async function withArchiveMetadataServer(
-  studyPayloads: Record<string, { statusCode?: number; body?: Record<string, unknown> }>,
+  studyPayloads:
+    | Record<string, { statusCode?: number; body?: Record<string, unknown> }>
+    | ((archiveBaseUrl: string) => Record<string, { statusCode?: number; body?: Record<string, unknown> }>),
   callback: (archiveBaseUrl: string) => Promise<void>,
 ) {
+  let resolvedStudyPayloads: Record<string, { statusCode?: number; body?: Record<string, unknown> }> = {};
+
   const server = createServer((request, response) => {
     const requestUrl = new URL(request.url ?? "/", "http://127.0.0.1");
 
@@ -199,7 +214,7 @@ async function withArchiveMetadataServer(
     }
 
     const studyUid = decodeURIComponent(requestUrl.pathname.slice("/studies/".length));
-    const payload = studyPayloads[studyUid];
+  const payload = resolvedStudyPayloads[studyUid];
 
     if (!payload) {
       response.statusCode = 404;
@@ -221,9 +236,12 @@ async function withArchiveMetadataServer(
   });
 
   const address = server.address() as AddressInfo;
+  const archiveBaseUrl = `http://127.0.0.1:${address.port}`;
+  resolvedStudyPayloads =
+    typeof studyPayloads === "function" ? studyPayloads(archiveBaseUrl) : studyPayloads;
 
   try {
-    await callback(`http://127.0.0.1:${address.port}`);
+    await callback(archiveBaseUrl);
   } finally {
     await new Promise<void>((resolve, reject) => {
       server.close((error) => {
@@ -347,6 +365,7 @@ async function startPostgresServer(
       internalApiToken: DEFAULT_INTERNAL_API_TOKEN,
       operatorApiToken: DEFAULT_OPERATOR_API_TOKEN,
       reviewerJwtSecret: DEFAULT_REVIEWER_JWT_SECRET,
+      publicStudyContextAllowedOrigins: DEFAULT_PUBLIC_STUDY_CONTEXT_ALLOWED_ORIGINS,
       ...configOverrides,
     },
     {
@@ -1617,6 +1636,157 @@ test("case intake enriches missing study context from archive lookup and exposes
   }
 });
 
+test("public case intake strips untrusted archive binding and volume URLs from persisted study context", async () => {
+  const { tempDir, caseStoreFile } = createTestStoreFile();
+
+  try {
+    await withServer(
+      caseStoreFile,
+      async ({ jsonRequest }) => {
+        const created = await jsonRequest("/api/cases", {
+          method: "POST",
+          body: JSON.stringify({
+            patientAlias: "public-provenance-sanitization-patient",
+            studyUid: "1.2.840.public.provenance.1",
+            sequenceInventory: ["T1w"],
+            studyContext: {
+              studyInstanceUid: "2.25.public.provenance.1",
+              sourceArchive: "external-fixture",
+              dicomWebBaseUrl: "https://untrusted.example.test/dicom-web/studies/2.25.public.provenance.1",
+              series: [
+                {
+                  seriesInstanceUid: "2.25.public.provenance.1.1",
+                  seriesDescription: "Untrusted T1w",
+                  modality: "MR",
+                  sequenceLabel: "T1w",
+                  instanceCount: 1,
+                  volumeDownloadUrl: "https://untrusted.example.test/blocked-volume.nii",
+                },
+              ],
+            },
+          }),
+        });
+
+        assert.equal(created.response.status, 201);
+        const caseId = created.body.case.caseId as string;
+
+        const detailBeforeInference = await jsonRequest(`/api/cases/${caseId}`);
+        assert.equal(detailBeforeInference.response.status, 200);
+        assert.equal(detailBeforeInference.body.case.studyContext.sourceArchive, null);
+        assert.equal(detailBeforeInference.body.case.studyContext.dicomWebBaseUrl, null);
+        assert.equal(detailBeforeInference.body.case.studyContext.series[0].volumeDownloadUrl, null);
+
+        const inferred = await jsonRequest("/api/internal/inference-callback", {
+          method: "POST",
+          body: JSON.stringify({
+            caseId,
+            qcDisposition: "pass",
+            findings: ["Untrusted archive binding must not create a viewer-ready artifact."],
+            measurements: [{ label: "whole_brain_ml", value: 1108 }],
+            artifacts: ["artifact://overlay-preview"],
+            generatedSummary: "Untrusted archive binding stripped from public intake.",
+          }),
+        });
+
+        assert.equal(inferred.response.status, 200);
+
+        const report = await jsonRequest(`/api/cases/${caseId}/report`);
+        assert.equal(report.response.status, 200);
+        assert.equal(report.body.report.artifacts[0].viewerReady, false);
+        assert.equal(report.body.report.artifacts[0].archiveStudyUrl, null);
+      },
+      {
+        publicStudyContextAllowedOrigins: [],
+      },
+    );
+  } finally {
+    rmSync(tempDir, { recursive: true, force: true });
+  }
+});
+
+test("archive lookup trusted study context overrides caller-supplied archive binding on public intake", async () => {
+  const { tempDir, caseStoreFile } = createTestStoreFile();
+
+  try {
+    await withArchiveMetadataServer(
+      (archiveBaseUrl) => ({
+        "1.2.840.lookup.override.1": {
+          body: {
+            studyInstanceUid: "2.25.lookup.override.1",
+            accessionNumber: "ACC-LOOKUP-OVERRIDE-001",
+            studyDate: "2026-04-12",
+            sourceArchive: "lookup-orthanc",
+            dicomWebBaseUrl: `${archiveBaseUrl}/dicom-web/studies/2.25.lookup.override.1`,
+            metadataSummary: ["Archive lookup must override caller-supplied binding"],
+            series: [
+              {
+                seriesInstanceUid: "2.25.lookup.override.1.1",
+                seriesDescription: "Lookup T1w",
+                modality: "MR",
+                sequenceLabel: "T1w",
+                instanceCount: 176,
+                volumeDownloadUrl: `${archiveBaseUrl}/volumes/2.25.lookup.override.1.1.nii`,
+              },
+            ],
+          },
+        },
+      }),
+      async (archiveBaseUrl) => {
+        const trustedDicomWebBaseUrl = `${archiveBaseUrl}/dicom-web/studies/2.25.lookup.override.1`;
+        const trustedVolumeDownloadUrl = `${archiveBaseUrl}/volumes/2.25.lookup.override.1.1.nii`;
+
+        await withServer(
+          caseStoreFile,
+          async ({ jsonRequest }) => {
+            const created = await jsonRequest("/api/cases", {
+              method: "POST",
+              body: JSON.stringify({
+                patientAlias: "archive-lookup-override-patient",
+                studyUid: "1.2.840.lookup.override.1",
+                sequenceInventory: ["T1w"],
+                studyContext: {
+                  studyInstanceUid: "2.25.caller.override.1",
+                  sourceArchive: "caller-fixture",
+                  dicomWebBaseUrl: "https://caller.example.test/dicom-web/studies/2.25.caller.override.1",
+                  series: [
+                    {
+                      seriesInstanceUid: "2.25.caller.override.1.1",
+                      seriesDescription: "Caller T1w",
+                      modality: "MR",
+                      sequenceLabel: "T1w",
+                      instanceCount: 1,
+                      volumeDownloadUrl: "https://caller.example.test/blocked-volume.nii",
+                    },
+                  ],
+                },
+              }),
+            });
+
+            assert.equal(created.response.status, 201);
+            const caseId = created.body.case.caseId as string;
+
+            const detail = await jsonRequest(`/api/cases/${caseId}`);
+            assert.equal(detail.response.status, 200);
+            assert.equal(detail.body.case.studyContext.studyInstanceUid, "2.25.caller.override.1");
+            assert.equal(detail.body.case.studyContext.sourceArchive, "lookup-orthanc");
+            assert.equal(detail.body.case.studyContext.dicomWebBaseUrl, trustedDicomWebBaseUrl);
+            assert.equal(detail.body.case.studyContext.series.length, 1);
+            assert.equal(detail.body.case.studyContext.series[0].seriesInstanceUid, "2.25.lookup.override.1.1");
+            assert.equal(detail.body.case.studyContext.series[0].volumeDownloadUrl, trustedVolumeDownloadUrl);
+          },
+          {
+            archiveLookupBaseUrl: archiveBaseUrl,
+            archiveLookupSource: "lookup-fallback-source",
+            publicStudyContextAllowedOrigins: [],
+          },
+        );
+      },
+    );
+  } finally {
+    rmSync(tempDir, { recursive: true, force: true });
+  }
+});
+
 test("case intake falls back cleanly when archive lookup cannot resolve the study", async () => {
   const { tempDir, caseStoreFile } = createTestStoreFile();
 
@@ -2378,7 +2548,7 @@ test("python worker blocks non-same-origin loopback volume URLs unless the origi
   }
 });
 
-test("python worker falls back without fetching when volume URL origin is not allowed", async () => {
+test("python worker falls back after API-side provenance stripping removes an untrusted absolute volume URL", async () => {
   const { tempDir, caseStoreFile } = createTestStoreFile();
 
   try {
@@ -2415,6 +2585,13 @@ test("python worker falls back without fetching when volume URL origin is not al
         assert.equal(created.response.status, 201);
         const caseId = created.body.case.caseId as string;
 
+        const persistedBeforeWorker = await jsonRequest(`/api/cases/${caseId}`);
+        assert.equal(persistedBeforeWorker.response.status, 200);
+        assert.equal(
+          persistedBeforeWorker.body.case.studyContext.series[0].volumeDownloadUrl,
+          null,
+        );
+
         const worker = await runPythonWorker(baseUrl, {
           MRI_WORKER_ID: "python-worker-origin-guard-001",
           MRI_INTERNAL_API_TOKEN: DEFAULT_INTERNAL_API_TOKEN,
@@ -2426,9 +2603,9 @@ test("python worker falls back without fetching when volume URL origin is not al
         assert.equal(detail.response.status, 200);
         assert.deepEqual(detail.body.case.structuralExecution.executionContext, {
           computeMode: "metadata-fallback",
-          fallbackCode: "volume-download-failed",
-          fallbackDetail: "Volume download URL origin is not permitted for worker fetch.",
-          sourceSeriesInstanceUid: "2.25.python.worker.origin.guard.study.001.1",
+          fallbackCode: "missing-volume-input",
+          fallbackDetail: "No volumeDownloadUrl was present in the execution contract.",
+          sourceSeriesInstanceUid: null,
         });
         assert.match(detail.body.case.reportSummary.processingSummary, /Metadata-derived draft/);
 
@@ -2436,12 +2613,12 @@ test("python worker falls back without fetching when volume URL origin is not al
         assert.equal(report.response.status, 200);
         assert.deepEqual(report.body.report.executionContext, {
           computeMode: "metadata-fallback",
-          fallbackCode: "volume-download-failed",
-          fallbackDetail: "Volume download URL origin is not permitted for worker fetch.",
-          sourceSeriesInstanceUid: "2.25.python.worker.origin.guard.study.001.1",
+          fallbackCode: "missing-volume-input",
+          fallbackDetail: "No volumeDownloadUrl was present in the execution contract.",
+          sourceSeriesInstanceUid: null,
         });
         assert.equal(
-          report.body.report.issues.some((issue: string) => /origin is not permitted for worker fetch/i.test(issue)),
+          report.body.report.issues.some((issue: string) => /No volumeDownloadUrl was present in the execution contract/i.test(issue)),
           true,
         );
       },

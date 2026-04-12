@@ -44,12 +44,131 @@ import {
 } from "./validation";
 import { createCorsMiddleware, createPublicApiRateLimiter, metricsMiddleware, writeMetricsResponse } from "./http-runtime";
 
+type ParsedCreateCaseInput = ReturnType<typeof parseCreateCaseInput>;
+
 export interface CreateAppOptions {
   postgresPoolFactory?: PostgresPoolFactory;
   artifactStore?: ArtifactStore;
 }
 
 const TENANT_ID_PATTERN = /^[A-Za-z0-9_-]{1,64}$/;
+
+function normalizeOrigin(value: string) {
+  try {
+    const parsedUrl = new URL(value);
+    if (!["http:", "https:"].includes(parsedUrl.protocol) || !parsedUrl.host) {
+      return null;
+    }
+
+    return `${parsedUrl.protocol.toLowerCase()}//${parsedUrl.host.toLowerCase()}`;
+  } catch {
+    return null;
+  }
+}
+
+function hasAbsoluteUrlScheme(value: string) {
+  return /^[A-Za-z][A-Za-z\d+.-]*:/u.test(value);
+}
+
+function isLoopbackHostname(hostname: string) {
+  const normalized = hostname.trim().toLowerCase();
+  return normalized === "localhost" || normalized === "::1" || /^127(?:\.\d{1,3}){3}$/u.test(normalized);
+}
+
+function createPublicStudyContextAllowedOriginSet(
+  config: Pick<AppConfig, "archiveLookupBaseUrl" | "publicStudyContextAllowedOrigins">,
+) {
+  const origins = new Set<string>();
+
+  for (const value of config.publicStudyContextAllowedOrigins ?? []) {
+    const origin = normalizeOrigin(value.trim());
+    if (origin) {
+      origins.add(origin);
+    }
+  }
+
+  if (config.archiveLookupBaseUrl) {
+    const archiveLookupOrigin = normalizeOrigin(config.archiveLookupBaseUrl);
+    if (archiveLookupOrigin) {
+      origins.add(archiveLookupOrigin);
+    }
+  }
+
+  return origins;
+}
+
+function isAllowedPublicAbsoluteOrigin(
+  value: string,
+  allowedOrigins: Set<string>,
+  nodeEnv: string,
+) {
+  const origin = normalizeOrigin(value);
+  if (!origin) {
+    return false;
+  }
+
+  if (allowedOrigins.has(origin)) {
+    return true;
+  }
+
+  try {
+    const parsedUrl = new URL(value);
+    return nodeEnv !== "production" && isLoopbackHostname(parsedUrl.hostname);
+  } catch {
+    return false;
+  }
+}
+
+function sanitizePublicStudyContext(
+  studyContext: ParsedCreateCaseInput["studyContext"],
+  config: Pick<AppConfig, "archiveLookupBaseUrl" | "publicStudyContextAllowedOrigins" | "nodeEnv">,
+): ParsedCreateCaseInput["studyContext"] {
+  if (!studyContext) {
+    return undefined;
+  }
+
+  const allowedOrigins = createPublicStudyContextAllowedOriginSet(config);
+  const dicomWebBaseUrl =
+    typeof studyContext.dicomWebBaseUrl === "string" &&
+    isAllowedPublicAbsoluteOrigin(studyContext.dicomWebBaseUrl, allowedOrigins, config.nodeEnv)
+      ? studyContext.dicomWebBaseUrl
+      : undefined;
+  const series = studyContext.series?.map((seriesEntry) => {
+    const rawDownloadUrl = typeof seriesEntry.volumeDownloadUrl === "string"
+      ? seriesEntry.volumeDownloadUrl.trim()
+      : "";
+
+    let volumeDownloadUrl: string | undefined;
+    if (rawDownloadUrl.length > 0) {
+      if (!hasAbsoluteUrlScheme(rawDownloadUrl)) {
+        volumeDownloadUrl = rawDownloadUrl;
+      } else if (isAllowedPublicAbsoluteOrigin(rawDownloadUrl, allowedOrigins, config.nodeEnv)) {
+        volumeDownloadUrl = rawDownloadUrl;
+      }
+    }
+
+    return volumeDownloadUrl
+      ? { ...seriesEntry, volumeDownloadUrl }
+      : { ...seriesEntry, volumeDownloadUrl: undefined };
+  });
+
+  return {
+    ...studyContext,
+    sourceArchive: dicomWebBaseUrl ? studyContext.sourceArchive : undefined,
+    dicomWebBaseUrl,
+    series,
+  };
+}
+
+function sanitizePublicCreateCaseInput(
+  input: ParsedCreateCaseInput,
+  config: Pick<AppConfig, "archiveLookupBaseUrl" | "publicStudyContextAllowedOrigins" | "nodeEnv">,
+): ParsedCreateCaseInput {
+  return {
+    ...input,
+    studyContext: sanitizePublicStudyContext(input.studyContext, config),
+  };
+}
 
 function resolveAccessScope(req: express.Request): { tenantId?: string } {
   const tenantId = req.get("x-tenant-id")?.trim();
@@ -207,8 +326,6 @@ export function createApp(config: AppConfig, options: CreateAppOptions = {}) {
   app.use(express.json({ limit: config.jsonBodyLimit ?? "1mb" }));
   app.use("/workbench", express.static(workbenchRoot, { index: false }));
 
-  type ParsedCreateCaseInput = ReturnType<typeof parseCreateCaseInput>;
-
   function hasUsableSeries(input: ParsedCreateCaseInput["studyContext"]) {
     return Array.isArray(input?.series) && input.series.length > 0;
   }
@@ -225,13 +342,13 @@ export function createApp(config: AppConfig, options: CreateAppOptions = {}) {
       studyInstanceUid: primary?.studyInstanceUid ?? fallback?.studyInstanceUid,
       accessionNumber: primary?.accessionNumber ?? fallback?.accessionNumber,
       studyDate: primary?.studyDate ?? fallback?.studyDate,
-      sourceArchive: primary?.sourceArchive ?? fallback?.sourceArchive,
-      dicomWebBaseUrl: primary?.dicomWebBaseUrl ?? fallback?.dicomWebBaseUrl,
+      sourceArchive: fallback?.sourceArchive ?? primary?.sourceArchive,
+      dicomWebBaseUrl: fallback?.dicomWebBaseUrl ?? primary?.dicomWebBaseUrl,
       metadataSummary:
         primary?.metadataSummary && primary.metadataSummary.length > 0
           ? primary.metadataSummary
           : fallback?.metadataSummary,
-      series: hasUsableSeries(primary) ? primary?.series : fallback?.series,
+      series: hasUsableSeries(fallback) ? fallback?.series : primary?.series,
     };
 
     if (
@@ -410,7 +527,7 @@ export function createApp(config: AppConfig, options: CreateAppOptions = {}) {
 
   app.post("/api/cases", async (req, res) => {
     try {
-      const parsed = parseCreateCaseInput(req.body);
+      const parsed = sanitizePublicCreateCaseInput(parseCreateCaseInput(req.body), config);
       const created = await caseService.createCase(await enrichCreateCaseInput(parsed));
 
       res.status(201).json({ case: created });
