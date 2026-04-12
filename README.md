@@ -96,6 +96,7 @@ Finalized reports can be exported as:
 What is already implemented in this repository:
 
 1. Public workflow API for case intake, review, finalization, report retrieval, artifact access, operations summary, and delivery retry
+    The top-level `studyUid` is the workflow-side study reference. Strict DICOM UID validation and normalization apply to `studyContext.studyInstanceUid` and `studyContext.series[].seriesInstanceUid`, while synthesized series identifiers stay marked as synthetic for viewer gating.
 2. Internal inference and delivery rails with claim, heartbeat, callback, failure, and retry paths
 3. A built-in review workbench at `/workbench` for queue and report handling
 4. A Python worker for inference and delivery stages
@@ -598,6 +599,7 @@ Python-воркер (`worker/main.py`) работает по принципу pu
 Что уже реализовано в текущем репозитории:
 
 1. Публичный workflow API для intake, review, finalization, выдачи отчёта, доступа к артефактам, operations summary и retry доставки
+    Верхнеуровневый `studyUid` здесь играет роль workflow-идентификатора исследования. Строгая DICOM UID validation и нормализация применяются к `studyContext.studyInstanceUid` и `studyContext.series[].seriesInstanceUid`, а синтезированные series UID остаются помеченными как synthetic и сами по себе не открывают viewer-path.
 2. Внутренние inference и delivery rails с claim, heartbeat, callback, fail и retry path
 3. Встроенный review workbench по адресу `/workbench`
 4. Python-воркер для inference и delivery stage

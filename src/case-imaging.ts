@@ -2,6 +2,7 @@ export type QcCheckStatus = "pass" | "warn" | "reject";
 
 export interface StudySeriesInput {
   seriesInstanceUid: string;
+  syntheticSeriesInstanceUid?: boolean;
   seriesDescription?: string;
   modality?: string;
   sequenceLabel?: string;
@@ -21,6 +22,7 @@ export interface StudyContextInput {
 
 export interface StudySeriesRecord {
   seriesInstanceUid: string;
+  syntheticSeriesInstanceUid: boolean;
   seriesDescription: string | null;
   modality: string;
   sequenceLabel: string | null;
@@ -98,6 +100,7 @@ export function createStudyContextRecord(input: {
 }): StudyContextRecord {
   const series = (input.studyContext?.series ?? []).map((entry) => ({
     seriesInstanceUid: entry.seriesInstanceUid,
+    syntheticSeriesInstanceUid: entry.syntheticSeriesInstanceUid === true,
     seriesDescription: normalizeString(entry.seriesDescription),
     modality: normalizeString(entry.modality) ?? "MR",
     sequenceLabel: normalizeString(entry.sequenceLabel),

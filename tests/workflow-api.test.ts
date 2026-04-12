@@ -724,22 +724,22 @@ async function createReviewedCase(
       sequenceInventory: ["T1w", "FLAIR"],
       indication: "queue verification",
       studyContext: {
-        studyInstanceUid: overrides.studyInstanceUid ?? "2.25.queue.1",
+        studyInstanceUid: overrides.studyInstanceUid ?? "2.25.50001",
         accessionNumber: overrides.accessionNumber ?? "ACC-QUEUE-001",
         studyDate: "2026-03-27",
         sourceArchive: "pacs-demo",
-        dicomWebBaseUrl: "https://dicom.example.test/studies/2.25.queue.1",
+        dicomWebBaseUrl: "https://dicom.example.test/studies/2.25.50001",
         metadataSummary: ["Queue demo study"],
         series: [
           {
-            seriesInstanceUid: "2.25.queue.1.1",
+            seriesInstanceUid: "2.25.50001.1",
             seriesDescription: "Sag T1 MPRAGE",
             modality: "MR",
             sequenceLabel: "T1w",
             instanceCount: 176,
           },
           {
-            seriesInstanceUid: "2.25.queue.1.2",
+            seriesInstanceUid: "2.25.50001.2",
             seriesDescription: "Ax FLAIR",
             modality: "MR",
             sequenceLabel: "FLAIR",
@@ -1016,15 +1016,15 @@ test("case detail exposes persisted execution contracts after restart", async ()
           studyUid: "1.2.840.execution.contract.1",
           sequenceInventory: ["T1w", "FLAIR"],
           studyContext: {
-            studyInstanceUid: "2.25.execution.contract.1",
+            studyInstanceUid: "2.25.51001",
             accessionNumber: "ACC-EXEC-001",
             studyDate: "2026-03-28",
             sourceArchive: "pacs-demo",
-            dicomWebBaseUrl: "https://dicom.example.test/studies/2.25.execution.contract.1",
+            dicomWebBaseUrl: "https://dicom.example.test/studies/2.25.51001",
             metadataSummary: ["Execution contract demo study"],
             series: [
               {
-                seriesInstanceUid: "2.25.execution.contract.1.1",
+                seriesInstanceUid: "2.25.51001.1",
                 seriesDescription: "Sag T1 MPRAGE",
                 modality: "MR",
                 sequenceLabel: "T1w",
@@ -1122,15 +1122,15 @@ test("artifact payloads are persisted and retrievable across sqlite restarts", a
           studyUid: "1.2.840.artifact.persist.1",
           sequenceInventory: ["T1w", "FLAIR"],
           studyContext: {
-            studyInstanceUid: "2.25.artifact.persist.1",
+            studyInstanceUid: "2.25.50002",
             accessionNumber: "ACC-ART-001",
             studyDate: "2026-03-28",
             sourceArchive: "pacs-demo",
-            dicomWebBaseUrl: "https://dicom.example.test/studies/2.25.artifact.persist.1",
+            dicomWebBaseUrl: "https://dicom.example.test/studies/2.25.50002",
             metadataSummary: ["Artifact payload persistence demo"],
             series: [
               {
-                seriesInstanceUid: "2.25.artifact.persist.1.1",
+                seriesInstanceUid: "2.25.50002.1",
                 seriesDescription: "Sag T1 MPRAGE",
                 modality: "MR",
                 sequenceLabel: "T1w",
@@ -1547,22 +1547,22 @@ test("case intake enriches missing study context from archive lookup and exposes
       {
         "1.2.840.lookup.1": {
           body: {
-            studyInstanceUid: "2.25.lookup.1",
+            studyInstanceUid: "2.25.51002",
             accessionNumber: "ACC-LOOKUP-001",
             studyDate: "2026-03-30",
             sourceArchive: "lookup-orthanc",
-            dicomWebBaseUrl: "https://archive.example.test/dicom-web/studies/2.25.lookup.1",
+            dicomWebBaseUrl: "https://archive.example.test/dicom-web/studies/2.25.51002",
             metadataSummary: ["Lookup hydrated study", "Archive returned two MR series"],
             series: [
               {
-                seriesInstanceUid: "2.25.lookup.1.1",
+                seriesInstanceUid: "2.25.51002.1",
                 seriesDescription: "Sag T1 archive",
                 modality: "MR",
                 sequenceLabel: "T1w",
                 instanceCount: 180,
               },
               {
-                seriesInstanceUid: "2.25.lookup.1.2",
+                seriesInstanceUid: "2.25.51002.2",
                 seriesDescription: "Ax FLAIR archive",
                 modality: "MR",
                 sequenceLabel: "FLAIR",
@@ -1590,7 +1590,7 @@ test("case intake enriches missing study context from archive lookup and exposes
 
             const detailBeforeInference = await jsonRequest(`/api/cases/${caseId}`);
             assert.equal(detailBeforeInference.response.status, 200);
-            assert.equal(detailBeforeInference.body.case.studyContext.studyInstanceUid, "2.25.lookup.1");
+            assert.equal(detailBeforeInference.body.case.studyContext.studyInstanceUid, "2.25.51002");
             assert.equal(detailBeforeInference.body.case.studyContext.sourceArchive, "lookup-orthanc");
             assert.equal(detailBeforeInference.body.case.studyContext.series.length, 2);
 
@@ -1621,7 +1621,7 @@ test("case intake enriches missing study context from archive lookup and exposes
             );
             assert.equal(
               overlayArtifact.archiveStudyUrl,
-              "https://archive.example.test/dicom-web/studies/2.25.lookup.1",
+              "https://archive.example.test/dicom-web/studies/2.25.51002",
             );
           },
           {
@@ -1650,12 +1650,12 @@ test("public case intake strips untrusted archive binding and volume URLs from p
             studyUid: "1.2.840.public.provenance.1",
             sequenceInventory: ["T1w"],
             studyContext: {
-              studyInstanceUid: "2.25.public.provenance.1",
+              studyInstanceUid: "2.25.51003",
               sourceArchive: "external-fixture",
-              dicomWebBaseUrl: "https://untrusted.example.test/dicom-web/studies/2.25.public.provenance.1",
+              dicomWebBaseUrl: "https://untrusted.example.test/dicom-web/studies/2.25.51003",
               series: [
                 {
-                  seriesInstanceUid: "2.25.public.provenance.1.1",
+                  seriesInstanceUid: "2.25.51003.1",
                   seriesDescription: "Untrusted T1w",
                   modality: "MR",
                   sequenceLabel: "T1w",
@@ -1712,28 +1712,28 @@ test("archive lookup trusted study context overrides caller-supplied archive bin
       (archiveBaseUrl) => ({
         "1.2.840.lookup.override.1": {
           body: {
-            studyInstanceUid: "2.25.lookup.override.1",
+            studyInstanceUid: "2.25.51004",
             accessionNumber: "ACC-LOOKUP-OVERRIDE-001",
             studyDate: "2026-04-12",
             sourceArchive: "lookup-orthanc",
-            dicomWebBaseUrl: `${archiveBaseUrl}/dicom-web/studies/2.25.lookup.override.1`,
+            dicomWebBaseUrl: `${archiveBaseUrl}/dicom-web/studies/2.25.51004`,
             metadataSummary: ["Archive lookup must override caller-supplied binding"],
             series: [
               {
-                seriesInstanceUid: "2.25.lookup.override.1.1",
+                seriesInstanceUid: "2.25.51004.1",
                 seriesDescription: "Lookup T1w",
                 modality: "MR",
                 sequenceLabel: "T1w",
                 instanceCount: 176,
-                volumeDownloadUrl: `${archiveBaseUrl}/volumes/2.25.lookup.override.1.1.nii`,
+                volumeDownloadUrl: `${archiveBaseUrl}/volumes/2.25.51004.1.nii`,
               },
             ],
           },
         },
       }),
       async (archiveBaseUrl) => {
-        const trustedDicomWebBaseUrl = `${archiveBaseUrl}/dicom-web/studies/2.25.lookup.override.1`;
-        const trustedVolumeDownloadUrl = `${archiveBaseUrl}/volumes/2.25.lookup.override.1.1.nii`;
+        const trustedDicomWebBaseUrl = `${archiveBaseUrl}/dicom-web/studies/2.25.51004`;
+        const trustedVolumeDownloadUrl = `${archiveBaseUrl}/volumes/2.25.51004.1.nii`;
 
         await withServer(
           caseStoreFile,
@@ -1745,12 +1745,12 @@ test("archive lookup trusted study context overrides caller-supplied archive bin
                 studyUid: "1.2.840.lookup.override.1",
                 sequenceInventory: ["T1w"],
                 studyContext: {
-                  studyInstanceUid: "2.25.caller.override.1",
+                  studyInstanceUid: "2.25.51005",
                   sourceArchive: "caller-fixture",
-                  dicomWebBaseUrl: "https://caller.example.test/dicom-web/studies/2.25.caller.override.1",
+                  dicomWebBaseUrl: "https://caller.example.test/dicom-web/studies/2.25.51005",
                   series: [
                     {
-                      seriesInstanceUid: "2.25.caller.override.1.1",
+                      seriesInstanceUid: "2.25.51005.1",
                       seriesDescription: "Caller T1w",
                       modality: "MR",
                       sequenceLabel: "T1w",
@@ -1767,11 +1767,11 @@ test("archive lookup trusted study context overrides caller-supplied archive bin
 
             const detail = await jsonRequest(`/api/cases/${caseId}`);
             assert.equal(detail.response.status, 200);
-            assert.equal(detail.body.case.studyContext.studyInstanceUid, "2.25.caller.override.1");
+            assert.equal(detail.body.case.studyContext.studyInstanceUid, "2.25.51005");
             assert.equal(detail.body.case.studyContext.sourceArchive, "lookup-orthanc");
             assert.equal(detail.body.case.studyContext.dicomWebBaseUrl, trustedDicomWebBaseUrl);
             assert.equal(detail.body.case.studyContext.series.length, 1);
-            assert.equal(detail.body.case.studyContext.series[0].seriesInstanceUid, "2.25.lookup.override.1.1");
+            assert.equal(detail.body.case.studyContext.series[0].seriesInstanceUid, "2.25.51004.1");
             assert.equal(detail.body.case.studyContext.series[0].volumeDownloadUrl, trustedVolumeDownloadUrl);
           },
           {
@@ -1823,7 +1823,7 @@ test("case intake falls back cleanly when archive lookup cannot resolve the stud
 
           const detail = await jsonRequest(`/api/cases/${caseId}`);
           assert.equal(detail.response.status, 200);
-          assert.equal(detail.body.case.studyContext.studyInstanceUid, "1.2.840.lookup.missing");
+          assert.match(detail.body.case.studyContext.studyInstanceUid, /^2\.25\.\d+$/);
 
           const report = await jsonRequest(`/api/cases/${caseId}/report`);
           assert.equal(report.response.status, 200);
@@ -2082,7 +2082,7 @@ test("inference jobs are persisted, restart-safe, and worker-claimable over HTTP
       assert.equal(claim.body.execution.claim.workerId, "inference-worker-1");
       assert.equal(claim.body.execution.caseContext.studyUid, "1.2.840.0.queue.inference");
       assert.deepEqual(claim.body.execution.caseContext.sequenceInventory, ["T1w", "FLAIR"]);
-      assert.equal(claim.body.execution.studyContext.studyInstanceUid, "1.2.840.0.queue.inference");
+      assert.match(claim.body.execution.studyContext.studyInstanceUid, /^2\.25\.\d+$/);
       assert.equal(claim.body.execution.dispatchProfile.resourceClass, "light-gpu");
       assert.equal(claim.body.execution.dispatchProfile.retryTier, "standard");
       assert.equal(claim.body.execution.packageManifest.packageId, "brain-structural-fastsurfer");
@@ -2201,22 +2201,22 @@ test("python worker derives metadata-backed outputs from the dispatch execution 
             sequenceInventory: ["T1w", "FLAIR"],
             indication: "memory complaints",
             studyContext: {
-              studyInstanceUid: "2.25.python.worker.study.001",
+              studyInstanceUid: "2.25.52001",
               accessionNumber: "PY-WORKER-001",
               studyDate: "2026-03-29",
               sourceArchive: "demo-orthanc",
-              dicomWebBaseUrl: "https://demo.example.test/dicom/studies/2.25.python.worker.study.001",
+              dicomWebBaseUrl: "https://demo.example.test/dicom/studies/2.25.52001",
               metadataSummary: ["Synthetic worker study", "Two MR series available"],
               series: [
                 {
-                  seriesInstanceUid: "2.25.python.worker.study.001.1",
+                  seriesInstanceUid: "2.25.52001.1",
                   seriesDescription: "Sag T1",
                   modality: "MR",
                   sequenceLabel: "T1w",
                   instanceCount: 176,
                 },
                 {
-                  seriesInstanceUid: "2.25.python.worker.study.001.2",
+                  seriesInstanceUid: "2.25.52001.2",
                   seriesDescription: "Ax FLAIR",
                   modality: "MR",
                   sequenceLabel: "FLAIR",
@@ -2254,7 +2254,7 @@ test("python worker derives metadata-backed outputs from the dispatch execution 
 
         const report = await jsonRequest(`/api/cases/${caseId}/report`);
         assert.equal(report.response.status, 200);
-        assert.match(report.body.report.processingSummary, /2\.25\.python\.worker\.study\.001/);
+        assert.match(report.body.report.processingSummary, /2\.25\.52001/);
         assert.deepEqual(report.body.report.executionContext, {
           computeMode: "metadata-fallback",
           fallbackCode: "missing-volume-input",
@@ -2280,7 +2280,7 @@ test("python worker derives metadata-backed outputs from the dispatch execution 
         const qcBody = await qcResponse.json();
         assert.equal(qcBody.caseId, caseId);
         assert.equal(qcBody.workerId, "python-worker-contract-001");
-        assert.equal(qcBody.studyInstanceUid, "2.25.python.worker.study.001");
+        assert.equal(qcBody.studyInstanceUid, "2.25.52001");
         assert.match(qcBody.summary, /Metadata-derived draft/);
       },
       {
@@ -2312,14 +2312,14 @@ test("python worker performs a voxel-backed pass when a T1w volume URL is presen
               sequenceInventory: ["T1w"],
               indication: "real-volume structural review",
               studyContext: {
-                studyInstanceUid: "2.25.python.worker.volume.study.001",
+                studyInstanceUid: "2.25.52002",
                 accessionNumber: "PY-WORKER-VOLUME-001",
                 studyDate: "2026-03-29",
                 sourceArchive: "fixture-http",
                 metadataSummary: ["Tiny NIfTI fixture for Wave 2B"],
                 series: [
                   {
-                    seriesInstanceUid: "2.25.python.worker.volume.study.001.1",
+                    seriesInstanceUid: "2.25.52002.1",
                     seriesDescription: "Fixture T1w",
                     modality: "MR",
                     sequenceLabel: "T1w",
@@ -2351,7 +2351,7 @@ test("python worker performs a voxel-backed pass when a T1w volume URL is presen
             computeMode: "voxel-backed",
             fallbackCode: null,
             fallbackDetail: null,
-            sourceSeriesInstanceUid: "2.25.python.worker.volume.study.001.1",
+            sourceSeriesInstanceUid: "2.25.52002.1",
           });
           assert.match(detail.body.case.reportSummary.processingSummary, /voxel-backed/i);
 
@@ -2362,7 +2362,7 @@ test("python worker performs a voxel-backed pass when a T1w volume URL is presen
             computeMode: "voxel-backed",
             fallbackCode: null,
             fallbackDetail: null,
-            sourceSeriesInstanceUid: "2.25.python.worker.volume.study.001.1",
+            sourceSeriesInstanceUid: "2.25.52002.1",
           });
           assert.equal(
             report.body.report.issues.some((issue: string) => /no voxel-level inference executed/i.test(issue)),
@@ -2417,14 +2417,14 @@ test("python worker records classified fallback metadata when a volume URL canno
               sequenceInventory: ["T1w"],
               indication: "fallback classification review",
               studyContext: {
-                studyInstanceUid: "2.25.python.worker.fallback.study.001",
+                studyInstanceUid: "2.25.52003",
                 accessionNumber: "PY-WORKER-FALLBACK-001",
                 studyDate: "2026-03-29",
                 sourceArchive: "fixture-http",
                 metadataSummary: ["Invalid NIfTI fixture for fallback classification"],
                 series: [
                   {
-                    seriesInstanceUid: "2.25.python.worker.fallback.study.001.1",
+                    seriesInstanceUid: "2.25.52003.1",
                     seriesDescription: "Broken Fixture T1w",
                     modality: "MR",
                     sequenceLabel: "T1w",
@@ -2453,7 +2453,7 @@ test("python worker records classified fallback metadata when a volume URL canno
             computeMode: "metadata-fallback",
             fallbackCode: "volume-parse-failed",
             fallbackDetail: "Downloaded NIfTI payload is too small to contain a valid header.",
-            sourceSeriesInstanceUid: "2.25.python.worker.fallback.study.001.1",
+            sourceSeriesInstanceUid: "2.25.52003.1",
           });
           assert.match(detail.body.case.reportSummary.processingSummary, /Metadata-derived draft/);
 
@@ -2463,7 +2463,7 @@ test("python worker records classified fallback metadata when a volume URL canno
             computeMode: "metadata-fallback",
             fallbackCode: "volume-parse-failed",
             fallbackDetail: "Downloaded NIfTI payload is too small to contain a valid header.",
-            sourceSeriesInstanceUid: "2.25.python.worker.fallback.study.001.1",
+            sourceSeriesInstanceUid: "2.25.52003.1",
           });
           assert.equal(
             report.body.report.issues.some((issue: string) => /fell back to metadata-only mode/i.test(issue)),
@@ -2498,14 +2498,14 @@ test("python worker blocks non-same-origin loopback volume URLs unless the origi
               sequenceInventory: ["T1w"],
               indication: "loopback allowlist review",
               studyContext: {
-                studyInstanceUid: "2.25.python.worker.loopback.guard.study.001",
+                studyInstanceUid: "2.25.52004",
                 accessionNumber: "PY-WORKER-LOOPBACK-GUARD-001",
                 studyDate: "2026-04-07",
                 sourceArchive: "fixture-http",
                 metadataSummary: ["Loopback absolute URL now requires explicit allowlisting"],
                 series: [
                   {
-                    seriesInstanceUid: "2.25.python.worker.loopback.guard.study.001.1",
+                    seriesInstanceUid: "2.25.52004.1",
                     seriesDescription: "Loopback Fixture T1w",
                     modality: "MR",
                     sequenceLabel: "T1w",
@@ -2533,7 +2533,7 @@ test("python worker blocks non-same-origin loopback volume URLs unless the origi
             computeMode: "metadata-fallback",
             fallbackCode: "volume-download-failed",
             fallbackDetail: "Volume download URL origin is not permitted for worker fetch.",
-            sourceSeriesInstanceUid: "2.25.python.worker.loopback.guard.study.001.1",
+            sourceSeriesInstanceUid: "2.25.52004.1",
           });
           assert.match(detail.body.case.reportSummary.processingSummary, /Metadata-derived draft/);
         },
@@ -2563,14 +2563,14 @@ test("python worker falls back after API-side provenance stripping removes an un
             sequenceInventory: ["T1w"],
             indication: "worker fetch guard review",
             studyContext: {
-              studyInstanceUid: "2.25.python.worker.origin.guard.study.001",
+              studyInstanceUid: "2.25.52005",
               accessionNumber: "PY-WORKER-ORIGIN-GUARD-001",
               studyDate: "2026-04-03",
               sourceArchive: "external-fixture",
               metadataSummary: ["Disallowed absolute volume URL should not be fetched"],
               series: [
                 {
-                  seriesInstanceUid: "2.25.python.worker.origin.guard.study.001.1",
+                  seriesInstanceUid: "2.25.52005.1",
                   seriesDescription: "Blocked external T1w",
                   modality: "MR",
                   sequenceLabel: "T1w",
@@ -2647,14 +2647,14 @@ test("python worker re-queues the job when inference callback returns an upstrea
             sequenceInventory: ["T1w", "FLAIR"],
             indication: "transient callback failure classification",
             studyContext: {
-              studyInstanceUid: "2.25.python.worker.transient.study.001",
+                studyInstanceUid: "2.25.52006",
               accessionNumber: "PY-WORKER-TRANSIENT-001",
               studyDate: "2026-03-29",
               sourceArchive: "demo-orthanc",
               metadataSummary: ["Synthetic transient callback failure study"],
               series: [
                 {
-                  seriesInstanceUid: "2.25.python.worker.transient.study.001.1",
+                    seriesInstanceUid: "2.25.52006.1",
                   seriesDescription: "Sag T1",
                   modality: "MR",
                   sequenceLabel: "T1w",
@@ -2727,14 +2727,14 @@ test("python worker marks the job failed when inference callback returns a termi
             sequenceInventory: ["T1w", "FLAIR"],
             indication: "terminal callback failure classification",
             studyContext: {
-              studyInstanceUid: "2.25.python.worker.terminal.study.001",
+                studyInstanceUid: "2.25.52007",
               accessionNumber: "PY-WORKER-TERMINAL-001",
               studyDate: "2026-03-29",
               sourceArchive: "demo-orthanc",
               metadataSummary: ["Synthetic terminal callback failure study"],
               series: [
                 {
-                  seriesInstanceUid: "2.25.python.worker.terminal.study.001.1",
+                    seriesInstanceUid: "2.25.52007.1",
                   seriesDescription: "Sag T1",
                   modality: "MR",
                   sequenceLabel: "T1w",
@@ -2811,7 +2811,7 @@ test("python worker marks delivery jobs complete when stage=delivery", async () 
         const prepared = await createReviewedCase(jsonRequest, {
           patientAlias: "synthetic-python-delivery-001",
           studyUid: "1.2.840.python.delivery.1",
-          studyInstanceUid: "2.25.python.delivery.study.001",
+          studyInstanceUid: "2.25.52008",
           accessionNumber: "PY-DELIVERY-001",
           internalApiToken: DEFAULT_INTERNAL_API_TOKEN,
         });
@@ -3027,7 +3027,7 @@ test("expired claimed inference jobs can be requeued over HTTP", async () => {
       assert.equal(reclaimed.body.job.attemptCount, 2);
     });
   } finally {
-    rmSync(tempDir, { recursive: true, force: true });
+    await cleanupTempDir(tempDir);
   }
 });
 
@@ -3210,7 +3210,7 @@ test("postgres delivery jobs are persisted, restart-safe, and worker-claimable o
       const prepared = await createReviewedCase(jsonRequest, {
         patientAlias: "synthetic-patient-postgres-queue",
         studyUid: "1.2.840.0.queue.postgres",
-        studyInstanceUid: "2.25.queue.postgres",
+        studyInstanceUid: "2.25.52009",
         accessionNumber: "ACC-QUEUE-POSTGRES",
       });
       caseId = prepared.caseId;
@@ -3482,7 +3482,7 @@ test("delivery callback is rejected when no active persisted job exists", async 
       const prepared = await createReviewedCase(jsonRequest, {
         patientAlias: "synthetic-patient-missing-job",
         studyUid: "1.2.840.0.queue.missing-job",
-        studyInstanceUid: "2.25.queue.missing-job",
+        studyInstanceUid: "2.25.52010",
         accessionNumber: "ACC-QUEUE-MISSING-JOB",
       });
       caseId = prepared.caseId;
@@ -3539,7 +3539,7 @@ test("stale worker claim returns null over HTTP instead of surfacing a store con
       const prepared = await createReviewedCase(jsonRequest, {
         patientAlias: "synthetic-patient-http-stale-claim",
         studyUid: "1.2.840.0.queue.http-stale-claim",
-        studyInstanceUid: "2.25.queue.http-stale-claim",
+        studyInstanceUid: "2.25.52011",
         accessionNumber: "ACC-QUEUE-HTTP-STALE",
       });
 
@@ -3617,9 +3617,9 @@ test("overlay artifacts stay non-viewer-ready when series locator data is synthe
           studyUid: "1.2.840.0.viewer-gap",
           sequenceInventory: ["T1w", "FLAIR"],
           studyContext: {
-            studyInstanceUid: "2.25.viewer-gap",
+            studyInstanceUid: "2.25.52012",
             sourceArchive: "pacs-demo",
-            dicomWebBaseUrl: "https://dicom.example.test/studies/2.25.viewer-gap",
+            dicomWebBaseUrl: "https://dicom.example.test/studies/2.25.52012",
             series: [
               {
                 seriesDescription: "Sag T1 MPRAGE",
@@ -3649,7 +3649,7 @@ test("overlay artifacts stay non-viewer-ready when series locator data is synthe
       assert.equal(report.response.status, 200);
       assert.equal(report.body.report.artifacts.length, 1);
       assert.equal(report.body.report.artifacts[0].artifactType, "overlay-preview");
-      assert.equal(report.body.report.artifacts[0].archiveLocator.seriesInstanceUids[0], "series-1");
+      assert.match(report.body.report.artifacts[0].archiveLocator.seriesInstanceUids[0], /^2\.25\.\d+$/);
       assert.equal(report.body.report.artifacts[0].viewerReady, false);
       assert.equal(report.body.report.artifacts[0].viewerDescriptor, null);
     });
@@ -4240,22 +4240,22 @@ test("deterministic synthetic demo flow covers intake through delivered state", 
           sequenceInventory: ["T1w", "FLAIR"],
           indication: "synthetic demo memory complaints",
           studyContext: {
-            studyInstanceUid: "2.25.demo.study.001",
+            studyInstanceUid: "2.25.53001",
             accessionNumber: "DEMO-001",
             studyDate: "2026-03-27",
             sourceArchive: "demo-orthanc",
-            dicomWebBaseUrl: "https://demo.example.test/dicom/studies/2.25.demo.study.001",
+            dicomWebBaseUrl: "https://demo.example.test/dicom/studies/2.25.53001",
             metadataSummary: ["Synthetic demo study", "Two MR series available"],
             series: [
               {
-                seriesInstanceUid: "2.25.demo.study.001.1",
+                seriesInstanceUid: "2.25.53001.1",
                 seriesDescription: "Sag T1 demo",
                 modality: "MR",
                 sequenceLabel: "T1w",
                 instanceCount: 160,
               },
               {
-                seriesInstanceUid: "2.25.demo.study.001.2",
+                seriesInstanceUid: "2.25.53001.2",
                 seriesDescription: "Ax FLAIR demo",
                 modality: "MR",
                 sequenceLabel: "FLAIR",
@@ -4277,7 +4277,7 @@ test("deterministic synthetic demo flow covers intake through delivered state", 
 
       const detailBeforeInference = await jsonRequest(`/api/cases/${caseId}`);
       assert.equal(detailBeforeInference.response.status, 200);
-      assert.equal(detailBeforeInference.body.case.studyContext.studyInstanceUid, "2.25.demo.study.001");
+      assert.equal(detailBeforeInference.body.case.studyContext.studyInstanceUid, "2.25.53001");
       assert.equal(detailBeforeInference.body.case.planSummary.selectedPackage, "brain-structural-fastsurfer");
 
       const inferred = await jsonRequest("/api/internal/inference-callback", {
@@ -4574,15 +4574,15 @@ test("report-preview artifact is persisted and retrievable with correct MIME typ
           studyUid: "1.2.840.wave3b.rp.1",
           sequenceInventory: ["T1w", "FLAIR"],
           studyContext: {
-            studyInstanceUid: "2.25.wave3b.rp.1",
+            studyInstanceUid: "2.25.54001",
             accessionNumber: "ACC-3B-RP-001",
             studyDate: "2026-03-30",
             sourceArchive: "pacs-demo",
-            dicomWebBaseUrl: "https://dicom.example.test/studies/2.25.wave3b.rp.1",
+            dicomWebBaseUrl: "https://dicom.example.test/studies/2.25.54001",
             metadataSummary: ["Wave 3B report-preview test"],
             series: [
               {
-                seriesInstanceUid: "2.25.wave3b.rp.1.1",
+                seriesInstanceUid: "2.25.54001.1",
                 seriesDescription: "Sag T1 MPRAGE",
                 modality: "MR",
                 sequenceLabel: "T1w",
@@ -4673,22 +4673,22 @@ test("artifact provenance chain traces back to producing package and archive", a
           studyUid: "1.2.840.wave3b.prov.1",
           sequenceInventory: ["T1w", "FLAIR"],
           studyContext: {
-            studyInstanceUid: "2.25.wave3b.prov.1",
+            studyInstanceUid: "2.25.54002",
             accessionNumber: "ACC-3B-PROV-001",
             studyDate: "2026-03-30",
             sourceArchive: "pacs-main",
-            dicomWebBaseUrl: "https://archive.hospital.test/dicom/studies/2.25.wave3b.prov.1",
+            dicomWebBaseUrl: "https://archive.hospital.test/dicom/studies/2.25.54002",
             metadataSummary: ["Wave 3B provenance chain test"],
             series: [
               {
-                seriesInstanceUid: "2.25.wave3b.prov.1.1",
+                seriesInstanceUid: "2.25.54002.1",
                 seriesDescription: "Sag T1 MPRAGE",
                 modality: "MR",
                 sequenceLabel: "T1w",
                 instanceCount: 176,
               },
               {
-                seriesInstanceUid: "2.25.wave3b.prov.1.2",
+                seriesInstanceUid: "2.25.54002.2",
                 seriesDescription: "Ax FLAIR",
                 modality: "MR",
                 sequenceLabel: "FLAIR",
@@ -4741,12 +4741,12 @@ test("artifact provenance chain traces back to producing package and archive", a
           `artifact ${artifact.artifactId} package version must be non-empty`);
 
         // Archive locator provenance
-        assert.equal(artifact.archiveLocator.studyInstanceUid, "2.25.wave3b.prov.1",
+        assert.equal(artifact.archiveLocator.studyInstanceUid, "2.25.54002",
           `artifact ${artifact.artifactId} archiveLocator must reference original study`);
         assert.equal(artifact.archiveLocator.sourceArchive, "pacs-main",
           `artifact ${artifact.artifactId} archiveLocator must reference source archive`);
         assert.equal(artifact.archiveLocator.dicomWebBaseUrl,
-          "https://archive.hospital.test/dicom/studies/2.25.wave3b.prov.1",
+          "https://archive.hospital.test/dicom/studies/2.25.54002",
           `artifact ${artifact.artifactId} archiveLocator must carry DICOMWeb URL`);
         assert.ok(artifact.archiveLocator.seriesInstanceUids.length >= 1,
           `artifact ${artifact.artifactId} archiveLocator must list series UIDs`);
@@ -4794,22 +4794,22 @@ test("archive truth is preserved through review, finalize, and report surfaces",
           studyUid: "1.2.840.wave3b.at.1",
           sequenceInventory: ["T1w", "FLAIR"],
           studyContext: {
-            studyInstanceUid: "2.25.wave3b.at.1",
+            studyInstanceUid: "2.25.54003",
             accessionNumber: "ACC-3B-AT-001",
             studyDate: "2026-03-30",
             sourceArchive: "hospital-pacs",
-            dicomWebBaseUrl: "https://pacs.hospital.test/dicom/studies/2.25.wave3b.at.1",
+            dicomWebBaseUrl: "https://pacs.hospital.test/dicom/studies/2.25.54003",
             metadataSummary: ["Wave 3B archive truth preservation test"],
             series: [
               {
-                seriesInstanceUid: "2.25.wave3b.at.1.1",
+                seriesInstanceUid: "2.25.54003.1",
                 seriesDescription: "Sag T1 MPRAGE",
                 modality: "MR",
                 sequenceLabel: "T1w",
                 instanceCount: 176,
               },
               {
-                seriesInstanceUid: "2.25.wave3b.at.1.2",
+                seriesInstanceUid: "2.25.54003.2",
                 seriesDescription: "Ax FLAIR",
                 modality: "MR",
                 sequenceLabel: "FLAIR",
@@ -4860,7 +4860,7 @@ test("archive truth is preserved through review, finalize, and report surfaces",
       assert.ok(overlayAfterInference.viewerReady, "overlay must be viewer-ready after inference");
       assert.ok(overlayAfterInference.viewerPath, "overlay must have viewerPath after inference");
       assert.equal(overlayAfterInference.archiveLocator.dicomWebBaseUrl,
-        "https://pacs.hospital.test/dicom/studies/2.25.wave3b.at.1");
+        "https://pacs.hospital.test/dicom/studies/2.25.54003");
       assert.ok(overlayAfterInference.archiveStudyUrl, "overlay must have archiveStudyUrl");
 
       // STAGE 2: Review
@@ -4877,7 +4877,7 @@ test("archive truth is preserved through review, finalize, and report surfaces",
       );
       assert.ok(overlayAfterReview.viewerReady, "overlay must stay viewer-ready after review");
       assert.ok(overlayAfterReview.viewerPath, "overlay must retain viewerPath after review");
-      assert.equal(overlayAfterReview.archiveLocator.studyInstanceUid, "2.25.wave3b.at.1",
+      assert.equal(overlayAfterReview.archiveLocator.studyInstanceUid, "2.25.54003",
         "archive locator study UID must survive review");
 
       // STAGE 3: Finalize
@@ -4893,7 +4893,7 @@ test("archive truth is preserved through review, finalize, and report surfaces",
       assert.ok(overlayAfterFinalize.viewerReady, "overlay must stay viewer-ready after finalize");
       assert.ok(overlayAfterFinalize.viewerPath, "overlay must retain viewerPath after finalize");
       assert.equal(overlayAfterFinalize.archiveLocator.dicomWebBaseUrl,
-        "https://pacs.hospital.test/dicom/studies/2.25.wave3b.at.1",
+        "https://pacs.hospital.test/dicom/studies/2.25.54003",
         "archive locator DICOMWeb URL must survive finalize");
 
       // STAGE 4: Report surface preserves archive binding
@@ -4906,10 +4906,10 @@ test("archive truth is preserved through review, finalize, and report surfaces",
       );
       assert.ok(reportOverlay, "report surface must include overlay artifact");
       assert.ok(reportOverlay.viewerReady, "report overlay must be viewer-ready");
-      assert.equal(reportOverlay.archiveLocator.studyInstanceUid, "2.25.wave3b.at.1",
+      assert.equal(reportOverlay.archiveLocator.studyInstanceUid, "2.25.54003",
         "report overlay must carry archive locator");
       assert.equal(reportOverlay.archiveLocator.dicomWebBaseUrl,
-        "https://pacs.hospital.test/dicom/studies/2.25.wave3b.at.1",
+        "https://pacs.hospital.test/dicom/studies/2.25.54003",
         "report overlay must carry DICOMWeb URL");
       assert.ok(reportOverlay.viewerPath, "report overlay must have viewerPath");
       assert.ok(reportOverlay.archiveStudyUrl, "report overlay must have archiveStudyUrl");
@@ -4938,15 +4938,15 @@ test("report derivedArtifacts carry full provenance and are not lossy copies", a
           studyUid: "1.2.840.wave3b.ra.1",
           sequenceInventory: ["T1w", "FLAIR"],
           studyContext: {
-            studyInstanceUid: "2.25.wave3b.ra.1",
+            studyInstanceUid: "2.25.54004",
             accessionNumber: "ACC-3B-RA-001",
             studyDate: "2026-03-30",
             sourceArchive: "archive-primary",
-            dicomWebBaseUrl: "https://archive-primary.test/dicom/studies/2.25.wave3b.ra.1",
+            dicomWebBaseUrl: "https://archive-primary.test/dicom/studies/2.25.54004",
             metadataSummary: ["Wave 3B report artifact losslessness test"],
             series: [
               {
-                seriesInstanceUid: "2.25.wave3b.ra.1.1",
+                seriesInstanceUid: "2.25.54004.1",
                 seriesDescription: "Sag T1",
                 modality: "MR",
                 sequenceLabel: "T1w",
@@ -5334,7 +5334,7 @@ test("Wave 4: export endpoints return 404 after review until finalization locks 
       const prepared = await createReviewedCase(jsonRequest, {
         patientAlias: "REVIEWED-EXPORT-001",
         studyUid: "1.2.840.113619.2.55.3.99.11",
-        studyInstanceUid: "2.25.reviewed-export.1",
+        studyInstanceUid: "2.25.54005",
         accessionNumber: "ACC-REVIEW-EXPORT-001",
       });
 

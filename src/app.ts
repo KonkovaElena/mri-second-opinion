@@ -43,6 +43,7 @@ import {
   parseRequeueExpiredInferenceJobsInput,
 } from "./validation";
 import { createCorsMiddleware, createPublicApiRateLimiter, metricsMiddleware, writeMetricsResponse } from "./http-runtime";
+import { normalizeDicomUid, resolveSeriesInstanceUid, resolveStudyInstanceUid } from "./dicom-uids";
 
 type ParsedCreateCaseInput = ReturnType<typeof parseCreateCaseInput>;
 
@@ -404,6 +405,30 @@ export function createApp(config: AppConfig, options: CreateAppOptions = {}) {
     return input;
   }
 
+  function materializeStudyContextIdentifiers(input: ParsedCreateCaseInput): ParsedCreateCaseInput {
+    const studyInstanceUid = resolveStudyInstanceUid(input.studyUid, input.studyContext?.studyInstanceUid);
+
+    return {
+      ...input,
+      studyContext: {
+        ...(input.studyContext ?? {}),
+        studyInstanceUid,
+        series: (input.studyContext?.series ?? []).map((seriesEntry, index) => ({
+          ...seriesEntry,
+          syntheticSeriesInstanceUid:
+            seriesEntry.syntheticSeriesInstanceUid === true
+            || normalizeDicomUid(seriesEntry.seriesInstanceUid) === undefined,
+          seriesInstanceUid: resolveSeriesInstanceUid(
+            studyInstanceUid,
+            index,
+            seriesEntry.seriesInstanceUid,
+            [seriesEntry.sequenceLabel, seriesEntry.seriesDescription],
+          ),
+        })),
+      },
+    };
+  }
+
   function handleError(res: express.Response, error: unknown) {
     const requestId = getRequestId(res);
 
@@ -528,7 +553,7 @@ export function createApp(config: AppConfig, options: CreateAppOptions = {}) {
   app.post("/api/cases", async (req, res) => {
     try {
       const parsed = sanitizePublicCreateCaseInput(parseCreateCaseInput(req.body), config);
-      const created = await caseService.createCase(await enrichCreateCaseInput(parsed));
+      const created = await caseService.createCase(materializeStudyContextIdentifiers(await enrichCreateCaseInput(parsed)));
 
       res.status(201).json({ case: created });
     } catch (error) {
@@ -715,7 +740,7 @@ export function createApp(config: AppConfig, options: CreateAppOptions = {}) {
   app.post("/api/internal/ingest", async (req, res) => {
     try {
       const parsed = parseCreateCaseInput(req.body);
-      const created = await caseService.ingestCase(await enrichCreateCaseInput(parsed));
+      const created = await caseService.ingestCase(materializeStudyContextIdentifiers(await enrichCreateCaseInput(parsed)));
 
       res.status(201).json({ case: created });
     } catch (error) {

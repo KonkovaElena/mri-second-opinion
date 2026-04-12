@@ -7,6 +7,12 @@ import {
   type InferenceCallbackInput,
 } from "./case-contracts";
 import type { QcSummaryInput, StudyContextInput } from "./case-imaging";
+import {
+  MAX_DICOM_UID_CHARACTERS,
+  isValidDicomUid,
+  resolveSeriesInstanceUid,
+  resolveStudyInstanceUid,
+} from "./dicom-uids";
 
 // ---------- Semantic size limits ----------
 const MAX_ID = 128;
@@ -91,6 +97,23 @@ const optionalTrimmedString = (maxLength = MAX_LONG_TEXT) =>
     return trimmed.length > 0 ? trimmed : undefined;
   }, z.string().max(maxLength, `value must be at most ${maxLength} characters`).optional());
 
+const optionalDicomUid = (fieldName: string) =>
+  z.preprocess((value) => {
+    if (typeof value !== "string") {
+      return undefined;
+    }
+
+    const trimmed = value.trim();
+    return trimmed.length > 0 ? trimmed : undefined;
+  }, z
+    .string()
+    .max(
+      MAX_DICOM_UID_CHARACTERS,
+      `${fieldName} must be at most ${MAX_DICOM_UID_CHARACTERS} characters`,
+    )
+    .refine((value) => isValidDicomUid(value), `${fieldName} must be a valid DICOM UID`)
+    .optional());
+
 const optionalNumberField = (fieldName: string) =>
   z.preprocess(
     (value) => (typeof value === "undefined" ? undefined : value),
@@ -136,7 +159,7 @@ const optionalStringArrayField = (fieldName: string, maxItems = MAX_FINDINGS, ma
   );
 
 const studySeriesSchema = z.object({
-  seriesInstanceUid: optionalTrimmedString(MAX_ID),
+  seriesInstanceUid: optionalDicomUid("studyContext.series[].seriesInstanceUid"),
   seriesDescription: optionalTrimmedString(MAX_SHORT),
   description: optionalTrimmedString(MAX_SHORT),
   modality: optionalTrimmedString(MAX_SHORT),
@@ -149,7 +172,7 @@ const studySeriesSchema = z.object({
 }));
 
 const studyContextInputSchema = z.object({
-  studyInstanceUid: optionalTrimmedString(MAX_ID),
+  studyInstanceUid: optionalDicomUid("studyContext.studyInstanceUid"),
   accessionNumber: optionalTrimmedString(MAX_ID),
   studyDate: optionalTrimmedString(MAX_SHORT),
   sourceArchive: optionalTrimmedString(MAX_SHORT),
@@ -163,12 +186,6 @@ const studyContextInputSchema = z.object({
           error: "studyContext.series must be an array",
         })
         .max(MAX_SERIES, `studyContext.series must have at most ${MAX_SERIES} entries`)
-        .transform((entries) =>
-          entries.map((entry, index) => ({
-            ...entry,
-            seriesInstanceUid: entry.seriesInstanceUid ?? `series-${index + 1}`,
-          })),
-        )
         .optional(),
     ),
 }).strict();
@@ -354,6 +371,30 @@ const deliveryCallbackSchema = z.object({
 
 export function parseCreateCaseInput(body: unknown): CreateCaseInput {
   const parsed = parseWithSchema(body, createCaseInputSchema);
+  const resolvedStudyContext: StudyContextInput | undefined = parsed.studyContext
+    ? (() => {
+        const resolvedStudyInstanceUid = resolveStudyInstanceUid(
+          parsed.studyUid,
+          parsed.studyContext.studyInstanceUid as string | undefined,
+        );
+
+        return {
+          ...parsed.studyContext,
+          studyInstanceUid: resolvedStudyInstanceUid,
+          series: (parsed.studyContext.series ?? []).map((seriesEntry, index) => ({
+            ...seriesEntry,
+            syntheticSeriesInstanceUid: seriesEntry.seriesInstanceUid === undefined,
+            seriesInstanceUid: resolveSeriesInstanceUid(
+              resolvedStudyInstanceUid,
+              index,
+              seriesEntry.seriesInstanceUid as string | undefined,
+              [seriesEntry.sequenceLabel as string | undefined, seriesEntry.seriesDescription as string | undefined],
+            ),
+          })),
+        };
+      })()
+    : undefined;
+
   return {
     patientAlias: parsed.patientAlias,
     tenantId: parsed.tenantId ?? undefined,
@@ -361,7 +402,7 @@ export function parseCreateCaseInput(body: unknown): CreateCaseInput {
     studyUid: parsed.studyUid,
     sequenceInventory: parsed.sequenceInventory,
     indication: parsed.indication as string | undefined,
-    studyContext: parsed.studyContext as StudyContextInput | undefined,
+    studyContext: resolvedStudyContext,
   };
 }
 

@@ -233,8 +233,8 @@ function toArtifactType(reference: string): DerivedArtifactType {
   return classifyArtifactType(reference);
 }
 
-function isSyntheticSeriesInstanceUid(seriesInstanceUid: string) {
-  return /^series-\d+$/u.test(seriesInstanceUid);
+function isSyntheticSeriesInstanceUid(series: StudyContextRecord["series"][number]) {
+  return series.syntheticSeriesInstanceUid || /^series-\d+$/u.test(series.seriesInstanceUid);
 }
 
 function createArchiveLocator(studyContext: StudyContextRecord): ArchiveLocator {
@@ -253,7 +253,7 @@ function hasTrustedArchiveBinding(studyContext: StudyContextRecord) {
 
 function getTrustedPrimarySeriesInstanceUid(studyContext: StudyContextRecord) {
   return (
-    studyContext.series.find((series) => !isSyntheticSeriesInstanceUid(series.seriesInstanceUid))
+    studyContext.series.find((series) => !isSyntheticSeriesInstanceUid(series))
       ?.seriesInstanceUid ?? null
   );
 }

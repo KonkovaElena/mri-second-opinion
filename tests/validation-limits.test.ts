@@ -177,7 +177,7 @@ test("rejects unknown nested studyContext fields", async () => {
     const payload = {
       ...validCreateCase(),
       studyContext: {
-        studyInstanceUid: "1.2.840.0.study.context.1",
+        studyInstanceUid: "1.2.840.113619.2.55.3.99.2001",
         unexpectedField: "surplus",
       },
     };
@@ -189,6 +189,55 @@ test("rejects unknown nested studyContext fields", async () => {
     assert.equal(response.status, 400);
     assert.equal(body.code, "INVALID_INPUT");
     assert.match(body.error, /unrecognized key/i);
+  });
+});
+
+test("rejects invalid DICOM studyInstanceUid in studyContext", async () => {
+  const storeFile = createTestStoreFile();
+  await withServer(storeFile, async ({ jsonRequest }) => {
+    const payload = {
+      ...validCreateCase(),
+      studyContext: {
+        studyInstanceUid: "2.25.invalid.study.1",
+      },
+    };
+
+    const { response, body } = await jsonRequest("/api/cases", {
+      method: "POST",
+      body: JSON.stringify(payload),
+    });
+
+    assert.equal(response.status, 400);
+    assert.equal(body.code, "INVALID_INPUT");
+    assert.match(body.error, /studyContext\.studyInstanceUid must be a valid DICOM UID/i);
+  });
+});
+
+test("rejects invalid DICOM seriesInstanceUid in studyContext series", async () => {
+  const storeFile = createTestStoreFile();
+  await withServer(storeFile, async ({ jsonRequest }) => {
+    const payload = {
+      ...validCreateCase(),
+      studyContext: {
+        studyInstanceUid: "1.2.840.113619.2.55.3.99.2002",
+        series: [
+          {
+            seriesInstanceUid: "1.02.840.113619.2.55.3.99.2002.1",
+            modality: "MR",
+            description: "T1 MPRAGE",
+          },
+        ],
+      },
+    };
+
+    const { response, body } = await jsonRequest("/api/cases", {
+      method: "POST",
+      body: JSON.stringify(payload),
+    });
+
+    assert.equal(response.status, 400);
+    assert.equal(body.code, "INVALID_INPUT");
+    assert.match(body.error, /studyContext\.series\[\]\.seriesInstanceUid must be a valid DICOM UID/i);
   });
 });
 

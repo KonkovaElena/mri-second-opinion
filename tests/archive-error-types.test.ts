@@ -210,13 +210,13 @@ test("archive lookup: 200 with valid payload → study context merged", async ()
       {
         "1.2.test.success": {
           body: {
-            studyInstanceUid: "2.25.success.1",
+            studyInstanceUid: "2.25.56001",
             accessionNumber: "ACC-001",
             studyDate: "2026-01-01",
             sourceArchive: "orthanc-test",
             series: [
               {
-                seriesInstanceUid: "2.25.success.1.1",
+                seriesInstanceUid: "2.25.56001.1",
                 seriesDescription: "Sag T1",
                 modality: "MR",
                 sequenceLabel: "T1w",
@@ -240,7 +240,7 @@ test("archive lookup: 200 with valid payload → study context merged", async ()
 
             const detail = await jsonRequest(`/api/cases/${caseId}`);
             assert.equal(detail.response.status, 200);
-            assert.equal(detail.body.case.studyContext.studyInstanceUid, "2.25.success.1");
+            assert.equal(detail.body.case.studyContext.studyInstanceUid, "2.25.56001");
             assert.equal(detail.body.case.studyContext.sourceArchive, "orthanc-test");
           },
           { archiveLookupBaseUrl: archiveBaseUrl },
