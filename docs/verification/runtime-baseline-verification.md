@@ -1,6 +1,6 @@
 # Runtime Baseline Verification
 
-Date: 2026-04-02
+Date: 2026-04-12
 
 ## Scope
 
@@ -38,17 +38,17 @@ It is not a target-architecture document and it intentionally excludes supersede
 
 Confirmed locally from the standalone repository root.
 
-The current cross-platform install baseline is `npm install --omit=optional`, followed by `npm run build`.
+The current cross-platform install baseline is `npm ci`, followed by `npm run build`.
 
-This install path is used because the current Node 24 Linux dependency tree can reject `npm ci` on optional CycloneDX validator branches even though build, test, and SBOM generation succeed once those optional branches are omitted.
+This was revalidated locally on 2026-04-12 against the checked-in `package.json` and `package-lock.json`. The frozen-install path now succeeds cleanly under the current Node 24 baseline, which closes the earlier install-lane caveat that required `npm install --omit=optional`.
 
 ## 2. Full standalone test baseline
 
 Confirmed locally.
 
-The current standalone suite passes via `npm test` (`node --import tsx --test tests/**/*.test.ts`) with `154` total tests, `153` passing, `0` failures, and `1` skipped.
+The current standalone suite passes via `npm test` (`node --import tsx --test tests/**/*.test.ts`) with `239` total tests, `238` passing, `0` failures, and `1` skipped.
 
-The latest hardening pass extends the baseline with semantic payload-size validation, archive lookup graceful-degradation coverage, PostgreSQL payload round-trip preservation for Unicode content, multiline review comments, floating-point measurements, and large sequence inventories, plus hyper-deep audit (structured error logging, Dockerfile HEALTHCHECK, Helmet/CSP), runtime-hardening coverage, and GitHub publication-lane verification.
+The latest hardening pass extends the baseline with semantic payload-size validation, archive lookup graceful-degradation coverage, PostgreSQL payload round-trip preservation for Unicode content, multiline review comments, floating-point measurements, large sequence inventories, archive circuit-breaker coverage, pagination or presentation coverage for list/detail surfaces, reader-study metrics coverage, reviewer-auth JWKS coverage, plus prior hyper-deep audit (structured error logging, Dockerfile HEALTHCHECK, Helmet/CSP), runtime-hardening coverage, and GitHub publication-lane verification.
 
 The strongest current verification anchors are:
 

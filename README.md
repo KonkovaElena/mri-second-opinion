@@ -263,7 +263,7 @@ What remains next-wave direction rather than current runtime proof:
 
 ```bash
 # Install dependencies
-npm install --omit=optional
+npm ci
 
 # Build TypeScript
 npm run build
@@ -753,7 +753,7 @@ Python-воркер (`worker/main.py`) работает по принципу pu
 
 ```bash
 # Установить зависимости
-npm install --omit=optional
+npm ci
 
 # Собрать TypeScript
 npm run build
