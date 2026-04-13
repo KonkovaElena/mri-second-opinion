@@ -57,16 +57,18 @@ For branch `main`:
 
 Five Dependabot PRs were opened automatically:
 
+Current local note (2026-04-13): the equivalent CI-only workflow bumps for `actions/checkout` and `actions/setup-node` are already applied directly in `.github/workflows/ci.yml` and `.github/workflows/release.yml` in the local working tree. If those Dependabot PRs are still open after this workflow patch is pushed, they are redundant and can be closed instead of merged.
+
 | PR | Package | Type | Risk | Recommendation |
 |----|---------|------|------|----------------|
 | express 5.2.1 | `express` | npm (major 4→5) | **HIGH** — breaking API changes | **Do not merge** without full migration review. Express 5 removes/changes middleware APIs. |
 | @types/node 25.5.0 | `@types/node` | npm (dev) | LOW | Safe to merge — dev-only type definitions. |
 | typescript 6.0.2 | `typescript` | npm (major 5→6) | **HIGH** — potential breaking compiler changes | **Do not merge** without build verification on TS 6.x. |
-| actions/checkout-6 | `actions/checkout` | GitHub Actions | LOW | Safe to merge — CI action version bump. |
-| actions/setup-node-6 | `actions/setup-node` | GitHub Actions | LOW | Safe to merge — CI action version bump. |
+| actions/checkout-6 | `actions/checkout` | GitHub Actions | LOW | Safe to merge, or close as redundant if the direct workflow bump has already landed on the branch. |
+| actions/setup-node-6 | `actions/setup-node` | GitHub Actions | LOW | Safe to merge, or close as redundant if the direct workflow bump has already landed on the branch. |
 
 **Recommended merge order**:
-1. `actions/checkout-6` + `actions/setup-node-6` (safe, CI-only)
+1. If the direct workflow bump is not already pushed, merge `actions/checkout-6` + `actions/setup-node-6`; otherwise close both PRs as redundant
 2. `@types/node-25.5.0` (safe, dev-only)
 3. Hold `express-5.2.1` and `typescript-6.0.2` until dedicated migration sessions
 
