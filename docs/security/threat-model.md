@@ -57,7 +57,7 @@ The current workflow system should protect:
 | clinician finalization coupled to delivery mutation | closed | public finalize route strips `deliveryOutcome` via `parsePublicFinalizeCaseInput`; only internal callers can specify delivery simulation; clinician action is now separated from delivery-plane authority |
 | internal route replay or signature spoofing | mitigated | namespace bearer protection gates all `/api/internal/*` routes; HMAC-SHA256 request signing with nonce replay enforcement protects `/api/internal/dispatch/*` |
 | artifact tampering after generation | partially mitigated | persisted artifact manifests now carry SHA-256 and byte-size integrity metadata for stored payload-backed artifacts, but download-time verification and stronger attestation are not yet enforced |
-| inference-worker crash and silent work loss | open gap | stronger lease recovery and scheduler-driven liveness are absent |
+| inference-worker crash and silent work loss | partially mitigated | automatic inference lease recovery and explicit requeue rails exist for the standalone runtime, but stronger hosted-worker liveness guarantees and broader operational proof remain open |
 | vulnerable dependency introduction | partially mitigated | dependency risk can still enter between updates without explicit inventory and triage |
 
 ## Current Mitigations
@@ -90,7 +90,7 @@ The highest-value security gaps that still remain are:
 4. ~~separation of clinician finalization from delivery-outcome mutation authority~~ — closed: public finalize route strips `deliveryOutcome` via `parsePublicFinalizeCaseInput`; only internal callers retain delivery simulation capability
 5. ~~nonce replay enforcement~~ — closed: replay store is now wired into dispatch middleware (see mitigations 6–7)
 6. artifact checksum verification at retrieval time plus stronger signed-attestation or immutable provenance beyond stored manifest hashes
-7. stronger lease recovery for inference work after crash or network interruption
+7. stronger hosted-worker liveness guarantees and broader operational proof for inference recovery beyond the current standalone automatic lease-recovery path
 8. a formal vulnerability-intake and remediation SOP tied to release evidence
 
 ## Phase 1 Hardening Actions

@@ -10,16 +10,35 @@ import uuid
 from datetime import datetime, timezone
 from urllib import error, parse, request
 
+from diagnosis_aware import apply_diagnosis_aware_protocol
+
 
 ONE_PIXEL_PNG_BASE64 = (
     "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/"
     "w8AAn8B9p8Z0iAAAAAASUVORK5CYII="
 )
+DEFAULT_WORKER_DOWNLOAD_TIMEOUT_SECONDS = 10
+DEFAULT_WORKER_MAX_DOWNLOAD_BYTES = 128 * 1024 * 1024
+WORKER_DOWNLOAD_CHUNK_BYTES = 64 * 1024
 
 
 def should_bypass_proxy(base_url: str) -> bool:
     hostname = (parse.urlparse(base_url).hostname or "").lower()
     return hostname in {"127.0.0.1", "localhost"}
+
+
+def parse_positive_int_env(name: str, default: int) -> int:
+    raw_value = str(os.environ.get(name, str(default))).strip()
+
+    try:
+        parsed_value = int(raw_value)
+    except ValueError as exc:
+        raise RuntimeError(f"{name} must be a positive integer.") from exc
+
+    if parsed_value <= 0:
+        raise RuntimeError(f"{name} must be a positive integer.")
+
+    return parsed_value
 
 
 def iso_now() -> str:
@@ -216,6 +235,14 @@ def download_binary_payload(base_url: str, download_url: str, correlation_id: st
     if not is_permitted_volume_download_url(base_url, download_url):
         raise RuntimeError("Volume download URL origin is not permitted for worker fetch.")
 
+    timeout_seconds = parse_positive_int_env(
+        "MRI_WORKER_DOWNLOAD_TIMEOUT_SECONDS",
+        DEFAULT_WORKER_DOWNLOAD_TIMEOUT_SECONDS,
+    )
+    max_download_bytes = parse_positive_int_env(
+        "MRI_WORKER_MAX_DOWNLOAD_BYTES",
+        DEFAULT_WORKER_MAX_DOWNLOAD_BYTES,
+    )
     resolved_url = resolve_download_url(base_url, download_url)
     req = request.Request(
         resolved_url,
@@ -226,8 +253,27 @@ def download_binary_payload(base_url: str, download_url: str, correlation_id: st
     )
     opener = request.build_opener(request.ProxyHandler({})) if should_bypass_proxy(resolved_url) else request.build_opener()
 
-    with opener.open(req) as response:
-        return response.read()
+    with opener.open(req, timeout=timeout_seconds) as response:
+        content_length = response.headers.get("content-length")
+        if content_length:
+            try:
+                if int(content_length) > max_download_bytes:
+                    raise RuntimeError("Volume download exceeded the worker byte budget.")
+            except ValueError:
+                pass
+
+        payload = bytearray()
+
+        while True:
+            chunk = response.read(min(WORKER_DOWNLOAD_CHUNK_BYTES, max_download_bytes - len(payload) + 1))
+            if not chunk:
+                break
+
+            payload.extend(chunk)
+            if len(payload) > max_download_bytes:
+                raise RuntimeError("Volume download exceeded the worker byte budget.")
+
+        return bytes(payload)
 
 
 def select_volume_input(study_context: dict) -> dict | None:
@@ -292,20 +338,42 @@ def parse_nifti_volume_bytes(payload_bytes: bytes) -> dict:
     if len(raw_bytes) < data_end:
         raise RuntimeError("Downloaded NIfTI payload ended before the declared voxel data completed.")
 
-    voxel_values = [
-        float(value)
-        for (value,) in struct.iter_unpack(
+    slice_voxel_count = dim_x * dim_y
+    center_z = dim_z // 2
+    center_slice_start = center_z * slice_voxel_count
+    center_slice_end = center_slice_start + slice_voxel_count
+    center_slice_values: list[float] = []
+    parsed_voxel_count = 0
+    min_intensity: float | None = None
+    max_intensity: float | None = None
+    nonzero_voxel_count = 0
+    intensity_sum = 0.0
+
+    for index, (value,) in enumerate(
+        struct.iter_unpack(
             f"{endian}{format_code}",
             raw_bytes[vox_offset:data_end],
         )
-    ]
-    if len(voxel_values) != voxel_count:
-        raise RuntimeError("Parsed voxel count does not match the declared NIfTI dimensions.")
+    ):
+        numeric_value = float(value)
+        parsed_voxel_count = index + 1
+        intensity_sum += numeric_value
 
-    min_intensity = min(voxel_values)
-    max_intensity = max(voxel_values)
-    nonzero_voxel_count = sum(1 for value in voxel_values if value != 0.0)
-    mean_intensity = round(sum(voxel_values) / voxel_count, 4)
+        if min_intensity is None or numeric_value < min_intensity:
+            min_intensity = numeric_value
+        if max_intensity is None or numeric_value > max_intensity:
+            max_intensity = numeric_value
+        if numeric_value != 0.0:
+            nonzero_voxel_count += 1
+        if center_slice_start <= index < center_slice_end:
+            center_slice_values.append(numeric_value)
+
+    if parsed_voxel_count != voxel_count:
+        raise RuntimeError("Parsed voxel count does not match the declared NIfTI dimensions.")
+    if len(center_slice_values) != slice_voxel_count:
+        raise RuntimeError("Parsed center slice does not match the declared NIfTI dimensions.")
+
+    mean_intensity = round(intensity_sum / voxel_count, 4)
 
     return {
         "dimensions": [dim_x, dim_y, dim_z],
@@ -314,16 +382,14 @@ def parse_nifti_volume_bytes(payload_bytes: bytes) -> dict:
         "meanIntensity": mean_intensity,
         "minIntensity": min_intensity,
         "maxIntensity": max_intensity,
-        "voxelValues": voxel_values,
+        "centerSliceValues": center_slice_values,
     }
 
 
 def build_slice_svg(volume_metrics: dict) -> str:
     dim_x, dim_y, dim_z = volume_metrics["dimensions"]
-    voxel_values = volume_metrics["voxelValues"]
-    center_z = dim_z // 2
-    offset = center_z * dim_x * dim_y
-    slice_values = voxel_values[offset : offset + dim_x * dim_y]
+    _ = dim_z
+    slice_values = volume_metrics["centerSliceValues"]
     min_intensity = min(slice_values)
     max_intensity = max(slice_values)
     intensity_range = max(max_intensity - min_intensity, 1e-9)
@@ -449,6 +515,12 @@ def build_inference_callback(
                     {"label": "foreground_voxel_pct", "value": foreground_ratio, "unit": "percent"},
                     {"label": "mean_intensity", "value": volume_metrics["meanIntensity"], "unit": "signal"},
                 ]
+
+                findings, measurements, protocol_note = apply_diagnosis_aware_protocol(
+                    indication, findings, measurements
+                )
+                if protocol_note:
+                    findings.insert(0, f"[{protocol_note}]")
 
                 qc_summary = {
                     "summary": summary,
@@ -606,6 +678,12 @@ def build_inference_callback(
             "unit": "percent",
         },
     ]
+
+    findings, measurements, protocol_note = apply_diagnosis_aware_protocol(
+        indication, findings, measurements
+    )
+    if protocol_note:
+        findings.insert(0, f"[{protocol_note}]")
 
     qc_summary = {
         "summary": summary,

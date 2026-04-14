@@ -36,8 +36,8 @@ Implemented claims in this document are grounded in:
 
 The following remain target seams or open gaps, not implemented standalone truth:
 
-1. relationship-based or case-scoped reviewer authorization
-2. hosted or distributed inference-worker lease recovery and scheduler-backed expiry automation
+1. cryptographically bound tenant identity plus broader multi-actor RBAC beyond the current tenant and assigned-reviewer gates
+2. hosted or distributed inference-worker liveness proof beyond the standalone lease-recovery and requeue path
 3. production PostgreSQL durability
 4. distributed or externally brokered workers
 5. production-grade Python compute-plane closure
@@ -119,9 +119,9 @@ The current standalone runtime enforces these invariants directly:
 
 The following are explicitly not enforced today:
 
-1. relationship-based or case-scoped reviewer authorization beyond authenticated reviewer JWT identity plus role allowlisting
+1. cryptographic tenant identity binding and broader actor-scoped RBAC beyond the current reviewer-role, tenant, and assigned-reviewer guards
 2. signed internal callbacks
-3. lease-based recovery for inference execution
+3. hosted or distributed recovery guarantees beyond the standalone lease-recovery implementation
 
 ## 2. Implemented Transition Function
 
@@ -182,8 +182,8 @@ Formal analysis exposes the following missing or only-partially-realized transit
 | Gap | Current state |
 |---|---|
 | `QC_REJECTED -> reingest` | absent in standalone runtime |
-| inference-worker `SUBMITTED` lease, heartbeat, and expiry reset | absent |
-| automated scheduler for lease expiry or background requeue | absent |
+| inference-worker `SUBMITTED` lease, heartbeat, and expiry reset | implemented for the standalone runtime |
+| automatic requeue of expired inference work | implemented for the standalone runtime |
 | archival or long-term retention state | absent |
 | hosted or distributed worker recovery semantics | absent |
 | production PostgreSQL-backed persistence semantics | absent |
@@ -231,7 +231,7 @@ $$
 \texttt{SUBMITTED} \xrightarrow{\texttt{inference-callback}} \{\texttt{AWAITING\_REVIEW},\ \texttt{QC\_REJECTED}\}
 $$
 
-The current standalone repo already implements bounded dispatch claim and heartbeat rails, but it does not yet prove a hosted or distributed lease-recovery control plane.
+The current standalone repo already implements bounded dispatch claim and heartbeat rails together with automatic standalone lease recovery for expired inference claims, but it does not yet prove a hosted or distributed lease-recovery control plane.
 
 ### 5.3. Review And Finalize
 
@@ -304,7 +304,7 @@ $$
 | `L-01` | restart-safe local delivery jobs remain visible and claimable after reload | implemented for local SQLite and snapshot baseline |
 | `L-02` | a case in `DELIVERY_FAILED` can return to `DELIVERY_PENDING` via explicit retry | implemented |
 | `L-03` | queued delivery work becomes claimable once `availableAt` is reached | partially implemented; the negative guard is proven, but no hosted or scheduler-backed proof exists |
-| `L-04` | expired inference work is automatically requeued after worker failure | absent |
+| `L-04` | expired inference work is automatically requeued after worker failure | implemented for the standalone runtime |
 | `L-05` | distributed multi-worker progress is guaranteed beyond local contention tests | absent |
 
 ### 6.3. Auditability Properties
@@ -325,10 +325,10 @@ $$
 | stale writer on queue claim | mitigated on the tested local path by persistence reload and retry logic |
 | duplicate inference callback replay | mitigated by fingerprint-based replay detection |
 | premature delivery callback after queue loss | mitigated by active delivery-job guard |
-| machine impersonation of clinician actions | partially mitigated by reviewer JWT identity plus role allowlisting; object-scoped and relationship-based authorization remain open |
+| machine impersonation of clinician actions | partially mitigated by reviewer JWT identity plus role allowlisting; tenant-scoped and assigned-reviewer authorization are implemented, while broader RBAC and cryptographic tenant identity remain open |
 | internal route replay or signature spoofing | mitigated: HMAC request signing with nonce replay enforcement is active on dispatch routes |
 | artifact tampering after generation | open gap because checksum verification is not implemented |
-| inference-worker crash and silent work loss | open liveness gap because lease and scheduler recovery are not implemented |
+| inference-worker crash and silent work loss | partially mitigated in the standalone runtime because automatic lease recovery and explicit requeue paths exist; hosted-worker liveness proof remains open |
 
 ## 8. Reproducibility Envelope
 
@@ -358,11 +358,12 @@ The strongest repo-backed contribution is a transparent workflow orchestrator wi
 4. planner and report provenance fields
 5. a persisted local delivery-job companion machine
 6. conservative readiness language that keeps `PUBLIC_GITHUB_READY` bounded below launch-ready, clinical-ready, and production-ready claims
+7. standalone inference lease recovery with explicit requeue semantics for expired claims
 
 The strongest open seams are:
 
-1. object-scoped and relationship-based authorization
-2. inference liveness and scheduler recovery
+1. cryptographic tenant identity and broader multi-actor RBAC
+2. hosted-worker liveness proof beyond the standalone recovery path
 3. production durability beyond local SQLite-backed truth
 4. artifact integrity and compute reproducibility closure
 5. clinically realistic compute and viewer integration

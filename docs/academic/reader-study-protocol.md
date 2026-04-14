@@ -53,13 +53,23 @@ A preliminary estimate suggests a minimum of 100 cases for the primary analysis,
 
 ### Expert Readers
 
-A minimum of 2 board-certified neuroradiologists should independently assess each case.
+A target panel of 3 to 5 board-certified neuroradiologists should independently assess each case. Two readers is the practical floor for pilot execution, but the primary validation target should remain an MRMC-oriented panel large enough to estimate reader variance rather than only reader-vs-system concordance.
 
 Reader qualifications:
 
 1. board certification in radiology with neuroradiology subspecialty training or equivalent experience
 2. minimum 3 years post-training clinical practice
 3. familiarity with volumetric brain assessment
+
+### Reader Consensus
+
+The study execution package should predefine how expert consensus is derived for the primary analysis.
+
+At minimum, it should specify:
+
+1. whether consensus is median, majority vote, or adjudicated consensus
+2. how tied or materially discordant reader assessments are resolved
+3. which endpoint uses raw per-reader values versus consensus-derived labels
 
 ### Blinding
 
@@ -107,6 +117,7 @@ Each case is processed through the standard workflow pipeline and the finalized 
 1. compute ICC between automated measurements and reader consensus
 2. construct Bland-Altman plots for each volumetric measurement
 3. compute sensitivity and specificity for clinically relevant volume thresholds
+4. execute an MRMC-aware analysis plan for the primary endpoint so reader and case variance are modeled explicitly instead of being collapsed into a single pooled agreement number
 
 ### Subgroup Analysis
 

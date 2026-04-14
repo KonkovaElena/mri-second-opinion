@@ -2398,6 +2398,90 @@ test("python worker performs a voxel-backed pass when a T1w volume URL is presen
   }
 });
 
+test("python worker falls back when a permitted volume exceeds the worker byte budget", async () => {
+  const { tempDir, caseStoreFile } = createTestStoreFile();
+  const niftiFixture = createTinyNifti1Buffer([0, 0, 1, 2, 3, 4, 5, 6]);
+
+  try {
+    await withBinaryFixtureServer(niftiFixture, async (volumeDownloadUrl) => {
+      const allowedOrigin = new URL(volumeDownloadUrl).origin;
+
+      await withServer(
+        caseStoreFile,
+        async ({ baseUrl, jsonRequest }) => {
+          const created = await jsonRequest("/api/cases", {
+            method: "POST",
+            body: JSON.stringify({
+              patientAlias: "synthetic-python-worker-volume-budget-001",
+              studyUid: "1.2.840.python.worker.volume.budget.1",
+              sequenceInventory: ["T1w"],
+              indication: "bounded worker download budget review",
+              studyContext: {
+                studyInstanceUid: "2.25.52002.5",
+                accessionNumber: "PY-WORKER-VOLUME-BUDGET-001",
+                studyDate: "2026-04-13",
+                sourceArchive: "fixture-http",
+                metadataSummary: ["Tiny NIfTI fixture that should exceed the worker byte budget"],
+                series: [
+                  {
+                    seriesInstanceUid: "2.25.52002.5.1",
+                    seriesDescription: "Budgeted Fixture T1w",
+                    modality: "MR",
+                    sequenceLabel: "T1w",
+                    instanceCount: 1,
+                    volumeDownloadUrl,
+                  },
+                ],
+              },
+            }),
+          });
+
+          assert.equal(created.response.status, 201);
+          const caseId = created.body.case.caseId as string;
+
+          const worker = await runPythonWorker(baseUrl, {
+            MRI_WORKER_ID: "python-worker-volume-budget-001",
+            MRI_INTERNAL_API_TOKEN: DEFAULT_INTERNAL_API_TOKEN,
+            MRI_WORKER_ALLOWED_VOLUME_ORIGINS: allowedOrigin,
+            MRI_WORKER_MAX_DOWNLOAD_BYTES: String(niftiFixture.byteLength - 1),
+          });
+
+          assert.equal(worker.exitCode, 0, `${worker.stderr}\n${worker.stdout}`);
+
+          const detail = await jsonRequest(`/api/cases/${caseId}`);
+          assert.equal(detail.response.status, 200);
+          assert.deepEqual(detail.body.case.structuralExecution.executionContext, {
+            computeMode: "metadata-fallback",
+            fallbackCode: "volume-download-failed",
+            fallbackDetail: "Volume download exceeded the worker byte budget.",
+            sourceSeriesInstanceUid: "2.25.52002.5.1",
+          });
+          assert.match(detail.body.case.reportSummary.processingSummary, /Metadata-derived draft/);
+
+          const report = await jsonRequest(`/api/cases/${caseId}/report`);
+          assert.equal(report.response.status, 200);
+          assert.deepEqual(report.body.report.executionContext, {
+            computeMode: "metadata-fallback",
+            fallbackCode: "volume-download-failed",
+            fallbackDetail: "Volume download exceeded the worker byte budget.",
+            sourceSeriesInstanceUid: "2.25.52002.5.1",
+          });
+          assert.equal(
+            report.body.report.issues.some((issue: string) => /byte budget/i.test(issue)),
+            true,
+          );
+        },
+        {
+          internalApiToken: DEFAULT_INTERNAL_API_TOKEN,
+          hmacSecret: DEFAULT_HMAC_SECRET,
+        },
+      );
+    });
+  } finally {
+    rmSync(tempDir, { recursive: true, force: true });
+  }
+});
+
 test("python worker records classified fallback metadata when a volume URL cannot be parsed", async () => {
   const { tempDir, caseStoreFile } = createTestStoreFile();
   const invalidFixture = Buffer.from("not-a-valid-nifti", "utf-8");
@@ -4213,6 +4297,18 @@ test("read-side endpoints expose case detail, report, and summary shapes", async
       assert.equal(Array.isArray(report.body.report.measurements), true);
       assert.equal(typeof report.body.report.provenance.workflowVersion, "string");
       assert.equal(Array.isArray(report.body.report.artifacts), true);
+
+      const evidenceBundle = await jsonRequest(`/api/cases/${caseId}/evidence-bundle`);
+      assert.equal(evidenceBundle.response.status, 200);
+      assert.equal(evidenceBundle.body.evidenceBundle.evidenceBundleSchemaVersion, "0.1.0");
+      assert.equal(evidenceBundle.body.evidenceBundle.case.caseId, caseId);
+      assert.equal(Array.isArray(evidenceBundle.body.evidenceBundle.evidenceCards), true);
+      assert.equal(typeof evidenceBundle.body.evidenceBundle.planEnvelope.planSchemaVersion, "string");
+      assert.equal(evidenceBundle.body.evidenceBundle.report.caseId, caseId);
+      assert.equal(
+        evidenceBundle.body.evidenceBundle.exports.dicomSr,
+        `/api/cases/${caseId}/exports/dicom-sr`,
+      );
 
       const summary = await jsonRequest("/api/operations/summary");
       assert.equal(summary.response.status, 200);
