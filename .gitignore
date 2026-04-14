@@ -8,3 +8,17 @@ npm-debug.log*
 artifacts/
 _*.txt
 _*.diff
+
+# User data and external files
+*.dll
+*.exe
+*.inf
+*.pdf
+dicom/
+MRT_Zashchitin.zip
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo

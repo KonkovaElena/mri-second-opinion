@@ -9,6 +9,7 @@ import sys
 import uuid
 from datetime import datetime, timezone
 from urllib import error, parse, request
+from diagnosis_aware import apply_diagnosis_aware_protocol
 
 
 ONE_PIXEL_PNG_BASE64 = (
@@ -450,6 +451,13 @@ def build_inference_callback(
                     {"label": "mean_intensity", "value": volume_metrics["meanIntensity"], "unit": "signal"},
                 ]
 
+                # Apply diagnosis-aware protocol enhancements
+                findings, measurements, protocol_note = apply_diagnosis_aware_protocol(
+                    indication, findings, measurements
+                )
+                if protocol_note != "Standard protocol":
+                    findings.insert(0, f"[{protocol_note}]")
+
                 qc_summary = {
                     "summary": summary,
                     "checks": [
@@ -606,6 +614,13 @@ def build_inference_callback(
             "unit": "percent",
         },
     ]
+
+    # Apply diagnosis-aware protocol enhancements
+    findings, measurements, protocol_note = apply_diagnosis_aware_protocol(
+        indication, findings, measurements
+    )
+    if protocol_note != "Standard protocol":
+        findings.insert(0, f"[{protocol_note}]")
 
     qc_summary = {
         "summary": summary,
