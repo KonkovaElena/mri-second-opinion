@@ -234,6 +234,62 @@ test("getConfig rejects reviewer JWT secret shorter than 32 bytes", () => {
   }
 });
 
+test("getConfig accepts MRI_ARCHIVE_LOOKUP_MODE=dicomweb", () => {
+  const previousPort = process.env.PORT;
+  const previousJwtSecret = process.env.MRI_REVIEWER_JWT_HS256_SECRET;
+  const previousArchiveLookupMode = process.env.MRI_ARCHIVE_LOOKUP_MODE;
+
+  process.env.PORT = "4010";
+  process.env.MRI_REVIEWER_JWT_HS256_SECRET = "reviewer-jwt-secret-0123456789abcdef";
+  process.env.MRI_ARCHIVE_LOOKUP_MODE = "dicomweb";
+
+  try {
+    const config = getConfig();
+    assert.equal(config.archiveLookupMode, "dicomweb");
+  } finally {
+    process.env.PORT = previousPort;
+    if (previousJwtSecret === undefined) {
+      delete process.env.MRI_REVIEWER_JWT_HS256_SECRET;
+    } else {
+      process.env.MRI_REVIEWER_JWT_HS256_SECRET = previousJwtSecret;
+    }
+    if (previousArchiveLookupMode === undefined) {
+      delete process.env.MRI_ARCHIVE_LOOKUP_MODE;
+    } else {
+      process.env.MRI_ARCHIVE_LOOKUP_MODE = previousArchiveLookupMode;
+    }
+  }
+});
+
+test("getConfig rejects unsupported MRI_ARCHIVE_LOOKUP_MODE values", () => {
+  const previousPort = process.env.PORT;
+  const previousJwtSecret = process.env.MRI_REVIEWER_JWT_HS256_SECRET;
+  const previousArchiveLookupMode = process.env.MRI_ARCHIVE_LOOKUP_MODE;
+
+  process.env.PORT = "4010";
+  process.env.MRI_REVIEWER_JWT_HS256_SECRET = "reviewer-jwt-secret-0123456789abcdef";
+  process.env.MRI_ARCHIVE_LOOKUP_MODE = "orthanc";
+
+  try {
+    assert.throws(
+      () => getConfig(),
+      /Invalid MRI_ARCHIVE_LOOKUP_MODE value: orthanc/,
+    );
+  } finally {
+    process.env.PORT = previousPort;
+    if (previousJwtSecret === undefined) {
+      delete process.env.MRI_REVIEWER_JWT_HS256_SECRET;
+    } else {
+      process.env.MRI_REVIEWER_JWT_HS256_SECRET = previousJwtSecret;
+    }
+    if (previousArchiveLookupMode === undefined) {
+      delete process.env.MRI_ARCHIVE_LOOKUP_MODE;
+    } else {
+      process.env.MRI_ARCHIVE_LOOKUP_MODE = previousArchiveLookupMode;
+    }
+  }
+});
+
 test("getConfig rejects negative clock skew tolerance", () => {
   const previousPort = process.env.PORT;
   const previousJwtSecret = process.env.MRI_REVIEWER_JWT_HS256_SECRET;

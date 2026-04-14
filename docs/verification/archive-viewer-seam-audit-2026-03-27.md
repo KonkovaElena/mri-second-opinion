@@ -1,8 +1,8 @@
 ---
 title: "Archive Viewer Seam Audit 2026-03-27"
 status: "active"
-version: "2.0.0"
-last_updated: "2026-03-30"
+version: "2.1.0"
+last_updated: "2026-04-14"
 tags: [verification, archive, viewer, mri, wave-3a]
 role: evidence
 ---
@@ -58,6 +58,16 @@ Validation completed on 2026-03-27:
 3. standalone subtree build passed via `npm run build`
 4. workspace immediate preflight passed via `workflow:catch-and-fix-now`
 
+An additional targeted proof pack was added on 2026-04-14 for the explicit `archiveLookupMode=dicomweb` path.
+
+That focused validation confirms the DICOMweb seam against PS3.18 2026b Studies Search and Retrieve resource shapes:
+
+1. QIDO-RS Studies Search on `/studies{?search*}`
+2. QIDO-RS Study's Series Search on `/studies/{study}/series{?search*}`
+3. series-level retrieve or handoff paths derived from `/studies/{study}/series/{series}`
+
+The repository proof remains bounded to ingest-time archive enrichment and viewer handoff metadata. It still does not claim a deployed Orthanc or OHIF runtime.
+
 ## Wave 3A: Archive Lookup And Viewer Path Closure
 
 The following Wave 3A capabilities were implemented and verified on 2026-03-30:
@@ -87,6 +97,7 @@ The existing review workbench at `GET /workbench` now renders an explicit Viewer
 3. Archive enrichment resolves real study metadata from configured DICOMWeb endpoint
 4. `viewerReady` stays honest: only true when trusted archive binding exists
 5. Workbench renders viewer and archive links only when binding is trustworthy
+6. isolated DICOMweb ingest enrichment is now proven via `tests/archive-dicomweb.test.ts`, including explicit `includefield` queries for required study and series tags plus canonical study-resource path composition
 
 ## Audit Decision
 

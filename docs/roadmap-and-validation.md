@@ -45,6 +45,8 @@ It means the current built-in workbench baseline, typed export seams, and govern
 
 It does not mean the full 100/100 target in `docs/academic/action-plan.md` is complete, and it does not claim OHIF deployment, Orthanc-managed runtime, binary DICOM Part-10 export, real ML pipeline closure, hosted distributed worker proof, or an executed reader study.
 
+The bounded ingest-time DICOMweb lookup seam can now be treated as locally proven archive enrichment, but that is still materially narrower than a production viewer or archive deployment claim.
+
 - Wave 1 + 1.5: API and durability baseline, hosted-validated on `04cb0a57d1e64f8a5cf03a22b4a5c60d37dffc3a`
 - Wave 2A + 2B: QC, artifacts, governance pack, bounded compute seam
 - Wave 3A + 3B: Archive/viewer, artifact/report closure

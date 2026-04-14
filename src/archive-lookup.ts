@@ -221,6 +221,19 @@ const DICOM_TAG_SERIES_DESCRIPTION = "0008103E";
 const DICOM_TAG_MODALITY = "00080060";
 const DICOM_TAG_NUMBER_OF_INSTANCES = "00201208";
 
+const DICOMWEB_STUDY_INCLUDE_FIELDS = [
+  DICOM_TAG_STUDY_INSTANCE_UID,
+  DICOM_TAG_ACCESSION_NUMBER,
+  DICOM_TAG_STUDY_DATE,
+] as const;
+
+const DICOMWEB_SERIES_INCLUDE_FIELDS = [
+  DICOM_TAG_SERIES_INSTANCE_UID,
+  DICOM_TAG_SERIES_DESCRIPTION,
+  DICOM_TAG_MODALITY,
+  DICOM_TAG_NUMBER_OF_INSTANCES,
+] as const;
+
 function dicomTagValue(dataset: Record<string, unknown>, tag: string): string | undefined {
   const entry = dataset[tag] as { Value?: unknown[] } | undefined;
   if (!entry || !Array.isArray(entry.Value) || entry.Value.length === 0) {
@@ -239,6 +252,12 @@ function dicomTagNumber(dataset: Record<string, unknown>, tag: string): number |
   return typeof first === "number" && Number.isFinite(first) ? first : undefined;
 }
 
+function appendIncludeFields(url: URL, includeFields: readonly string[]) {
+  for (const field of includeFields) {
+    url.searchParams.append("includefield", field);
+  }
+}
+
 function buildWadoRsSeriesUrl(baseUrl: string, studyUid: string, seriesUid: string): string {
   return `${baseUrl}studies/${encodeURIComponent(studyUid)}/series/${encodeURIComponent(seriesUid)}`;
 }
@@ -250,10 +269,10 @@ async function lookupStudyDicomWeb(
 ): Promise<ArchiveLookupResult> {
   try {
     // Step 1: QIDO-RS study-level query
-    const qidoStudyUrl = new URL(
-      `studies?StudyInstanceUID=${encodeURIComponent(studyUid)}&limit=1`,
-      baseUrl,
-    );
+    const qidoStudyUrl = new URL("studies", baseUrl);
+    qidoStudyUrl.searchParams.set("StudyInstanceUID", studyUid);
+    qidoStudyUrl.searchParams.set("limit", "1");
+    appendIncludeFields(qidoStudyUrl, DICOMWEB_STUDY_INCLUDE_FIELDS);
     const studyResponse = await fetch(qidoStudyUrl, {
       headers: { accept: "application/dicom+json" },
       signal: AbortSignal.timeout(10_000),
@@ -279,9 +298,10 @@ async function lookupStudyDicomWeb(
 
     // Step 2: QIDO-RS series-level query for this study
     const qidoSeriesUrl = new URL(
-      `studies/${encodeURIComponent(studyUid)}/series`,
+      `studies/${encodeURIComponent(studyInstanceUid)}/series`,
       baseUrl,
     );
+    appendIncludeFields(qidoSeriesUrl, DICOMWEB_SERIES_INCLUDE_FIELDS);
     const seriesResponse = await fetch(qidoSeriesUrl, {
       headers: { accept: "application/dicom+json" },
       signal: AbortSignal.timeout(10_000),
@@ -301,7 +321,7 @@ async function lookupStudyDicomWeb(
               seriesDescription: dicomTagValue(seriesDataset, DICOM_TAG_SERIES_DESCRIPTION),
               modality: dicomTagValue(seriesDataset, DICOM_TAG_MODALITY),
               instanceCount: dicomTagNumber(seriesDataset, DICOM_TAG_NUMBER_OF_INSTANCES),
-              volumeDownloadUrl: buildWadoRsSeriesUrl(baseUrl, studyUid, seriesInstanceUid),
+              volumeDownloadUrl: buildWadoRsSeriesUrl(baseUrl, studyInstanceUid, seriesInstanceUid),
             };
           });
       }
