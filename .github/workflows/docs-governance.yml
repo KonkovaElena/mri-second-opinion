@@ -162,6 +162,10 @@ jobs:
               raise SystemExit(f'package.json missing publication keywords: {missing}')
           PY
 
+      - name: Verify authority docs are synchronized
+        run: |
+          node scripts/sync-authority-docs.mjs --check
+
       - name: Reject parent-only evidence references
         run: |
           ! grep -R -n --exclude='docs-governance.yml' 'docs/superpowers/specs/' README.md docs .github || exit 1

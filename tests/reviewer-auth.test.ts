@@ -22,6 +22,7 @@ function createReviewerJwt(payload: {
   reviewerId: string;
   reviewerRole?: string;
   exp?: number;
+  aud?: string | string[];
   secret?: string;
 }) {
   const encodedHeader = Buffer.from(JSON.stringify({ alg: "HS256", typ: "JWT" }), "utf-8").toString("base64url");
@@ -29,6 +30,7 @@ function createReviewerJwt(payload: {
     JSON.stringify({
       sub: payload.reviewerId,
       ...(payload.reviewerRole ? { role: payload.reviewerRole } : {}),
+      ...(typeof payload.aud !== "undefined" ? { aud: payload.aud } : {}),
       exp: payload.exp ?? Math.floor(Date.now() / 1000) + 60,
     }),
     "utf-8",
@@ -145,6 +147,47 @@ test("reviewer auth accepts HS256 token within clock skew tolerance", async () =
 
   assert.equal(reviewer.reviewerId, "reviewer-skew-accept");
   assert.equal(reviewer.reviewerRole, "radiologist");
+});
+
+test("reviewer auth enforces configured audience on HS256 tokens", async () => {
+  const token = createReviewerJwt({
+    reviewerId: "reviewer-hs256-aud-ok",
+    reviewerRole: "radiologist",
+    aud: "mri-second-opinion-reviewers",
+  });
+
+  const reviewer = await resolveAuthenticatedReviewerAsync(createRequest(`Bearer ${token}`), {
+    reviewerJwtSecret: DEFAULT_REVIEWER_JWT_SECRET,
+    reviewerJwksUrl: undefined,
+    reviewerJwksIssuer: undefined,
+    reviewerJwksAudience: "mri-second-opinion-reviewers",
+    clockSkewToleranceMs: DEFAULT_CLOCK_SKEW_TOLERANCE_MS,
+  });
+
+  assert.equal(reviewer.reviewerId, "reviewer-hs256-aud-ok");
+});
+
+test("reviewer auth rejects HS256 token with mismatched audience", async () => {
+  const token = createReviewerJwt({
+    reviewerId: "reviewer-hs256-aud-bad",
+    reviewerRole: "radiologist",
+    aud: "wrong-audience",
+  });
+
+  await assert.rejects(
+    () =>
+      resolveAuthenticatedReviewerAsync(createRequest(`Bearer ${token}`), {
+        reviewerJwtSecret: DEFAULT_REVIEWER_JWT_SECRET,
+        reviewerJwksUrl: undefined,
+        reviewerJwksIssuer: undefined,
+        reviewerJwksAudience: "mri-second-opinion-reviewers",
+        clockSkewToleranceMs: DEFAULT_CLOCK_SKEW_TOLERANCE_MS,
+      }),
+    (error: unknown) =>
+      error instanceof WorkflowError &&
+      error.code === "UNAUTHORIZED" &&
+      /audience mismatch/i.test(error.message),
+  );
 });
 
 test("reviewer auth rejects HS256 token expired beyond clock skew tolerance", async () => {

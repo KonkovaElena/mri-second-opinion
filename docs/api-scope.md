@@ -1,6 +1,7 @@
 # API Scope
 
-## Wave 1 Public API
+<!-- AUTHORITY:API_SCOPE:START -->
+## Public Workflow API (13 routes)
 
 1. `POST /api/cases`
 2. `GET /api/cases`
@@ -15,13 +16,8 @@
 11. `GET /api/operations/summary`
 12. `POST /api/reader-study/concordance`
 13. `POST /api/delivery/:caseId/retry`
-14. `GET /workbench`
-15. `GET /`
-16. `GET /healthz`
-17. `GET /readyz`
-18. `GET /metrics`
 
-## Internal Integration Endpoints
+## Internal Integration Endpoints (11 routes)
 
 1. `POST /api/internal/ingest`
 2. `GET /api/internal/inference-jobs`
@@ -34,6 +30,15 @@
 9. `POST /api/internal/dispatch/claim`
 10. `POST /api/internal/dispatch/heartbeat`
 11. `POST /api/internal/dispatch/fail`
+
+## Operational Endpoints (5 routes)
+
+1. `GET /`
+2. `GET /healthz`
+3. `GET /readyz`
+4. `GET /metrics`
+5. `GET /workbench`
+<!-- AUTHORITY:API_SCOPE:END -->
 
 Route descriptions and public nouns should follow `docs/public-vocabulary.md`.
 

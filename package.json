@@ -30,6 +30,8 @@
     "node": ">=24"
   },
   "scripts": {
+    "authority:check": "node scripts/sync-authority-docs.mjs --check",
+    "authority:sync": "node scripts/sync-authority-docs.mjs",
     "build": "tsc -p tsconfig.json",
     "db:migrate": "tsx scripts/db-migrate.ts",
     "db:migrate:smoke": "tsx scripts/db-migrate-smoke.ts",

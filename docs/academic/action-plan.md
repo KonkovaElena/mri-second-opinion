@@ -24,15 +24,17 @@ evidence_sources: |
 
 ## Текущее состояние (сводка)
 
+<!-- AUTHORITY:ACTION_PLAN_CURRENT_STATE:START -->
 | Параметр | Значение |
 |---|---|
-| TypeScript API | 27 файлов, ~10 000 LOC |
-| Python worker | 1 файл, 853 LOC |
-| Тесты | 15 файлов, ~7 100 LOC |
-| Документация | 87 файлов (82 Markdown + 5 binary), ~2.7 МБ |
-| Маршруты API | 27 (16 public + 11 internal) |
-| Инфраструктура | Dockerfile, docker-compose, healthchecks |
+| TypeScript API | 32 tracked files, 9,647 LOC |
+| Python worker | 1 tracked file, 975 LOC |
+| Тесты | 24 tracked files, 12,623 LOC |
+| Документация | 97 tracked docs files (92 Markdown + 5 binary), ~2.8 MB |
+| Маршруты API | 24 (13 public workflow + 11 internal integration) |
+| Validation snapshot | 258 total / 257 passing / 0 failing / 1 skipped (2026-04-14) |
 | Оценка | 10/10 (MVP), ~85/100 (Clinical-Ready) |
+<!-- AUTHORITY:ACTION_PLAN_CURRENT_STATE:END -->
 
 ---
 

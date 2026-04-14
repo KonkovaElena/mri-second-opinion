@@ -52,7 +52,8 @@ Use it when checking whether a route, document, test, or demo asset is inside th
 2. `public/workbench/review-workbench.css`
 3. `public/workbench/review-workbench.js`
 
-### Public HTTP surface
+<!-- AUTHORITY:SCOPE_HTTP_SURFACE:START -->
+### Public workflow routes (13)
 
 1. `POST /api/cases`
 2. `GET /api/cases`
@@ -67,13 +68,16 @@ Use it when checking whether a route, document, test, or demo asset is inside th
 11. `GET /api/operations/summary`
 12. `POST /api/reader-study/concordance`
 13. `POST /api/delivery/:caseId/retry`
-14. `GET /workbench`
-15. `GET /`
-16. `GET /healthz`
-17. `GET /readyz`
-18. `GET /metrics`
 
-### Internal integration rails
+### Operational endpoints (5)
+
+1. `GET /`
+2. `GET /healthz`
+3. `GET /readyz`
+4. `GET /metrics`
+5. `GET /workbench`
+
+### Internal integration rails (11)
 
 1. `POST /api/internal/ingest`
 2. `GET /api/internal/inference-jobs`
@@ -86,6 +90,7 @@ Use it when checking whether a route, document, test, or demo asset is inside th
 9. `POST /api/internal/dispatch/claim`
 10. `POST /api/internal/dispatch/heartbeat`
 11. `POST /api/internal/dispatch/fail`
+<!-- AUTHORITY:SCOPE_HTTP_SURFACE:END -->
 
 ## Active Documentation Surfaces
 

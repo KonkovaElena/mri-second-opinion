@@ -19,6 +19,11 @@ import {
 } from "./case-presentation";
 import { buildHealthSnapshot, buildReadinessSnapshot, type RuntimeState } from "./health";
 import { buildDicomSrExport, buildFhirDiagnosticReport } from "./case-exports";
+import {
+  INTERNAL_INTEGRATION_ROUTE_STRINGS,
+  OPERATIONAL_ROUTE_STRINGS,
+  PUBLIC_WORKFLOW_ROUTE_STRINGS,
+} from "./api-surface.generated";
 import { createInternalAuthMiddleware } from "./internal-auth";
 import { createHmacAuthMiddleware } from "./hmac-auth";
 import { createOperatorAuthMiddleware } from "./operator-auth";
@@ -490,34 +495,9 @@ export function createApp(config: AppConfig, options: CreateAppOptions = {}) {
         reviewWorkbench: "/workbench",
       },
       api: {
-        public: [
-          "POST /api/cases",
-          "GET /api/cases",
-          "GET /api/cases/:caseId",
-          "POST /api/cases/:caseId/review",
-          "POST /api/cases/:caseId/finalize",
-          "GET /api/cases/:caseId/report",
-          "GET /api/cases/:caseId/evidence-bundle",
-          "GET /api/cases/:caseId/exports/dicom-sr",
-          "GET /api/cases/:caseId/exports/fhir-diagnostic-report",
-          "GET /api/cases/:caseId/artifacts/:artifactId",
-          "GET /api/operations/summary",
-          "POST /api/reader-study/concordance",
-          "POST /api/delivery/:caseId/retry",
-        ],
-        internal: [
-          "POST /api/internal/ingest",
-          "POST /api/internal/inference-callback",
-          "GET /api/internal/inference-jobs",
-          "POST /api/internal/inference-jobs/claim-next",
-          "POST /api/internal/inference-jobs/requeue-expired",
-          "GET /api/internal/delivery-jobs",
-          "POST /api/internal/delivery-jobs/claim-next",
-          "POST /api/internal/delivery-callback",
-          "POST /api/internal/dispatch/claim",
-          "POST /api/internal/dispatch/heartbeat",
-          "POST /api/internal/dispatch/fail",
-        ],
+        public: PUBLIC_WORKFLOW_ROUTE_STRINGS,
+        internal: INTERNAL_INTEGRATION_ROUTE_STRINGS,
+        operational: OPERATIONAL_ROUTE_STRINGS,
       },
       docs: {
         scope: "docs/scope-lock.md",

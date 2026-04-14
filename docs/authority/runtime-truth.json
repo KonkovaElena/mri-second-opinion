@@ -1,0 +1,57 @@
+{
+  "publicationVerdict": "PUBLIC_GITHUB_READY",
+  "lastReviewed": "2026-04-14",
+  "routeSurface": {
+    "publicWorkflow": [
+      { "method": "POST", "path": "/api/cases", "description": "Create a new MRI case" },
+      { "method": "GET", "path": "/api/cases", "description": "List all cases" },
+      { "method": "GET", "path": "/api/cases/:caseId", "description": "Get detailed case information" },
+      { "method": "POST", "path": "/api/cases/:caseId/review", "description": "Submit clinician review" },
+      { "method": "POST", "path": "/api/cases/:caseId/finalize", "description": "Finalize a reviewed case" },
+      { "method": "GET", "path": "/api/cases/:caseId/report", "description": "Get the structured report" },
+      { "method": "GET", "path": "/api/cases/:caseId/evidence-bundle", "description": "Get the machine-readable evidence bundle for the case" },
+      { "method": "GET", "path": "/api/cases/:caseId/exports/dicom-sr", "description": "Export as DICOM Structured Report" },
+      { "method": "GET", "path": "/api/cases/:caseId/exports/fhir-diagnostic-report", "description": "Export as FHIR R4 DiagnosticReport" },
+      { "method": "GET", "path": "/api/cases/:caseId/artifacts/:artifactId", "description": "Download a derived artifact" },
+      { "method": "GET", "path": "/api/operations/summary", "description": "Operational dashboard data" },
+      { "method": "POST", "path": "/api/reader-study/concordance", "description": "Compute reader-study concordance metrics" },
+      { "method": "POST", "path": "/api/delivery/:caseId/retry", "description": "Retry failed delivery" }
+    ],
+    "internalIntegration": [
+      { "method": "POST", "path": "/api/internal/ingest", "description": "Ingest case from internal system" },
+      { "method": "GET", "path": "/api/internal/inference-jobs", "description": "List inference jobs" },
+      { "method": "POST", "path": "/api/internal/inference-jobs/claim-next", "description": "Claim next inference job" },
+      { "method": "POST", "path": "/api/internal/inference-jobs/requeue-expired", "description": "Requeue expired jobs" },
+      { "method": "POST", "path": "/api/internal/inference-callback", "description": "Worker reports inference results" },
+      { "method": "GET", "path": "/api/internal/delivery-jobs", "description": "List delivery jobs" },
+      { "method": "POST", "path": "/api/internal/delivery-jobs/claim-next", "description": "Claim next delivery job" },
+      { "method": "POST", "path": "/api/internal/delivery-callback", "description": "Worker reports delivery result" },
+      { "method": "POST", "path": "/api/internal/dispatch/claim", "description": "HMAC-signed dispatch claim" },
+      { "method": "POST", "path": "/api/internal/dispatch/heartbeat", "description": "Renew dispatch lease" },
+      { "method": "POST", "path": "/api/internal/dispatch/fail", "description": "Report dispatch failure" }
+    ],
+    "operational": [
+      { "method": "GET", "path": "/", "description": "API identity, route map, and documentation links" },
+      { "method": "GET", "path": "/healthz", "description": "Liveness probe" },
+      { "method": "GET", "path": "/readyz", "description": "Readiness probe including persistence checks" },
+      { "method": "GET", "path": "/metrics", "description": "Prometheus metrics" },
+      { "method": "GET", "path": "/workbench", "description": "Built-in review workbench UI" }
+    ]
+  },
+  "evidence": {
+    "latestHostedValidatedHead": "3f42a4b8d3f912f9eb84ca0f6bf3e1d56f932170",
+    "previousHostedValidatedHead": "1e340b978bfa35a2ed339adcdb0d2add56cc08c3",
+    "wave15HostedValidatedHead": "04cb0a57d1e64f8a5cf03a22b4a5c60d37dffc3a",
+    "latestLocalValidationSnapshot": {
+      "date": "2026-04-14",
+      "installCommand": "npm ci",
+      "buildCommand": "npm run build",
+      "testCommand": "npm test",
+      "totalTests": 258,
+      "passing": 257,
+      "failing": 0,
+      "skipped": 1,
+      "notes": "Full-suite local rerun completed on 2026-04-14 above the latest hosted-validated head. This remains a date-bound local snapshot rather than a separately hosted GitHub Actions run."
+    }
+  }
+}

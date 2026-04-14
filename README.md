@@ -188,7 +188,8 @@ What remains next-wave direction rather than current runtime proof:
 
 ## API Surface
 
-### Public Endpoints (11 routes)
+<!-- AUTHORITY:README_API_SURFACE:START -->
+### Public Workflow Endpoints (13 routes)
 
 | Method | Path | Description |
 |---|---|---|
@@ -198,21 +199,23 @@ What remains next-wave direction rather than current runtime proof:
 | `POST` | `/api/cases/:caseId/review` | Submit clinician review |
 | `POST` | `/api/cases/:caseId/finalize` | Finalize a reviewed case |
 | `GET` | `/api/cases/:caseId/report` | Get the structured report |
+| `GET` | `/api/cases/:caseId/evidence-bundle` | Get the machine-readable evidence bundle for the case |
 | `GET` | `/api/cases/:caseId/exports/dicom-sr` | Export as DICOM Structured Report |
 | `GET` | `/api/cases/:caseId/exports/fhir-diagnostic-report` | Export as FHIR R4 DiagnosticReport |
 | `GET` | `/api/cases/:caseId/artifacts/:artifactId` | Download a derived artifact |
 | `GET` | `/api/operations/summary` | Operational dashboard data |
+| `POST` | `/api/reader-study/concordance` | Compute reader-study concordance metrics |
 | `POST` | `/api/delivery/:caseId/retry` | Retry failed delivery |
 
-### Internal Endpoints (12 routes)
+### Internal Integration Endpoints (11 routes)
 
 | Method | Path | Description |
 |---|---|---|
 | `POST` | `/api/internal/ingest` | Ingest case from internal system |
-| `POST` | `/api/internal/inference-callback` | Worker reports inference results |
 | `GET` | `/api/internal/inference-jobs` | List inference jobs |
 | `POST` | `/api/internal/inference-jobs/claim-next` | Claim next inference job |
 | `POST` | `/api/internal/inference-jobs/requeue-expired` | Requeue expired jobs |
+| `POST` | `/api/internal/inference-callback` | Worker reports inference results |
 | `GET` | `/api/internal/delivery-jobs` | List delivery jobs |
 | `POST` | `/api/internal/delivery-jobs/claim-next` | Claim next delivery job |
 | `POST` | `/api/internal/delivery-callback` | Worker reports delivery result |
@@ -220,15 +223,16 @@ What remains next-wave direction rather than current runtime proof:
 | `POST` | `/api/internal/dispatch/heartbeat` | Renew dispatch lease |
 | `POST` | `/api/internal/dispatch/fail` | Report dispatch failure |
 
-### Operational Endpoints
+### Operational Endpoints (5 routes)
 
 | Method | Path | Description |
 |---|---|---|
-| `GET` | `/` | API identity, route map, documentation links |
+| `GET` | `/` | API identity, route map, and documentation links |
 | `GET` | `/healthz` | Liveness probe |
-| `GET` | `/readyz` | Readiness probe (includes DB check) |
+| `GET` | `/readyz` | Readiness probe including persistence checks |
 | `GET` | `/metrics` | Prometheus metrics |
 | `GET` | `/workbench` | Built-in review workbench UI |
+<!-- AUTHORITY:README_API_SURFACE:END -->
 
 ---
 
@@ -405,7 +409,7 @@ This project is positioned under the **FDA Clinical Decision Support (CDS) Non-D
 3. **Clinician can independently review** — The underlying data (MRI study) remains accessible
 4. **Clinician-in-the-loop is enforced** — The state machine makes human review mandatory
 
-For EU markets, the project will require conformity assessment under both the **Medical Device Regulation (MDR)** and the **EU AI Act** (obligations apply from August 2, 2026).
+For EU markets, the project will require conformity assessment under both the **Medical Device Regulation (MDR)** and the **EU AI Act**. The AI Act has a general application date of **2 August 2026**, but Article 113 applies different sections on different timelines, so high-risk and sector-specific obligations should be read against the relevant staggered dates rather than as a single all-at-once switch.
 
 Key regulatory documents in the repository:
 - `docs/regulatory/pms-plan.md` — Post-market surveillance plan
@@ -423,7 +427,7 @@ Key regulatory documents in the repository:
 | **Wave 2: Compute** | ✅ Complete | Python worker, dispatch API, HMAC auth, lease renewal, NIfTI parsing, artifact persistence |
 | **Wave 3: Viewer** | 🔜 Next | OHIF v3.12 integration, Orthanc DICOMweb, segmentation overlays |
 | **Wave 4: Interoperability** | 🟡 Partial | DICOM SR JSON export (done), FHIR R4 export (done), binary DICOM Part-10 (planned) |
-| **Wave 5: Clinical Validation** | ⬜ Planned | MRMC reader study, 100 cases, 3-5 neuroradiologists |
+| **Wave 5: Clinical Validation** | ⬜ Planned | MRMC reader study, 100+ cases, 3-5 neuroradiologists, preregistered statistical analysis plan |
 
 See `docs/academic/action-plan.md` for the detailed technical roadmap.
 
@@ -866,7 +870,7 @@ mri-second-opinion/
 3. **Врач может независимо проверить** — Исходные данные (МРТ-исследование) остаются доступными
 4. **Участие врача обязательно** — Машина состояний делает рецензию обязательной
 
-Для рынков ЕС проект потребует оценки соответствия по **MDR (Регламент медицинских изделий)** и **EU AI Act** (обязательства с 2 августа 2026).
+Для рынков ЕС проект потребует оценки соответствия по **MDR (Регламент медицинских изделий)** и **EU AI Act**. Для AI Act корректнее говорить о **общей дате применения 2 августа 2026 года** с поэтапным вступлением отдельных разделов по статье 113, а не об одном универсальном сроке для всех обязанностей сразу.
 
 ---
 

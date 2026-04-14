@@ -173,7 +173,10 @@ export function resolveAuthenticatedReviewer(
     throw new WorkflowError(401, "Reviewer bearer token is missing or invalid", "UNAUTHORIZED");
   }
 
-  return verifyReviewerJwt(token, config.reviewerJwtSecret, config.clockSkewToleranceMs);
+  return verifyReviewerJwt(token, config.reviewerJwtSecret, {
+    clockSkewToleranceMs: config.clockSkewToleranceMs,
+    requiredAudience: config.reviewerJwksAudience,
+  });
 }
 
 export async function resolveAuthenticatedReviewerAsync(
@@ -193,7 +196,10 @@ export async function resolveAuthenticatedReviewerAsync(
   }
 
   // Fallback to HS256 (original behavior)
-  return verifyReviewerJwt(token, config.reviewerJwtSecret, config.clockSkewToleranceMs);
+  return verifyReviewerJwt(token, config.reviewerJwtSecret, {
+    clockSkewToleranceMs: config.clockSkewToleranceMs,
+    requiredAudience: config.reviewerJwksAudience,
+  });
 }
 
 export function resolveAuthorizedReviewer(
@@ -233,6 +239,18 @@ function extractBearerToken(authorizationHeader: string | undefined) {
   return parts[1];
 }
 
+function audienceMatches(payload: JwtPayload, requiredAudience: string | undefined) {
+  if (!requiredAudience) {
+    return true;
+  }
+
+  const aud = payload.aud;
+  return (
+    (typeof aud === "string" && aud === requiredAudience) ||
+    (Array.isArray(aud) && aud.includes(requiredAudience))
+  );
+}
+
 function peekJwtHeader(token: string): JwtHeader {
   const dotIndex = token.indexOf(".");
   if (dotIndex < 0) {
@@ -241,7 +259,11 @@ function peekJwtHeader(token: string): JwtHeader {
   return parseJwtJson(token.substring(0, dotIndex), "header") as JwtHeader;
 }
 
-function verifyReviewerJwt(token: string, secret: string, clockSkewToleranceMs = 0): AuthenticatedReviewer {
+function verifyReviewerJwt(
+  token: string,
+  secret: string,
+  options: { clockSkewToleranceMs?: number; requiredAudience?: string } = {},
+): AuthenticatedReviewer {
   const parts = token.split(".");
   if (parts.length !== 3) {
     throw new WorkflowError(401, "Reviewer bearer token is missing or invalid", "UNAUTHORIZED");
@@ -266,7 +288,11 @@ function verifyReviewerJwt(token: string, secret: string, clockSkewToleranceMs =
     throw new WorkflowError(401, "Reviewer bearer token is missing or invalid", "UNAUTHORIZED");
   }
 
-  assertPayloadExpiry(payload, clockSkewToleranceMs);
+  assertPayloadExpiry(payload, options.clockSkewToleranceMs);
+
+  if (!audienceMatches(payload, options.requiredAudience)) {
+    throw new WorkflowError(401, "Reviewer bearer token audience mismatch", "UNAUTHORIZED");
+  }
 
   const reviewerId = typeof payload.sub === "string" ? payload.sub.trim() : "";
   if (!reviewerId) {
@@ -328,11 +354,7 @@ async function verifyReviewerJwtRs256(
 
   // Validate audience if configured
   if (config.reviewerJwksAudience) {
-    const aud = payload.aud;
-    const audMatches =
-      (typeof aud === "string" && aud === config.reviewerJwksAudience) ||
-      (Array.isArray(aud) && aud.includes(config.reviewerJwksAudience));
-    if (!audMatches) {
+    if (!audienceMatches(payload, config.reviewerJwksAudience)) {
       throw new WorkflowError(401, "Reviewer bearer token audience mismatch", "UNAUTHORIZED");
     }
   }

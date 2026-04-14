@@ -8,28 +8,34 @@ This document is the evidence ledger that links a specific repository version to
 
 It satisfies Wave 5 exit gate 3: evidence ledger links runtime version, docs version, and validation results.
 
-## Version Linkage
+## Version Linkage And Test Evidence
 
+<!-- AUTHORITY:RELEASE_PACKET_SUMMARY:START -->
 | Dimension | Value |
 |-----------|-------|
 | Repository | mri-second-opinion |
-| Repository base head | `3f42a4b8d3f912f9eb84ca0f6bf3e1d56f932170` |
 | Latest hosted-validated head | `3f42a4b8d3f912f9eb84ca0f6bf3e1d56f932170` |
-| Local validation scope | finalized-only export gating, release-doc reconciliation, audit remediation, later validation plus persistence hardening (semantic payload-size limits, archive lookup graceful degradation, PostgreSQL payload round-trip preservation), the `s3-compatible` artifact backend plus post-A2 documentation reconciliation, artifact-boundary hardening for local-file and object-store retrieval, strict-by-default browser-origin hardening with explicit allowlist parsing plus public-route preflight enforcement, reviewer-role allowlisting for review/finalize mutations, local `dist` artifact cleanup, GitHub publication hardening with a Node 24 cross-platform install lane above the base head, fail-closed internal/operator route-auth hardening with protected-route helper reconciliation, reader-study metrics plus archive circuit-breaker coverage, reviewer-auth JWKS cache URL-scoping hardening, and the 2026-04-12 rerun on the current local head with green `npm ci`, `npm run build`, and `npm test`. Public GitHub-hosted `ci` and `docs-governance` remain last recorded on repository head `3f42a4b8d3f912f9eb84ca0f6bf3e1d56f932170` until the new head completes hosted workflows. The environment-gated `verify:postgres-bootstrap` probe still fails closed without `MRI_CASE_STORE_DATABASE_URL` or `DATABASE_URL`, which matches the documented bootstrap contract rather than signaling a runtime regression. |
+| Previous hosted-validated head | `1e340b978bfa35a2ed339adcdb0d2add56cc08c3` |
+| Latest documented local validation snapshot | 2026-04-14 |
+| Local validation commands | `npm ci` -> `npm run build` -> `npm test` |
+| Public workflow routes | 13 |
+| Internal integration routes | 11 |
+| Operational endpoints | 5 |
 | Node.js target | 24+ |
 | TypeScript target | ES2022 |
 | Test runner | `npm test` (`node --import tsx --test tests/**/*.test.ts`) |
 
-## Test Evidence
-
 | Metric | Value |
 |--------|-------|
-| Total tests | 239 |
-| Passing | 238 |
+| Total tests | 258 |
+| Passing | 257 |
 | Failing | 0 |
 | Skipped | 1 |
-| Duration | ~5.1 s |
-| Runner | `npm test` (`node --import tsx --test tests/**/*.test.ts`) |
+<!-- AUTHORITY:RELEASE_PACKET_SUMMARY:END -->
+
+## Local Validation Scope
+
+The latest documented local validation snapshot covers finalized-only export gating, release-doc reconciliation, audit remediation, later validation plus persistence hardening (semantic payload-size limits, archive lookup graceful degradation, PostgreSQL payload round-trip preservation), the `s3-compatible` artifact backend plus post-A2 documentation reconciliation, artifact-boundary hardening for local-file and object-store retrieval, strict-by-default browser-origin hardening with explicit allowlist parsing plus public-route preflight enforcement, reviewer-role allowlisting for review/finalize mutations, local `dist` artifact cleanup, GitHub publication hardening with a Node 24 cross-platform install lane above the hosted baseline, fail-closed internal/operator route-auth hardening with protected-route helper reconciliation, reader-study metrics plus archive circuit-breaker coverage, and reviewer-auth JWKS cache URL-scoping hardening.
 
 ### Test Coverage By Wave
 
@@ -53,6 +59,7 @@ It satisfies Wave 5 exit gate 3: evidence ledger links runtime version, docs ver
 | Route-auth fail-closed hardening | fail-closed internal/operator middleware behavior outside development, protected-route test-helper alignment, and auth-regression reconciliation | 166 |
 | Object-scoped authorization | tenant isolation (x-tenant-id), reviewer-scoped mutation denial, cross-tenant 403 enforcement across report/export/artifact routes, try/catch hardening on list and operations-summary routes | 177 |
 | Post-auth and dependency reproducibility hardening | reader-study metrics, archive circuit breaker, case pagination/presentation coverage, reviewer-auth JWKS cache URL scoping, and strict `npm ci` install proof | 239 |
+| Authority SSOT + reviewer-auth audience hardening | machine-readable route or validation truth sync, generated API surface verification, and HS256 reviewer audience enforcement | 258 |
 
 ## TypeScript Compilation
 
@@ -114,7 +121,7 @@ Status: clean (`npm run build` -> `tsc -p tsconfig.json`)
 
 | Validation dimension | Artifact | Status |
 |---------------------|----------|--------|
-| Functional correctness | 239 tests, 238 pass, 0 fail, 1 skipped | Complete |
+| Functional correctness | Current authority snapshot in `docs/authority/runtime-truth.json` (`258` tests, `257` pass, `0` fail, `1` skipped) | Complete |
 | Type safety | `npm run build` clean | Complete |
 | Interoperability | DICOM SR + FHIR R4 exports validated | Complete |
 | Regulatory readiness | 5-document governance pack | Complete |
@@ -139,6 +146,6 @@ Status: clean (`npm run build` -> `tsc -p tsconfig.json`)
 
 This validation packet establishes that the repository has a current local validation snapshot with clean build output, validated interoperability exports, a strengthened validation, persistence, artifact-boundary, browser-origin, reviewer-auth, and fail-closed route-auth regression net, and a documented regulatory and clinical evaluation path.
 
-The gaps are execution gaps, not specification gaps: the protocols and plans exist, the studies have not been run yet. Public GitHub-hosted workflow truth is still last captured for repository head `3f42a4b8d3f912f9eb84ca0f6bf3e1d56f932170`, while the present local hardening snapshot now sits above that head with strict `npm ci` proof and a larger regression net. The PostgreSQL bootstrap probe remains a deliberate env-gated check rather than part of the zero-config baseline, and the 2026-04-12 rerun confirms that it still fails closed when the connection string is absent.
+The gaps are execution gaps, not specification gaps: the protocols and plans exist, the studies have not been run yet. Public GitHub-hosted workflow truth is still last captured for repository head `3f42a4b8d3f912f9eb84ca0f6bf3e1d56f932170`, while the present local hardening snapshot now sits above that head with strict `npm ci` proof and a larger regression net. The PostgreSQL bootstrap probe remains a deliberate env-gated check rather than part of the zero-config baseline, and the 2026-04-14 rerun confirms that it still fails closed when the connection string is absent.
 
 This is the expected state for a pre-evaluation RUO system. The next milestone is reader study execution, which will populate the subgroup analysis and provide the first real clinical performance data.

@@ -15,11 +15,22 @@ Only these verdicts are allowed:
 
 `PUBLIC_GITHUB_READY`
 
+## Authority Snapshot
+
+<!-- AUTHORITY:GO_NO_GO_SNAPSHOT:START -->
+- Last reviewed: 2026-04-14
+- Current verdict: `PUBLIC_GITHUB_READY`
+- Latest hosted-validated head: `3f42a4b8d3f912f9eb84ca0f6bf3e1d56f932170`
+- Previous hosted-validated head: `1e340b978bfa35a2ed339adcdb0d2add56cc08c3`
+- Wave 1.5 hosted-validated head: `04cb0a57d1e64f8a5cf03a22b4a5c60d37dffc3a`
+- Latest documented local validation snapshot: 2026-04-14 via `npm ci`, `npm run build`, and `npm test` with 258 total tests, 257 passing, 0 failing, and 1 skipped
+<!-- AUTHORITY:GO_NO_GO_SNAPSHOT:END -->
+
 ## Why
 
-The seven launch gates in `../launch-readiness-checklist.md` remain satisfied for the conservative public-publication posture: the repository is independently buildable, the bounded workflow slice is locally verified, the built-in review workbench and synthetic demo path are real, public repository hygiene is hosted-proof-backed on the latest fully hosted-validated head, and documentation honesty is aligned to current runtime truth. The latest fully hosted-validated head is now `04cb0a57d1e64f8a5cf03a22b4a5c60d37dffc3a`, which closes Wave 1.5 for the current platform-sensitive and release-evidence baseline. The earlier runtime-bearing head `f6021ecdb45f4ecf5aece2c52cc0e6f462361d49` remains the Wave 2A artifact-persistence milestone, and `1e340b978bfa35a2ed339adcdb0d2add56cc08c3` remains the prior full hosted-validation milestone. Later docs-only evidence refresh commits do not reopen Wave 1.5 or the publication verdict unless they change platform-sensitive runtime behavior or GitHub workflow surfaces. Remaining gaps are still real, and they belong to higher product-maturity work rather than to safe public GitHub publication.
+The seven launch gates in `../launch-readiness-checklist.md` remain satisfied for the conservative public-publication posture: the repository is independently buildable, the bounded workflow slice is locally verified, the built-in review workbench and synthetic demo path are real, public repository hygiene is hosted-proof-backed on the latest documented hosted-validated head, and documentation honesty is aligned to the current runtime truth file rather than to duplicated counters spread across multiple authority docs.
 
-The 2026-04-08 object-scoped authorization hardening implements tenant-scoped isolation (x-tenant-id enforcement across all case/report/export/artifact routes), reviewer-scoped mutation authorization (assignedReviewerId matching on review/finalize), and closes the try/catch gaps on the list and operations-summary routes. The latest local full-suite rerun is green at 177 total tests, 176 passing, 0 failing, and 1 skipped.
+The current object-scoped authorization baseline still enforces tenant-scoped isolation across case, report, export, and artifact access paths together with reviewer-scoped mutation authorization on review and finalize flows. The remaining blockers for stronger readiness claims are higher-maturity concerns, not publication honesty concerns.
 
 The remaining blockers for stronger claims are:
 
@@ -35,7 +46,7 @@ They do not invalidate `PUBLIC_GITHUB_READY`, because this verdict is about safe
 
 For the current evidence ledger and the publication reconciliation lessons behind this verdict, use `../verification/launch-evidence-index.md` together with `../verification/publication-retrospective-audit-2026-03-27.md`, `../verification/runtime-and-production-boundary-revalidation-2026-04-03.md`, and `../verification/release-validation-packet.md`.
 
-The active evidence ledger records that `04cb0a57d1e64f8a5cf03a22b4a5c60d37dffc3a` is now the latest head with both hosted `ci` and `docs-governance` proof, while the current local validated head is `aef1acba8f96ba489af912743a72fda55e00f2ac` with clean build output plus a green 166-test local rerun. `f6021ecdb45f4ecf5aece2c52cc0e6f462361d49` remains the earlier runtime-bearing artifact-persistence milestone and `1e340b978bfa35a2ed339adcdb0d2add56cc08c3` remains the prior fully hosted-validated head. That closes Wave 1.5 without changing the repository-level verdict.
+The active evidence ledger records the latest hosted-validated head and the latest documented local full-suite snapshot in a single machine-readable source of truth. That closes the route-count and validation-metric drift that had started to appear between README, release docs, and roadmap docs.
 
 Supporting artifacts that exist now:
 

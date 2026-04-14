@@ -41,15 +41,15 @@ Confirmed locally from the standalone repository root.
 
 The current cross-platform install baseline is `npm ci`, followed by `npm run build`.
 
-This was revalidated locally on 2026-04-12 against the checked-in `package.json` and `package-lock.json`. The frozen-install path now succeeds cleanly under the current Node 24 baseline, which closes the earlier install-lane caveat that required `npm install --omit=optional`.
+This was revalidated locally on 2026-04-14 against the checked-in `package.json` and `package-lock.json`. The frozen-install path now succeeds cleanly under the current Node 24 baseline, which closes the earlier install-lane caveat that required `npm install --omit=optional`.
 
 ## 2. Full standalone test baseline
 
 Confirmed locally.
 
-The last full standalone suite snapshot remains `npm test` (`node --import tsx --test tests/**/*.test.ts`) with `239` total tests, `238` passing, `0` failures, and `1` skipped.
+The current full standalone suite snapshot is `npm test` (`node --import tsx --test tests/**/*.test.ts`) with `258` total tests, `257` passing, `0` failures, and `1` skipped.
 
-The focused 2026-04-14 hardening pass additionally revalidated `npm run build` together with targeted DICOMweb archive lookup tests, without reopening the claim that a fresh full-suite rerun was performed in this note.
+The 2026-04-14 rerun now includes the authority-truth regression pack and HS256 reviewer-audience validation in addition to the earlier DICOMweb archive lookup and persistence hardening coverage.
 
 The latest hardening pass extends the baseline with semantic payload-size validation, archive lookup graceful-degradation coverage across both custom and DICOMweb lookup modes, PostgreSQL payload round-trip preservation for Unicode content, multiline review comments, floating-point measurements, large sequence inventories, archive circuit-breaker coverage, pagination or presentation coverage for list/detail surfaces, reader-study metrics coverage, reviewer-auth JWKS coverage, plus prior hyper-deep audit (structured error logging, Dockerfile HEALTHCHECK, Helmet/CSP), runtime-hardening coverage, and GitHub publication-lane verification.
 
