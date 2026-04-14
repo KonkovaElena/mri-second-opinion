@@ -375,6 +375,27 @@ The v1 product should preserve, but not yet implement as core scope, these futur
 4. export paths to expert workstations such as 3D Slicer for advanced manual review
 5. longitudinal comparison services for prior-study-aware second-opinion workflows
 
+## Interoperability And Governance Upgrade Rails
+
+The April 2026 audit sets the next post-baseline closure priorities more explicitly.
+
+Those rails should be treated as dependency-ordered follow-on work rather than as implicit promises in the current baseline.
+
+### Interoperability rails
+
+1. close DICOMweb retrieve and publish seams across QIDO-RS, WADO-RS, and STOW-RS
+2. treat OHIF as the primary browser review surface once archive truth is present
+3. promote JSON report seams into standards-grade binary DICOM SR and DICOM SEG deliverables where workflow evidence supports them
+4. keep publication of AI-derived results compatible with hospital-side interoperability patterns such as IHE AI-results style integration rather than inventing repository-local payload dialects
+
+### Governance rails
+
+1. make release-facing evidence bundles first-class runtime outputs rather than manual reporting artifacts
+2. map validation and release claims to CLAIM, DECIDE-AI, GMLP, and NIST AI RMF style controls without overstating current compliance status
+3. keep reviewer oversight, package identity, model versioning, and export provenance visible in the control plane
+
+The practical backlog for these rails lives in `academic/2026-04-audit-execution-program.md`.
+
 ## Why This Stack Is Defensible
 
 1. Orthanc avoids PACS vendor lock-in

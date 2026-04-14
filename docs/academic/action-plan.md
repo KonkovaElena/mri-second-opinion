@@ -1,8 +1,8 @@
 ---
 title: "Детальный план до 100/100 качества"
 status: "active"
-version: "2.0.0"
-last_updated: "2026-03-31"
+version: "2.1.0"
+last_updated: "2026-04-14"
 tags: [roadmap, planning, action-plan, academic, 100-percent]
 role: documentation
 evidence_sources: |
@@ -73,6 +73,18 @@ evidence_sources: |
 4. demo verification pack и closure audits для текущего standalone baseline
 
 Текущие blockers до 100/100 остаются ниже по плану: artifact-store hardening follow-up, real ML pipeline, production-grade viewer/archive layer, binary export closure, lifecycle/regulatory pack expansion и выполненная clinical validation program.
+
+## Актуальная надстройка исполнения: аудит апреля 2026
+
+После локального закрытия базовых wave gates активная программа исполнения ведётся по `2026-04-audit-execution-program.md`.
+
+Роли документов теперь разделяются так:
+
+1. этот документ остаётся полным long-range reference до 100/100 качества
+2. `2026-04-audit-execution-program.md` задаёт практический порядок следующего engineering cycle
+3. `roadmap-and-validation.md` фиксирует, что audit-driven backlog не отменяет уже закрытую local baseline evidence
+
+Это сделано для того, чтобы не смешивать already-closed repository-local proof с новым interoperability, TEVV, и governance backlog.
 
 ---
 

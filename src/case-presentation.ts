@@ -120,6 +120,29 @@ export function presentReport(report: ReportPayload) {
   };
 }
 
+export function presentEvidenceBundle(caseRecord: CaseRecord) {
+  const detail = presentCaseDetail(caseRecord);
+  const report = caseRecord.report ? presentReport(caseRecord.report) : null;
+  const exports = caseRecord.report?.reviewStatus === "finalized"
+    ? {
+        dicomSr: `/api/cases/${caseRecord.caseId}/exports/dicom-sr`,
+        fhirDiagnosticReport: `/api/cases/${caseRecord.caseId}/exports/fhir-diagnostic-report`,
+      }
+    : {
+        dicomSr: null,
+        fhirDiagnosticReport: null,
+      };
+
+  return {
+    evidenceBundleSchemaVersion: "0.1.0",
+    case: detail,
+    report,
+    planEnvelope: caseRecord.planEnvelope,
+    evidenceCards: caseRecord.evidenceCards,
+    exports,
+  };
+}
+
 export function presentDeliveryJob(deliveryJob: DeliveryJobRecord) {
   return {
     jobId: deliveryJob.jobId,

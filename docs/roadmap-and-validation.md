@@ -18,11 +18,12 @@ Each phase should add one clinically meaningful capability family and the valida
 
 The remaining work is governed by a sequential wave program.
 
-Use `academic/action-plan.md` as the execution authority for:
+Use `academic/action-plan.md` as the long-range 100/100 reference and `academic/2026-04-audit-execution-program.md` as the next-cycle execution authority for:
 
 1. which wave is active now
 2. what blocks the next wave
 3. what the exit gate is for each wave
+4. which post-baseline audit epic should be worked next
 
 This document remains the validation and sequencing rationale, not the task tracker.
 
@@ -82,6 +83,21 @@ The next real gaps are no longer missing baseline surfaces. They are deeper hard
 3. production-grade viewer/archive runtime: OHIF plus Orthanc/DICOMweb deployment proof
 4. stronger export packaging: binary DICOM Part-10 and fuller FHIR bundle surface
 5. hosted evidence capture and executed clinical-validation program
+
+### April 2026 audit-driven execution program
+
+The next implementation cycle should use `academic/2026-04-audit-execution-program.md` as the practical backlog for post-baseline work.
+
+That program keeps local closure intact while sequencing the next dependency-ordered epics:
+
+1. imaging interoperability closure: DICOMweb plus archive truth and OHIF launch gating
+2. standards-grade report outputs: binary DICOM SR, DICOM SEG, and richer FHIR relationships
+3. worker packaging and model-family boundaries
+4. QC as a first-class product surface
+5. evidence, TEVV, and governance by design
+6. enterprise identity and object-scoped access controls
+
+It is an implementation overlay, not a claim that those surfaces already exist.
 
 ### Post-Publication Sequencing
 

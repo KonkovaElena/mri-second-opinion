@@ -8,16 +8,18 @@
 4. `POST /api/cases/:caseId/review`
 5. `POST /api/cases/:caseId/finalize`
 6. `GET /api/cases/:caseId/report`
-7. `GET /api/cases/:caseId/exports/dicom-sr`
-8. `GET /api/cases/:caseId/exports/fhir-diagnostic-report`
-9. `GET /api/cases/:caseId/artifacts/:artifactId`
-10. `GET /api/operations/summary`
-11. `POST /api/delivery/:caseId/retry`
-12. `GET /workbench`
-13. `GET /`
-14. `GET /healthz`
-15. `GET /readyz`
-16. `GET /metrics`
+7. `GET /api/cases/:caseId/evidence-bundle`
+8. `GET /api/cases/:caseId/exports/dicom-sr`
+9. `GET /api/cases/:caseId/exports/fhir-diagnostic-report`
+10. `GET /api/cases/:caseId/artifacts/:artifactId`
+11. `GET /api/operations/summary`
+12. `POST /api/reader-study/concordance`
+13. `POST /api/delivery/:caseId/retry`
+14. `GET /workbench`
+15. `GET /`
+16. `GET /healthz`
+17. `GET /readyz`
+18. `GET /metrics`
 
 ## Internal Integration Endpoints
 

@@ -10,6 +10,7 @@ import { MemoryCaseService } from "./cases";
 import {
   presentCaseDetail,
   presentDeliveryJob,
+  presentEvidenceBundle,
   presentInferenceExecutionContract,
   presentInferenceJob,
   presentCaseListItem,
@@ -496,6 +497,7 @@ export function createApp(config: AppConfig, options: CreateAppOptions = {}) {
           "POST /api/cases/:caseId/review",
           "POST /api/cases/:caseId/finalize",
           "GET /api/cases/:caseId/report",
+          "GET /api/cases/:caseId/evidence-bundle",
           "GET /api/cases/:caseId/exports/dicom-sr",
           "GET /api/cases/:caseId/exports/fhir-diagnostic-report",
           "GET /api/cases/:caseId/artifacts/:artifactId",
@@ -628,6 +630,16 @@ export function createApp(config: AppConfig, options: CreateAppOptions = {}) {
     try {
       const scope = resolveAccessScope(req);
       res.json({ report: presentReport(await caseService.getReport(req.params.caseId, scope)) });
+    } catch (error) {
+      handleError(res, error);
+    }
+  });
+
+  app.get("/api/cases/:caseId/evidence-bundle", async (req, res) => {
+    try {
+      const scope = resolveAccessScope(req);
+      const caseRecord = await caseService.getCase(req.params.caseId, scope);
+      res.json({ evidenceBundle: presentEvidenceBundle(caseRecord) });
     } catch (error) {
       handleError(res, error);
     }

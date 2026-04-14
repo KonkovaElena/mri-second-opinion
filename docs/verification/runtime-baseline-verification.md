@@ -87,11 +87,13 @@ The current merged runtime exposes and validates these public endpoints:
 4. `POST /api/cases/:caseId/review`
 5. `POST /api/cases/:caseId/finalize`
 6. `GET /api/cases/:caseId/report`
-7. `GET /api/cases/:caseId/exports/dicom-sr`
-8. `GET /api/cases/:caseId/exports/fhir-diagnostic-report`
-9. `GET /api/cases/:caseId/artifacts/:artifactId`
-10. `GET /api/operations/summary`
-11. `POST /api/delivery/:caseId/retry`
+7. `GET /api/cases/:caseId/evidence-bundle`
+8. `GET /api/cases/:caseId/exports/dicom-sr`
+9. `GET /api/cases/:caseId/exports/fhir-diagnostic-report`
+10. `GET /api/cases/:caseId/artifacts/:artifactId`
+11. `GET /api/operations/summary`
+12. `POST /api/reader-study/concordance`
+13. `POST /api/delivery/:caseId/retry`
 
 The current merged runtime also exposes these internal bounded-slice endpoints:
 
@@ -107,7 +109,7 @@ The current merged runtime also exposes these internal bounded-slice endpoints:
 10. `POST /api/internal/dispatch/heartbeat`
 11. `POST /api/internal/dispatch/fail`
 
-The route-level tests cover create, review, finalize, report retrieval, finalized-only export guards, artifact retrieval, delivery retry, inference completion, delivery completion, ingest idempotency, malformed JSON normalization, semantic request-size enforcement, archive-lookup degradation paths, HMAC-guarded dispatch claim or heartbeat rails, dispatch failure classification, durable job claims, and expired inference-job requeue behavior.
+The route-level tests cover create, review, finalize, report retrieval, evidence-bundle retrieval, finalized-only export guards, artifact retrieval, delivery retry, reader-study metrics, inference completion, delivery completion, ingest idempotency, malformed JSON normalization, semantic request-size enforcement, archive-lookup degradation paths, HMAC-guarded dispatch claim or heartbeat rails, dispatch failure classification, durable job claims, and expired inference-job requeue behavior.
 
 ## 5. Restart-safe local persistence
 
