@@ -1,0 +1,25 @@
+cff-version: 1.2.0
+title: "MRI Second Opinion"
+message: "If you use MRI Second Opinion in research or technical evaluation, please cite it using the metadata below."
+type: software
+version: "0.1.0"
+url: "https://github.com/KonkovaElena/mri-second-opinion"
+repository-code: "https://github.com/KonkovaElena/mri-second-opinion"
+license: MIT
+authors:
+  - family-names: Konkova
+    given-names: Elena
+abstract: >-
+  MRI Second Opinion is a clinician-in-the-loop workflow control plane for MRI
+  case intake, sequence-aware AI draft generation, mandatory human review,
+  finalization, delivery, and interoperable DICOM SR and FHIR export in a
+  research-use-only setting.
+keywords:
+  - mri
+  - medical-imaging
+  - radiology
+  - clinician-in-the-loop
+  - second-opinion
+  - dicom
+  - fhir
+  - research-use-only

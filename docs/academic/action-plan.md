@@ -28,8 +28,8 @@ evidence_sources: |
 | Параметр | Значение |
 |---|---|
 | TypeScript API | 33 tracked files, 9,709 LOC |
-| Python worker | 1 tracked file, 975 LOC |
-| Тесты | 25 tracked files, 12,660 LOC |
+| Python worker | 2 tracked files, 1,100 LOC |
+| Тесты | 26 tracked files, 12,825 LOC |
 | Документация | 97 tracked docs files (92 Markdown + 5 binary), ~2.8 MB |
 | Маршруты API | 24 (13 public workflow + 11 internal integration) |
 | Validation snapshot | 258 total / 257 passing / 0 failing / 1 skipped (2026-04-14) |

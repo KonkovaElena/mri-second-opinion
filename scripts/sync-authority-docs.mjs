@@ -134,7 +134,6 @@ function updateMarkdownFile(relativePath, transform) {
   writeOrCheck(absolutePath, nextContents);
 }
 
-const metrics = collectTrackedMetrics();
 const publicRoutes = ssot.routeSurface.publicWorkflow;
 const internalRoutes = ssot.routeSurface.internalIntegration;
 const operationalRoutes = ssot.routeSurface.operational;
@@ -148,6 +147,8 @@ const routeSummary = {
 };
 
 writeOrCheck(generatedApiSurfacePath, generateApiSurfaceTs());
+
+const metrics = collectTrackedMetrics();
 
 updateMarkdownFile("README.md", (contents) =>
   replaceBlock(

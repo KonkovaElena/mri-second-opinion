@@ -497,6 +497,7 @@ See `docs/academic/action-plan.md` for the detailed technical roadmap.
 - [Security Policy](SECURITY.md) — How to report vulnerabilities
 - [Code of Conduct](CODE_OF_CONDUCT.md) — Community standards
 - [Support](SUPPORT.md) — How to get help
+- [Citation](CITATION.cff) — How to cite the repository
 - [Governance](GOVERNANCE.md) — Project governance model
 
 ---
