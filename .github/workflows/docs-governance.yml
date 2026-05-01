@@ -6,6 +6,7 @@ on:
     paths:
       - 'package.json'
       - 'README.md'
+      - 'README.ru.md'
       - 'LICENSE'
       - '.github/CODEOWNERS'
       - 'CODE_OF_CONDUCT.md'
@@ -23,6 +24,7 @@ on:
     paths:
       - 'package.json'
       - 'README.md'
+      - 'README.ru.md'
       - 'LICENSE'
       - '.github/CODEOWNERS'
       - 'CODE_OF_CONDUCT.md'
@@ -45,12 +47,13 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@692973e3d937129bcbf40652eb9f2f61becf3332 # v4.2.2
 
       - name: Verify required root files
         run: |
           test -f package.json
           test -f README.md
+          test -f README.ru.md
           test -f LICENSE
           test -f CODE_OF_CONDUCT.md
           test -f SUPPORT.md

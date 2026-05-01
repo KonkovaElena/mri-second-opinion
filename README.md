@@ -1,5 +1,7 @@
 # MRI Second Opinion
 
+English | [Русский](README.ru.md)
+
 **Clinician-in-the-loop MRI second-opinion workflow system.**
 
 A standalone TypeScript API plus Python worker that orchestrate the full lifecycle of an MRI second-opinion case — from intake and quality checks through AI-assisted draft generation to mandatory clinician review, finalization, and delivery.
@@ -27,7 +29,7 @@ A standalone TypeScript API plus Python worker that orchestrate the full lifecyc
 - [Documentation](#documentation)
 - [Community](#community)
 - [License](#license)
-- [Русская версия](#русская-версия)
+- [Русская версия](README.ru.md)
 
 ---
 
